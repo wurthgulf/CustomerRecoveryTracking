@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Recovery Tracking App</title>
 
-    <!-- External Libraries (via CDN for single-file convenience) -->
+    <!-- External Libraries (via CDN for single-file convenience)  -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,6 +17,7 @@
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
 
     <style>
         :root {
@@ -141,7 +142,7 @@
         .data-table th { font-weight: 600; color: var(--secondary-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; }
         .data-table th:hover { color: var(--heading-color); }
         .data-table th .sort-icon { margin-left: 0.5rem; color: #94a3b8; }
-        .data-table tbody tr { transition: background-color: 0.2s; }
+        .data-table tbody tr { transition: background-color 0.2s; }
         .data-table tbody tr:hover { background-color: #f8fafc; }
         
         .action-buttons { display: flex; gap: 0.5rem; }
@@ -285,6 +286,47 @@
         .timeline-empty-state i { font-size: 2.5rem; margin-bottom: 0.75rem; }
         .timeline-empty-state p { font-weight: 500; }
 
+        /* New styles for enhanced features */
+        .search-container { position: relative; flex-grow: 1; }
+        .search-container .clear-search { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--secondary-color); cursor: pointer; }
+        .search-container input { padding-right: 2rem; }
+        
+        .badge { display: inline-block; padding: 0.25em 0.4em; font-size: 75%; font-weight: 700; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.25rem; }
+        .badge-pill { padding-right: 0.6em; padding-left: 0.6em; border-radius: 10rem; }
+        .badge-primary { color: #fff; background-color: var(--primary-color); }
+        .badge-secondary { color: #fff; background-color: var(--secondary-color); }
+        
+        .table-responsive { overflow-x: auto; }
+        .data-table td, .data-table th { white-space: nowrap; }
+        
+        .custom-tooltip { position: absolute; z-index: 1070; display: block; margin: 0; font-family: var(--font-family); font-style: normal; font-weight: 400; line-height: 1.5; text-align: left; text-decoration: none; text-shadow: none; text-transform: none; letter-spacing: normal; word-break: normal; word-spacing: normal; white-space: normal; line-break: auto; font-size: 0.875rem; }
+        .tooltip-inner { max-width: 200px; padding: 0.25rem 0.5rem; color: #fff; text-align: center; background-color: #000; border-radius: 0.25rem; }
+        
+        .chart-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .chart-toolbar .btn { padding: 0.4rem 0.75rem; font-size: 0.8rem; }
+        
+        .notification-badge { position: absolute; top: -5px; right: -5px; background-color: var(--danger-color); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; }
+        
+        .offline-indicator { position: fixed; bottom: 20px; left: 20px; background-color: var(--warning-color); color: #000; padding: 0.5rem 1rem; border-radius: var(--border-radius); z-index: 1050; display: none; }
+        .online-indicator { position: fixed; bottom: 20px; left: 20px; background-color: var(--success-color); color: white; padding: 0.5rem 1rem; border-radius: var(--border-radius); z-index: 1050; display: none; }
+        
+        .dark-mode { 
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --heading-color: #ffffff;
+            --border-color: #2d2d2d;
+            --sidebar-bg: #000000;
+            --sidebar-text: #b0b0b0;
+            --sidebar-text-hover: #ffffff;
+        }
+        .theme-switcher { position: fixed; bottom: 20px; right: 20px; z-index: 100; }
+        
+        .customer-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary-color); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 0.5rem; }
+        
+        .pagination { display: flex; justify-content: center; margin-top: 1rem; }
+        .pagination .btn { margin: 0 0.25rem; }
+        
         @media (max-width: 1200px) {
             #visits-page-layout { grid-template-columns: 1fr; }
         }
@@ -301,6 +343,9 @@
             .charts-grid, .stats-grid, .detail-grid, .form-grid { grid-template-columns: 1fr; }
             .modal-content { width: 95%; padding: 1.5rem; }
             h1 { font-size: 1.75rem; }
+            
+            .theme-switcher { bottom: 10px; right: 10px; }
+            .theme-switcher .btn { padding: 0.5rem; }
         }
     </style>
 </head>
@@ -310,6 +355,17 @@
         <p>Loading Data from Database...</p>
     </div>
     <div id="toast-container"></div>
+    
+    <div class="offline-indicator" id="offline-indicator">
+        <i class="fas fa-wifi"></i> You are currently offline
+    </div>
+    <div class="online-indicator" id="online-indicator">
+        <i class="fas fa-wifi"></i> Back online
+    </div>
+    
+    <div class="theme-switcher">
+        <button id="theme-toggle" class="btn btn-secondary"><i class="fas fa-moon"></i></button>
+    </div>
 
     <div id="login-wrapper">
         <div class="login-card">
@@ -340,6 +396,7 @@
                 <li class="nav-item admin-only"><a href="#reports" class="nav-link"><i class="fas fa-file-invoice"></i><span>Reports</span></a></li>
                 <li class="nav-item admin-only"><a href="#consultants" class="nav-link"><i class="fas fa-user-tie"></i><span>Consultants</span></a></li>
                 <li class="nav-item admin-only"><a href="#usermanagement" class="nav-link"><i class="fas fa-user-cog"></i><span>User Management</span></a></li>
+                <li class="nav-item"><a href="#" id="sync-button" class="nav-link"><i class="fas fa-sync-alt"></i><span>Sync Data</span></a></li>
             </ul>
             <div class="sidebar-footer">
                 <div id="user-info" style="padding: 0 1rem 1rem; color: var(--sidebar-text-hover);"></div>
@@ -402,7 +459,10 @@
                         </div>
                     </div>
                     <div class="filter-bar">
-                        <input type="text" id="search-input" placeholder="Search by Name, Emirate, etc...">
+                        <div class="search-container">
+                            <input type="text" id="search-input" placeholder="Search by Name, Emirate, etc...">
+                            <button class="clear-search" id="clear-search" style="display: none;"><i class="fas fa-times"></i></button>
+                        </div>
                         <select id="status-filter">
                             <option value="">All Statuses</option>
                             <option value="Active">Active</option>
@@ -410,8 +470,14 @@
                             <option value="Closed">Closed</option>
                             <option value="Priority">Priority Customers</option>
                         </select>
+                        <select id="payment-status-filter">
+                            <option value="">All Payment Statuses</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Overdue">Overdue</option>
+                        </select>
                     </div>
-                    <div style="overflow-x: auto;">
+                    <div class="table-responsive">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -426,6 +492,11 @@
                             </thead>
                             <tbody id="customer-table-body"></tbody>
                         </table>
+                    </div>
+                    <div class="pagination" id="customer-pagination">
+                        <button class="btn btn-sm btn-secondary" id="prev-page"><i class="fas fa-chevron-left"></i> Previous</button>
+                        <span id="page-info" style="margin: 0 1rem; display: flex; align-items: center;">Page 1 of 1</span>
+                        <button class="btn btn-sm btn-secondary" id="next-page">Next <i class="fas fa-chevron-right"></i></button>
                     </div>
                 </div>
             </div>
@@ -448,11 +519,16 @@
                                 <button id="apply-date-filter-btn" class="btn btn-sm btn-primary">Apply Range</button>
                             </div>
                         </div>
-                        <div style="overflow-x: auto;">
+                        <div class="table-responsive">
                             <table class="data-table">
                                 <thead><tr><th>Date</th><th>Company Name</th><th>Emirate</th><th>Sales Consultant</th><th>Actions</th></tr></thead>
                                 <tbody id="visit-list-body"></tbody>
                             </table>
+                        </div>
+                        <div class="pagination" id="visits-pagination">
+                            <button class="btn btn-sm btn-secondary" id="prev-visits-page"><i class="fas fa-chevron-left"></i> Previous</button>
+                            <span id="visits-page-info" style="margin: 0 1rem; display: flex; align-items: center;">Page 1 of 1</span>
+                            <button class="btn btn-sm btn-secondary" id="next-visits-page">Next <i class="fas fa-chevron-right"></i></button>
                         </div>
                     </div>
                 </div>
@@ -466,7 +542,16 @@
                     <div class="stat-card" style="border-color: var(--warning-color);"><div class="icon" style="background-color: var(--warning-color);"><i class="fas fa-user-tie"></i></div><div class="info"><h4>Top Sales Consultant</h4><p id="top-consultant-stat">N/A</p></div></div>
                 </div>
                 <div class="charts-grid">
-                    <div class="card"><div class="card-header"><h3>Recovery Performance (YTD)</h3></div><canvas id="recoveryPerformanceChart"></canvas></div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Recovery Performance (YTD)</h3>
+                            <div class="chart-toolbar">
+                                <button class="btn btn-sm btn-primary active" data-chart-type="bar">Bar</button>
+                                <button class="btn btn-sm btn-secondary" data-chart-type="line">Line</button>
+                            </div>
+                        </div>
+                        <canvas id="recoveryPerformanceChart"></canvas>
+                    </div>
                     <div class="card"><div class="card-header"><h3>Customers by Payment Status</h3></div><canvas id="paymentStatusChart"></canvas></div>
                 </div>
                 <div class="card"><div class="card-header"><h3>Sales Consultant Workload (Outstanding Amount)</h3></div><canvas id="consultantWorkloadChart"></canvas></div>
@@ -508,11 +593,12 @@
                         <h3>Sales Consultant Management</h3>
                         <button class="btn btn-primary" id="add-consultant-btn"><i class="fas fa-user-plus"></i> Add Consultant</button>
                     </div>
-                    <div style="overflow-x: auto;">
+                    <div class="table-responsive">
                         <table class="data-table">
                             <thead>
                                 <tr>
                                     <th>Consultant Name</th>
+                                    <th>Total Customers</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -528,7 +614,7 @@
                         <h3>User Management</h3>
                         <button class="btn btn-primary" id="add-user-btn"><i class="fas fa-user-plus"></i> Add User</button>
                     </div>
-                    <div style="overflow-x: auto;">
+                    <div class="table-responsive">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -560,7 +646,7 @@
                     <div class="form-group"><label for="area">Area</label><input type="text" id="area" required></div>
                     <div class="form-group"><label for="status">Status</label><select id="status" required><option value="Active">Active</option><option value="On Hold">On Hold</option><option value="Closed">Closed</option></select></div>
                     <div class="form-group"><label for="payment-status">Payment Status</label><select id="payment-status" required><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Overdue">Overdue</option></select></div>
-                    <div class="form-group"><label for="outstanding-amount">Outstanding Amount (AED)</label><input type="number" id="outstanding-amount" step="0.01" required></div>
+                    <div class="form-group"><label for="outstanding-amount">Outstanding Amount (AED)</label><input type="number" id="outstanding-amount" step="0.01" required min="0"></div>
                     <div class="form-group"><label for="sales-consultant">Sales Consultant</label><input list="consultants-list" type="text" id="sales-consultant" required></div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary close-btn">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div>
@@ -637,7 +723,7 @@
                 <input type="hidden" id="user-id">
                 <div class="form-group">
                     <label for="user-username">Username</label>
-                    <input type="text" id="user-username" required>
+                    <input type="text" id="user-username" required pattern="[A-Za-z0-9_]{3,20}" title="Username must be 3-20 characters and can only contain letters, numbers, and underscores">
                 </div>
                 <div class="form-group">
                     <label for="user-fullname">Full Name</label>
@@ -645,7 +731,7 @@
                 </div>
                 <div class="form-group">
                     <label for="user-password">Password</label>
-                    <input type="password" id="user-password" placeholder="Leave blank to keep unchanged">
+                    <input type="password" id="user-password" placeholder="Leave blank to keep unchanged" minlength="6">
                 </div>
                  <div class="form-group">
                     <label for="user-role">Role</label>
@@ -696,6 +782,12 @@
             let currentVisitFilter = 'upcoming';
             const loadingOverlay = document.getElementById('loading-overlay');
             let lastGeneratedReportData = [];
+            
+            // Pagination variables
+            let currentPage = 1;
+            let itemsPerPage = 10;
+            let currentVisitsPage = 1;
+            let visitsPerPage = 10;
 
             // --- GOOGLE SHEET DATA SYNC ---
             async function loadInitialData() {
@@ -705,6 +797,21 @@
                 }
                 loadingOverlay.style.display = 'flex';
                 try {
+                    // Check if we have cached data
+                    const cachedData = localStorage.getItem('appData');
+                    const cacheTimestamp = localStorage.getItem('appDataTimestamp');
+                    
+                    // Use cached data if it's less than 1 hour old
+                    if (cachedData && cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < 3600000) {
+                        const data = JSON.parse(cachedData);
+                        customers = data.customers || [];
+                        consultants = data.consultants || [];
+                        users = data.users || [];
+                        attendance = data.attendance || [];
+                        showToast('Loaded data from cache', 'info');
+                    }
+                    
+                    // Always try to fetch fresh data
                     const response = await fetch(SCRIPT_URL);
                     if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
                     const data = await response.json();
@@ -714,9 +821,19 @@
                     consultants = data.consultants || [];
                     users = data.users || [];
                     attendance = data.attendance || [];
+                    
+                    // Cache the data
+                    localStorage.setItem('appData', JSON.stringify({ customers, consultants, users, attendance }));
+                    localStorage.setItem('appDataTimestamp', Date.now().toString());
+                    
                 } catch (error) {
                     console.error('Failed to load initial data:', error);
                     showToast(`Error loading data: ${error.message}`, 'error');
+                    
+                    // If we don't have cached data, show error
+                    if (!localStorage.getItem('appData')) {
+                        showToast('No cached data available. Working offline.', 'error');
+                    }
                 } finally {
                     loadingOverlay.style.display = 'none';
                 }
@@ -734,10 +851,15 @@
                             payload: { customers, consultants, users }
                         })
                     });
-                    showToast('Data sync initiated!', 'success');
+                    
+                    // Update cache after successful sync
+                    localStorage.setItem('appData', JSON.stringify({ customers, consultants, users, attendance }));
+                    localStorage.setItem('appDataTimestamp', Date.now().toString());
+                    
+                    showToast('Data synced successfully!', 'success');
                 } catch (error) {
                     console.error('Sync failed:', error);
-                    showToast('Data sync failed. Check console for details.', 'error');
+                    showToast('Data sync failed. Working offline.', 'error');
                 }
             }
             
@@ -775,6 +897,24 @@
 
                 updateDatalists();
                 showPage('dashboard');
+                
+                // Initialize theme
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                setTheme(savedTheme);
+                
+                // Check online status
+                checkOnlineStatus();
+                window.addEventListener('online', () => {
+                    document.getElementById('online-indicator').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('online-indicator').style.display = 'none';
+                    }, 3000);
+                    checkOnlineStatus();
+                });
+                window.addEventListener('offline', () => {
+                    document.getElementById('offline-indicator').style.display = 'block';
+                    checkOnlineStatus();
+                });
             };
 
             const showLoginScreen = () => {
@@ -793,18 +933,32 @@
                 const password = document.getElementById('password').value;
                 const errorEl = document.getElementById('login-error');
                 
+                // Simple validation
+                if (!username || !password) {
+                    errorEl.textContent = 'Please enter both username and password.';
+                    return;
+                }
+                
                 const foundUser = users.find(u => u.username === username && u.password == password);
 
                 if (foundUser) {
                     sessionStorage.setItem('loggedInUser', JSON.stringify(foundUser));
                     errorEl.textContent = '';
                     initializeApp(foundUser);
+                    
+                    // Log login activity
+                    logActivity('login', `User ${foundUser.username} logged in`);
                 } else {
                     errorEl.textContent = 'Invalid username or password.';
                 }
             };
 
             const handleLogout = () => {
+                // Log logout activity
+                if (currentUser) {
+                    logActivity('logout', `User ${currentUser.username} logged out`);
+                }
+                
                 sessionStorage.removeItem('loggedInUser');
                 currentUser = null;
                 location.reload();
@@ -833,6 +987,41 @@
             };
             navLinks.forEach(l => l.addEventListener('click', (e) => { e.preventDefault(); showPage(e.currentTarget.getAttribute('href').substring(1)); }));
             
+            // Add sync button functionality
+            document.getElementById('sync-button').addEventListener('click', syncAllData);
+            
+            // Theme toggle functionality
+            document.getElementById('theme-toggle').addEventListener('click', () => {
+                const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                setTheme(newTheme);
+            });
+
+            function setTheme(theme) {
+                if (theme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                    document.getElementById('theme-toggle').innerHTML = '<i class="fas fa-sun"></i>';
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    document.getElementById('theme-toggle').innerHTML = '<i class="fas fa-moon"></i>';
+                    localStorage.setItem('theme', 'light');
+                }
+            }
+
+            function checkOnlineStatus() {
+                if (navigator.onLine) {
+                    document.getElementById('offline-indicator').style.display = 'none';
+                } else {
+                    document.getElementById('offline-indicator').style.display = 'block';
+                }
+            }
+
+            function logActivity(type, message) {
+                // In a real app, you would send this to a server
+                console.log(`[${new Date().toISOString()}] ${type.toUpperCase()}: ${message}`);
+            }
+
             const customerModal = document.getElementById('customerModal'); 
             const detailModal = document.getElementById('customerDetailModal'); 
             const scheduleModal = document.getElementById('scheduleVisitModal');
@@ -956,6 +1145,9 @@
                 syncAttendance(attendanceData);
                 updateAttendanceUI();
                 showToast('Day started successfully!');
+                
+                // Log activity
+                logActivity('attendance', `User ${currentUser.username} started their day at ${now}`);
             });
 
             endDayBtn.addEventListener('click', () => {
@@ -968,6 +1160,9 @@
                 syncAttendance(attendanceData);
                 updateAttendanceUI();
                 showToast('Day ended successfully!');
+                
+                // Log activity
+                logActivity('attendance', `User ${currentUser.username} ended their day at ${now}`);
             });
             
             function renderAnalyticsPage() {
@@ -987,18 +1182,36 @@
                 const recoveryByMonth = months.reduce((acc, m) => ({...acc, [m]: 0}), {}); 
                 const outstandingByMonth = months.reduce((acc, m) => ({...acc, [m]: 0}), {});
                 visibleCustomers.forEach(c => {
-                    if (c.dateRecovered) { 
-                        const month = new Date(c.dateRecovered).toLocaleString('default', { month: 'short' }); 
-                        if(recoveryByMonth[month] !== undefined) recoveryByMonth[month] += (c.recoveredAmount || 0); 
-                    }
-                    if (c.dateAdded) { 
-                        const month = new Date(c.dateAdded).toLocaleString('default', { month: 'short' }); 
-                        if(outstandingByMonth[month] !== undefined) outstandingByMonth[month] += c.outstandingAmount + (c.recoveredAmount || 0); 
-                    }
+                    if (c.dateRecovered) { const month = new Date(c.dateRecovered).toLocaleString('default', { month: 'short' }); if(recoveryByMonth[month] !== undefined) recoveryByMonth[month] += (c.recoveredAmount || 0); }
+                    if (c.dateAdded) { const month = new Date(c.dateAdded).toLocaleString('default', { month: 'short' }); if(outstandingByMonth[month] !== undefined) outstandingByMonth[month] += c.outstandingAmount + (c.recoveredAmount || 0); }
                 });
                 
                 destroyChart('recoveryPerformanceChart');
                 chartInstances['recoveryPerformanceChart'] = new Chart(document.getElementById('recoveryPerformanceChart'), { type: 'bar', data: { labels: months, datasets: [{ label: 'Total Value Added', data: Object.values(outstandingByMonth), backgroundColor: UI_COLORS.danger, borderRadius: 4 }, { label: 'Recovered', data: Object.values(recoveryByMonth), backgroundColor: UI_COLORS.success, borderRadius: 4 }] }, options: { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } } });
+                
+                // Add chart type switching
+                document.querySelectorAll('[data-chart-type]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const type = e.target.dataset.chartType;
+                        document.querySelectorAll('[data-chart-type]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        
+                        chartInstances['recoveryPerformanceChart'].destroy();
+                        chartInstances['recoveryPerformanceChart'] = new Chart(document.getElementById('recoveryPerformanceChart'), { 
+                            type: type, 
+                            data: { 
+                                labels: months, 
+                                datasets: [
+                                    { label: 'Total Value Added', data: Object.values(outstandingByMonth), backgroundColor: UI_COLORS.danger, borderRadius: 4 }, 
+                                    { label: 'Recovered', data: Object.values(recoveryByMonth), backgroundColor: UI_COLORS.success, borderRadius: 4 }
+                                ] 
+                            }, 
+                            options: { 
+                                scales: type === 'bar' ? { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } : { y: { beginAtZero: true } }
+                            } 
+                        });
+                    });
+                });
                 
                 destroyChart('paymentStatusChart');
                 const paymentStatusCounts = visibleCustomers.reduce((acc, c) => { acc[c.paymentStatus] = (acc[c.paymentStatus] || 0) + 1; return acc; }, {});
@@ -1025,13 +1238,25 @@
                 chartInstances['consultantWorkloadChart'] = new Chart(document.getElementById('consultantWorkloadChart'), { type: 'bar', data: { labels: Object.keys(workload), datasets: [{ label: 'Outstanding Amount', data: Object.values(workload), backgroundColor: UI_COLORS.info, borderRadius: 4 }] }, options: { indexAxis: 'y', scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } } });
             }
             
-            const customerTableBody = document.getElementById('customer-table-body'); const searchInput = document.getElementById('search-input'); const statusFilter = document.getElementById('status-filter');
+            const customerTableBody = document.getElementById('customer-table-body'); 
+            const searchInput = document.getElementById('search-input'); 
+            const statusFilter = document.getElementById('status-filter');
+            const paymentStatusFilter = document.getElementById('payment-status-filter');
+            const clearSearchBtn = document.getElementById('clear-search');
+            
             function renderCustomerList() {
                 const visibleCustomers = getVisibleCustomers();
-                const searchTerm = searchInput.value.toLowerCase(); const status = statusFilter.value;
+                const searchTerm = searchInput.value.toLowerCase(); 
+                const status = statusFilter.value;
+                const paymentStatus = paymentStatusFilter.value;
+                
                 let filtered = visibleCustomers.map(c => ({...c, priorityScore: calculatePriorityScore(c)}))
-                    .filter(c => (c.companyName.toLowerCase().includes(searchTerm) || c.emirate.toLowerCase().includes(searchTerm) || c.accountNumber.toLowerCase().includes(searchTerm)) && 
-                                   (status ? (status === 'Priority' ? c.priorityScore > 15 : c.status === status) : true));
+                    .filter(c => (c.companyName.toLowerCase().includes(searchTerm) || 
+                                 c.emirate.toLowerCase().includes(searchTerm) || 
+                                 c.accountNumber.toLowerCase().includes(searchTerm) ||
+                                 c.salesConsultant.toLowerCase().includes(searchTerm)) && 
+                                 (status ? (status === 'Priority' ? c.priorityScore > 15 : c.status === status) : true) &&
+                                 (paymentStatus ? c.paymentStatus === paymentStatus : true));
                 
                 filtered.sort((a, b) => {
                     const valA = a[sortConfig.key]; const valB = b[sortConfig.key];
@@ -1045,7 +1270,17 @@
                     else icon.className = 'fas fa-sort sort-icon';
                 });
 
-                customerTableBody.innerHTML = filtered.length ? filtered.map(c => {
+                // Pagination logic
+                const totalPages = Math.ceil(filtered.length / itemsPerPage);
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = Math.min(startIndex + itemsPerPage, filtered.length);
+                const paginatedData = filtered.slice(startIndex, endIndex);
+                
+                document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+                document.getElementById('prev-page').disabled = currentPage === 1;
+                document.getElementById('next-page').disabled = currentPage === totalPages || totalPages === 0;
+                
+                customerTableBody.innerHTML = paginatedData.length ? paginatedData.map(c => {
                     const score = c.priorityScore;
                     let priorityClass = 'low'; let priorityText = 'Low';
                     if (score > 25) { priorityClass = 'high'; priorityText = 'High'; } else if (score > 15) { priorityClass = 'medium'; priorityText = 'Medium'; }
@@ -1054,9 +1289,14 @@
                         <button class="action-btn edit-btn" title="Edit Customer"><i class="fas fa-pencil-alt"></i></button>
                         <button class="action-btn delete-btn" title="Delete Customer"><i class="fas fa-trash"></i></button>`;
 
+                    // Create avatar from company name initials
+                    const initials = c.companyName.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2);
+                    
                     return `
                     <tr data-id="${c.id}">
-                        <td>${c.accountNumber}</td><td>${c.companyName}</td><td>${c.emirate}</td>
+                        <td>${c.accountNumber}</td>
+                        <td><div style="display: flex; align-items: center;"><div class="customer-avatar">${initials}</div>${c.companyName}</div></td>
+                        <td>${c.emirate}</td>
                         <td>${formatCurrency(c.outstandingAmount)}</td>
                         <td><span class="priority-badge priority-${priorityClass}">${priorityText}</span></td>
                         <td><span class="status-badge status-${c.status.toLowerCase().replace(' ', '-')}">${c.status}</span></td>
@@ -1067,6 +1307,7 @@
                         </td>
                     </tr>`}).join('') : `<tr><td colspan="7"><div class="empty-state"><i class="fas fa-folder-open"></i>No customers found matching your criteria.</div></td></tr>`;
             }
+            
             document.querySelectorAll('#customers-page .data-table th').forEach(header => {
                 header.addEventListener('click', () => {
                     const key = header.dataset.sort;
@@ -1075,6 +1316,7 @@
                     renderCustomerList();
                 });
             });
+            
             customerTableBody.addEventListener('click', e => {
                 const btn = e.target.closest('button.action-btn'); if (!btn) return;
                 const id = e.target.closest('tr').dataset.id;
@@ -1085,11 +1327,53 @@
                     if (confirm('Are you sure you want to permanently delete this customer?')) {
                         customers = customers.filter(c => c.id != id);
                         syncAllData(); renderCustomerList(); showToast('Customer deleted successfully.', 'error');
+                        
+                        // Log activity
+                        logActivity('delete', `Customer ${id} was deleted`);
                     }
                 }
             });
-            [searchInput, statusFilter].forEach(el => el.addEventListener('input', renderCustomerList));
             
+            [searchInput, statusFilter, paymentStatusFilter].forEach(el => el.addEventListener('input', () => {
+                currentPage = 1;
+                renderCustomerList();
+            }));
+            
+            // Clear search functionality
+            searchInput.addEventListener('input', () => {
+                clearSearchBtn.style.display = searchInput.value ? 'block' : 'none';
+            });
+            
+            clearSearchBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                clearSearchBtn.style.display = 'none';
+                currentPage = 1;
+                renderCustomerList();
+            });
+            
+            // Pagination event listeners
+            document.getElementById('prev-page').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderCustomerList();
+                }
+            });
+            
+            document.getElementById('next-page').addEventListener('click', () => {
+                const visibleCustomers = getVisibleCustomers();
+                const filtered = visibleCustomers.map(c => ({...c, priorityScore: calculatePriorityScore(c)}))
+                    .filter(c => (c.companyName.toLowerCase().includes(searchInput.value.toLowerCase()) || 
+                                 c.emirate.toLowerCase().includes(searchInput.value.toLowerCase()) || 
+                                 c.accountNumber.toLowerCase().includes(searchInput.value.toLowerCase())) && 
+                                 (statusFilter.value ? (statusFilter.value === 'Priority' ? c.priorityScore > 15 : c.status === statusFilter.value) : true));
+                
+                const totalPages = Math.ceil(filtered.length / itemsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderCustomerList();
+                }
+            });
+
             function updateDatalists() {
                 const emirates = [...new Set(customers.map(c => c.emirate))];
                 document.getElementById('emirates-list').innerHTML = emirates.map(e => `<option value="${e}"></option>`).join('');
@@ -1132,6 +1416,13 @@
                     outstandingAmount: parseFloat(document.getElementById('outstanding-amount').value),
                     salesConsultant: document.getElementById('sales-consultant').value
                 };
+                
+                // Validation
+                if (data.outstandingAmount < 0) {
+                    showToast('Outstanding amount cannot be negative', 'error');
+                    return;
+                }
+                
                 if (id) {
                     const index = customers.findIndex(c => c.id == id); const original = customers[index];
                     if (data.status === 'Closed' && data.paymentStatus === 'Paid' && original.outstandingAmount > 0) {
@@ -1139,7 +1430,15 @@
                         data.outstandingAmount = 0; data.dateRecovered = new Date().toISOString();
                     }
                     customers[index] = { ...original, ...data };
-                } else { customers.push({ ...data, id: generateId('c'), notes: [], scheduledVisits: [], dateAdded: new Date().toISOString(), recoveredAmount: 0, dateRecovered: null }); }
+                    
+                    // Log activity
+                    logActivity('update', `Customer ${data.companyName} was updated`);
+                } else { 
+                    customers.push({ ...data, id: generateId('c'), notes: [], scheduledVisits: [], dateAdded: new Date().toISOString(), recoveredAmount: 0, dateRecovered: null }); 
+                    
+                    // Log activity
+                    logActivity('create', `Customer ${data.companyName} was created`);
+                }
                 syncAllData(); renderCustomerList(); closeModal(customerModal); showToast('Customer saved successfully!'); updateDatalists();
             });
             
@@ -1199,6 +1498,9 @@
                         renderCustomerList();
                         updateDatalists();
                         showToast(`Successfully added ${addedCount} new customers.`, "success");
+                        
+                        // Log activity
+                        logActivity('bulk-import', `${addedCount} customers were imported via CSV`);
                     }
                     closeModal(bulkAddModal);
                     fileInput.value = '';
@@ -1231,6 +1533,9 @@
                 if (visitDate) customer.scheduledVisits.push(visitDate);
                 syncAllData(); renderNotesHistory(customer); noteEditor.setContents([]); document.getElementById('scheduled-visit-date').value = '';
                 showToast('Note and schedule updated.');
+                
+                // Log activity
+                logActivity('note', `Note added to customer ${customer.companyName}`);
             });
             
             function openScheduleModal(id) {
@@ -1260,6 +1565,9 @@
                 syncAllData(); showToast(`Visit scheduled for ${customer.companyName}`);
                 closeModal(scheduleModal);
                 if(document.getElementById('visits-page').classList.contains('active')) renderVisitsPage();
+                
+                // Log activity
+                logActivity('schedule', `Visit scheduled for customer ${customer.companyName} on ${visitDate}`);
             });
 
             function renderVisitsPage() {
@@ -1282,6 +1590,7 @@
                         currentVisitFilter = btn.dataset.filter;
                         document.getElementById('visit-start-date').value = '';
                         document.getElementById('visit-end-date').value = '';
+                        currentVisitsPage = 1;
                         renderVisitList();
                     });
                 });
@@ -1289,6 +1598,7 @@
                 document.getElementById('apply-date-filter-btn').addEventListener('click', () => {
                     quickFilterButtons.forEach(b => b.classList.remove('active'));
                     currentVisitFilter = 'range';
+                    currentVisitsPage = 1;
                     renderVisitList();
                 });
 
@@ -1346,8 +1656,18 @@
                 }
 
                 filteredVisits.sort((a, b) => new Date(a.date.replace(/-/g, '/')) - new Date(b.date.replace(/-/g, '/')));
+                
+                // Pagination for visits
+                const totalPages = Math.ceil(filteredVisits.length / visitsPerPage);
+                const startIndex = (currentVisitsPage - 1) * visitsPerPage;
+                const endIndex = Math.min(startIndex + visitsPerPage, filteredVisits.length);
+                const paginatedVisits = filteredVisits.slice(startIndex, endIndex);
+                
+                document.getElementById('visits-page-info').textContent = `Page ${currentVisitsPage} of ${totalPages}`;
+                document.getElementById('prev-visits-page').disabled = currentVisitsPage === 1;
+                document.getElementById('next-visits-page').disabled = currentVisitsPage === totalPages || totalPages === 0;
 
-                visitListBody.innerHTML = filteredVisits.length ? filteredVisits.map(v => {
+                visitListBody.innerHTML = paginatedVisits.length ? paginatedVisits.map(v => {
                     const visitDate = new Date(v.date.replace(/-/g, '/'));
                     let rowClass = '';
                     if (visitDate < today) rowClass = 'overdue';
@@ -1357,10 +1677,70 @@
                                 <td>${formatDate(v.date)}</td><td>${v.companyName}</td><td>${v.emirate}</td>
                                 <td>${v.salesConsultant}</td>
                                 <td class="action-buttons"><button class="action-btn view-btn" title="View Customer"><i class="fas fa-eye"></i></button></td>
-                            </tr>`;
-                }).join('') : `<tr><td colspan="5"><div class="empty-state"><i class="fas fa-calendar-times"></i>No visits match the current filter.</div></td></tr>`;
+                            </tr>`}).join('') : `<tr><td colspan="5"><div class="empty-state"><i class="fas fa-calendar-times"></i>No visits match the current filter.</div></td></tr>`;
             }
+            
             document.getElementById('visit-list-body').addEventListener('click', e => { if (e.target.closest('button.view-btn')) openDetailModal(e.target.closest('tr').dataset.id); });
+            
+            // Visits pagination event listeners
+            document.getElementById('prev-visits-page').addEventListener('click', () => {
+                if (currentVisitsPage > 1) {
+                    currentVisitsPage--;
+                    renderVisitList();
+                }
+            });
+            
+            document.getElementById('next-visits-page').addEventListener('click', () => {
+                const visibleCustomers = getVisibleCustomers();
+                const allVisits = visibleCustomers.flatMap(c => 
+                    (c.scheduledVisits || []).map(v => ({ 
+                        date: v, companyName: c.companyName, emirate: c.emirate, 
+                        salesConsultant: c.salesConsultant, customerId: c.id 
+                    }))
+                );
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                let filteredVisits = [];
+                
+                // Reapply current filter
+                if (currentVisitFilter === 'range') {
+                    const startDateVal = document.getElementById('visit-start-date').value;
+                    const endDateVal = document.getElementById('visit-end-date').value;
+                    if (startDateVal && endDateVal) {
+                        const start = new Date(startDateVal.replace(/-/g, '/'));
+                        const end = new Date(endDateVal.replace(/-/g, '/'));
+                        start.setHours(0, 0, 0, 0);
+                        end.setHours(23, 59, 59, 999);
+                        filteredVisits = allVisits.filter(v => {
+                            const visitDate = new Date(v.date.replace(/-/g, '/'));
+                            return visitDate >= start && visitDate <= end;
+                        });
+                    }
+                } else {
+                    switch (currentVisitFilter) {
+                        case 'overdue':
+                            filteredVisits = allVisits.filter(v => new Date(v.date.replace(/-/g, '/')) < today);
+                            break;
+                        case 'today':
+                            filteredVisits = allVisits.filter(v => new Date(v.date.replace(/-/g, '/')).getTime() === today.getTime());
+                            break;
+                        case 'upcoming':
+                            filteredVisits = allVisits.filter(v => new Date(v.date.replace(/-/g, '/')) >= today);
+                            break;
+                        case 'all':
+                        default:
+                            filteredVisits = allVisits;
+                            break;
+                    }
+                }
+                
+                const totalPages = Math.ceil(filteredVisits.length / visitsPerPage);
+                if (currentVisitsPage < totalPages) {
+                    currentVisitsPage++;
+                    renderVisitList();
+                }
+            });
 
             let lastActivityReportData = {};
             function renderReportsPage() {
@@ -1454,10 +1834,8 @@
             });
 
             document.getElementById('export-activity-pdf-btn').addEventListener('click', () => {
-                // *** FIX: Correct way to instantiate jsPDF and call autoTable ***
-                const jsPDF = window.jspdf.jsPDF; 
+                const { jsPDF } = jspdf; 
                 const doc = new jsPDF();
-
                 const { consultantName, reportDateStr, timelineEvents } = lastActivityReportData;
                 doc.setFontSize(18); doc.text("Daily Activity Report", 14, 22); doc.setFontSize(11);
                 doc.text(`Consultant: ${consultantName}`, 14, 32); doc.text(`Date: ${formatDate(reportDateStr)}`, 14, 38);
@@ -1467,13 +1845,14 @@
                     return [event.timestamp.toLocaleTimeString(), event.data.companyName, event.data.emirate, event.data.noteText];
                 });
                 
-                doc.autoTable({ 
+                // CHANGE: Call autoTable as a static function
+                jspdf.autoTable(doc, { 
                     head: [['Time', 'Activity/Customer', 'Emirate', 'Notes']], 
                     body: bodyData, 
                     startY: 45, 
                     theme: 'grid', 
                     styles: { fontSize: 8 }, 
-                    headStyles: { fillColor: [220, 53, 69] } 
+                    headStyles: { fillColor: [22, 160, 133] } 
                 });
 
                 doc.save(`Activity_Report_${consultantName}_${reportDateStr}.pdf`);
@@ -1555,8 +1934,7 @@
             }
 
             function exportReportToPDF() {
-                // *** FIX: Correct way to instantiate jsPDF and call autoTable ***
-                const jsPDF = window.jspdf.jsPDF;
+                const { jsPDF } = jspdf;
                 const doc = new jsPDF();
                 
                 doc.setFontSize(18);
@@ -1569,7 +1947,8 @@
                     formatCurrency(c.outstandingAmount), c.status, c.paymentStatus
                 ]);
 
-                doc.autoTable({
+                // CHANGE: Call autoTable as a static function
+                jspdf.autoTable(doc, {
                     head: head,
                     body: body,
                     startY: 30,
@@ -1597,14 +1976,17 @@
                     </tr>`).join('');
             }
             function renderConsultantsPage() {
-                consultantTableBody.innerHTML = consultants.map(c => `
+                consultantTableBody.innerHTML = consultants.map(c => {
+                    const customerCount = customers.filter(cust => cust.salesConsultant === c.name).length;
+                    return `
                     <tr data-id="${c.id}">
                         <td>${c.name}</td>
+                        <td>${customerCount}</td>
                         <td class="action-buttons">
                             <button class="action-btn edit-btn" title="Edit Consultant"><i class="fas fa-pencil-alt"></i></button>
                             <button class="action-btn delete-btn" title="Delete Consultant"><i class="fas fa-trash"></i></button>
                         </td>
-                    </tr>`).join('');
+                    </tr>`}).join('');
             }
 
             document.getElementById('add-user-btn').addEventListener('click', () => openUserForm());
@@ -1639,7 +2021,7 @@
                     } else consultantNameGroup.style.display = 'none';
                 } else {
                     userModalTitle.textContent = "Add New User"; usernameInput.readOnly = false;
-                    passwordInput.required = true; passwordInput.placeholder = "Enter password";
+                    passwordInput.required = true; passwordInput.placeholder = "Enter password (min 6 characters)";
                     consultantNameGroup.style.display = document.getElementById('user-role').value === 'user' ? 'block' : 'none';
                 }
                 openModal(userModal);
@@ -1650,7 +2032,18 @@
                 const username = document.getElementById('user-username').value;
                 const password = document.getElementById('user-password').value;
                 const role = document.getElementById('user-role').value;
-                if (!id && users.some(u => u.username === username)) { showToast('Username already exists.', 'error'); return; }
+                
+                // Validation
+                if (!id && users.some(u => u.username === username)) { 
+                    showToast('Username already exists.', 'error'); 
+                    return; 
+                }
+                
+                if (!id && (!password || password.length < 6)) {
+                    showToast('Password must be at least 6 characters.', 'error');
+                    return;
+                }
+                
                 const userData = {
                     username: username, name: document.getElementById('user-fullname').value, role: role,
                     consultantName: role === 'user' ? document.getElementById('user-consultant-name').value : ''
@@ -1659,10 +2052,15 @@
                 if (id) {
                     const userIndex = users.findIndex(u => u.id == parseInt(id));
                     users[userIndex] = { ...users[userIndex], ...userData };
+                    
+                    // Log activity
+                    logActivity('user-update', `User ${username} was updated`);
                 } else {
                     userData.id = Date.now();
-                    if (!userData.password) { showToast('Password is required for new users.', 'error'); return; }
                     users.push(userData);
+                    
+                    // Log activity
+                    logActivity('user-create', `User ${username} was created`);
                 }
                 syncAllData(); renderUserManagementPage(); closeModal(userModal); showToast('User saved successfully!');
             });
@@ -1673,6 +2071,9 @@
                 if (confirm(`Are you sure you want to delete user: ${user.username}?`)) {
                     users = users.filter(u => u.id !== id);
                     syncAllData(); renderUserManagementPage(); showToast(`User ${user.username} deleted.`, 'error');
+                    
+                    // Log activity
+                    logActivity('user-delete', `User ${user.username} was deleted`);
                 }
             }
             
@@ -1693,7 +2094,15 @@
                 if (id) {
                     const index = consultants.findIndex(c => c.id === id);
                     consultants[index].name = name;
-                } else consultants.push({ id: generateId('con'), name: name });
+                    
+                    // Log activity
+                    logActivity('consultant-update', `Consultant ${name} was updated`);
+                } else {
+                    consultants.push({ id: generateId('con'), name: name });
+                    
+                    // Log activity
+                    logActivity('consultant-create', `Consultant ${name} was created`);
+                }
                 syncAllData(); renderConsultantsPage(); updateDatalists(); closeModal(consultantModal); showToast('Consultant saved successfully!');
             });
 
@@ -1702,6 +2111,9 @@
                 if (confirm(`Are you sure you want to delete consultant: ${consultant.name}?`)) {
                     consultants = consultants.filter(c => c.id !== id);
                     syncAllData(); renderConsultantsPage(); updateDatalists(); showToast(`Consultant ${consultant.name} deleted.`, 'error');
+                    
+                    // Log activity
+                    logActivity('consultant-delete', `Consultant ${consultant.name} was deleted`);
                 }
             }
             
