@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Recovery Tracking App</title>
+
+    <!-- External Libraries (via CDN for single-file convenience) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.autotable.min.js"></script>
+
+    <style>
+        :root {
+            /* --- Red, Black, & White Theme --- */
+            --primary-color: #dc3545;      /* Red */
+            --primary-hover: #c82333;      /* Darker Red */
+            --secondary-color: #6c757d;    /* Medium Gray */
+            --bg-color: #f8f9fa;           /* Off-white background */
+            --sidebar-bg: #212529;         /* Near-black */
+            --sidebar-text: #adb5bd;       /* Light Gray for sidebar text */
+            --sidebar-text-hover: #ffffff; /* White */
+            --card-bg: #ffffff;            /* White */
+            --text-color: #495057;         /* Dark Gray for body text */
+            --heading-color: #212529;      /* Near-black for headings */
+            --border-color: #dee2e6;       /* Light Gray for borders */
+
+            /* Status & Action Colors */
+            --success-color: #28a745; /* Green */
+            --warning-color: #ffc107; /* Yellow */
+            --danger-color: #dc3545;  /* Red (same as primary) */
+            --info-color: #6c757d;    /* Gray (same as secondary) */
+
+            /* Shared settings */
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --border-radius: 0.5rem;
+            --font-family: 'Inter', sans-serif;
+            
+            /* Action Button Specifics (Simplified) */
+            --action-btn-view: var(--secondary-color);
+            --action-btn-edit: var(--secondary-color);
+            --action-btn-schedule: var(--success-color);
+            --action-btn-delete: var(--danger-color);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: 16px; }
+        body {
+            font-family: var(--font-family); background-color: var(--bg-color); color: var(--text-color);
+            display: flex; height: 100vh; overflow: hidden;
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+        }
+        h1 { font-size: 2.25rem; margin-bottom: 1.5rem; font-weight: 700; color: var(--heading-color); }
+        .sidebar {
+            width: 260px; background-color: var(--sidebar-bg); color: var(--sidebar-text);
+            padding: 1.5rem 0; display: flex; flex-direction: column; transition: width 0.3s ease; border-right: 1px solid #495057;
+        }
+        .sidebar-header { text-align: center; padding: 0 1.5rem 1.5rem; }
+        .sidebar-header h2 { color: var(--sidebar-text-hover); font-size: 1.5rem; font-weight: 600; }
+        .sidebar-header i { margin-right: 0.75rem; color: var(--primary-color); }
+        .nav-menu { list-style: none; flex-grow: 1; margin-top: 1rem; padding: 0 1rem; }
+        .nav-item a {
+            display: flex; align-items: center; padding: 0.75rem 1rem; margin-bottom: 0.5rem;
+            text-decoration: none; color: var(--sidebar-text); border-radius: var(--border-radius);
+            transition: background-color 0.2s, color 0.2s; font-weight: 500;
+        }
+        .nav-item a:hover { background-color: #495057; color: var(--sidebar-text-hover); }
+        .nav-item a.active { background-color: var(--primary-color); color: #fff; font-weight: 600; box-shadow: var(--shadow); }
+        .nav-item a i { width: 25px; text-align: center; margin-right: 1rem; font-size: 1.1rem; }
+        .main-content { flex-grow: 1; padding: 2rem; overflow-y: auto; }
+        .page { display: none; animation: fadeIn 0.5s ease-in-out; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .card { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .card-header .actions { display: flex; gap: 0.75rem; }
+        .card-header h3 { font-size: 1.25rem; font-weight: 600; color: var(--heading-color); }
+        .btn {
+            padding: 0.65rem 1.25rem; border: none; border-radius: var(--border-radius); cursor: pointer;
+            font-size: 0.9rem; font-weight: 600; transition: all 0.2s; display: inline-flex;
+            align-items: center; gap: 0.5rem;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+        .btn:active { transform: translateY(0); box-shadow: var(--shadow); }
+        .btn-primary { background-color: var(--primary-color); color: #fff; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-danger { background-color: var(--danger-color); color: #fff; }
+        .btn-danger:hover { background-color: #c82333; }
+        .btn-success { background-color: var(--success-color); color: #fff; }
+        .btn-success:hover { background-color: #218838; }
+        .btn-secondary { background-color: var(--secondary-color); color: #fff; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        .btn:disabled { background-color: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+
+
+        .status-badge, .priority-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-active { background-color: #d1fae5; color: #065f46; }
+        .status-on-hold { background-color: #fff3cd; color: #856404; }
+        .status-closed { background-color: #e9ecef; color: #495057; }
+        .priority-high { background-color: #f8d7da; color: #721c24; }
+        .priority-medium { background-color: #fff3cd; color: #856404; }
+        .priority-low { background-color: #d4edda; color: #155724; }
+        .payment-paid { color: var(--success-color); font-weight: 600; }
+        .payment-pending { color: var(--warning-color); font-weight: 600; }
+        .payment-overdue { color: var(--danger-color); font-weight: 600; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card {
+            background: var(--card-bg); padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--shadow);
+            display: flex; align-items: center; border-left: 5px solid transparent; transition: all 0.2s ease;
+        }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+        .stat-card:nth-child(1) { border-color: var(--primary-color); }
+        .stat-card:nth-child(2) { border-color: var(--danger-color); }
+        .stat-card:nth-child(3) { border-color: var(--success-color); }
+        .stat-card:nth-child(4) { border-color: var(--info-color); }
+        .stat-card .icon { font-size: 2rem; padding: 0.75rem; border-radius: 50%; margin-right: 1rem; color: #fff; }
+        .stat-card .info h4 { font-size: 0.9rem; font-weight: 500; color: var(--secondary-color); margin-bottom: 0.25rem; }
+        .stat-card .info p { font-size: 1.75rem; font-weight: 700; color: var(--heading-color); }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; }
+        
+        .filter-bar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .filter-bar input, .filter-bar select {
+            padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);
+            flex-grow: 1; font-size: 1rem; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .filter-bar input:focus, .filter-bar select:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2); }
+        
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .data-table thead { background-color: #f8fafc; }
+        .data-table th { font-weight: 600; color: var(--secondary-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; }
+        .data-table th:hover { color: var(--heading-color); }
+        .data-table th .sort-icon { margin-left: 0.5rem; color: #94a3b8; }
+        .data-table tbody tr { transition: background-color: 0.2s; }
+        .data-table tbody tr:hover { background-color: #f8fafc; }
+        
+        .action-buttons { display: flex; gap: 0.5rem; }
+        .action-btn {
+            border: none; border-radius: 0.5rem; width: 40px; height: 40px; color: #fff;
+            display: inline-flex; justify-content: center; align-items: center;
+            font-size: 1rem; cursor: pointer; transition: all 0.2s;
+        }
+        .action-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+        .action-btn.view-btn, .action-btn.edit-btn { background-color: var(--action-btn-view); }
+        .action-btn.schedule-btn { background-color: var(--action-btn-schedule); }
+        .action-btn.delete-btn { background-color: var(--action-btn-delete); }
+        
+        .empty-state { text-align: center; padding: 3rem; color: var(--secondary-color); }
+        .empty-state i { font-size: 3rem; margin-bottom: 1rem; display: block; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal.active { display: flex; animation: fadeIn 0.3s; }
+        .modal-content { background-color: #fefefe; margin: auto; padding: 2rem; border-radius: var(--border-radius); box-shadow: var(--shadow-lg); width: 90%; max-width: 800px; animation: slideIn 0.3s; }
+        .modal-content.small { max-width: 500px; }
+        @keyframes slideIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        .modal-header h2 { color: var(--heading-color); font-weight: 600; }
+        .close-btn { color: #9ca3af; font-size: 24px; font-weight: bold; cursor: pointer; background: #f3f4f6; border-radius: 50%; width: 32px; height: 32px; display: flex; justify-content: center; align-items: center; transition: all 0.2s; }
+        .close-btn:hover { color: var(--heading-color); background: #e5e7eb; transform: rotate(90deg); }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); font-size: 1rem; transition: border-color 0.2s, box-shadow 0.2s; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2); }
+        .form-group textarea { resize: vertical; }
+        .modal-footer { margin-top: 2rem; text-align: right; border-top: 1px solid var(--border-color); padding-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem; }
+        
+        #customerDetailModal .modal-content { max-width: 900px; }
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .detail-item { background: #f8fafc; padding: 1rem; border-radius: var(--border-radius); border: 1px solid var(--border-color); }
+        .detail-item strong { display: block; color: var(--secondary-color); font-size: 0.8rem; margin-bottom: 0.25rem; font-weight: 500; }
+        .detail-item span { font-weight: 600; font-size: 1rem; }
+        #notes-history { max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--border-radius); margin-bottom: 1.5rem; background: #f8fafc; }
+        .note-item { padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px dashed #d1d5db; } .note-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .note-meta { font-size: 0.8rem; color: var(--secondary-color); margin-bottom: 0.5rem; }
+        .note-content p, .note-content { margin: 0; line-height: 1.6; }
+        #note-editor-container { height: 150px; border-radius: var(--border-radius); }
+        .ql-toolbar { border-top-left-radius: var(--border-radius); border-top-right-radius: var(--border-radius); }
+        .ql-container { border-bottom-left-radius: var(--border-radius); border-bottom-right-radius: var(--border-radius); }
+
+        #visits-page-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; }
+        #calendar { height: 60vh; --fc-border-color: var(--border-color); --fc-today-bg-color: rgba(220, 53, 69, 0.1); --fc-event-bg-color: var(--primary-color); --fc-event-border-color: var(--primary-color); }
+        .fc-event { cursor: pointer; font-weight: 500; }
+        
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000; }
+        .toast {
+            background-color: #fff; color: var(--text-color); padding: 1rem 1.5rem;
+            border-radius: var(--border-radius); box-shadow: var(--shadow-lg); display: flex;
+            align-items: center; gap: 1rem; margin-bottom: 1rem; border-left: 5px solid;
+            transform: translateX(120%); animation: slideInToast 0.5s forwards, fadeOutToast 0.5s 4s forwards;
+        }
+        .toast-success { border-color: var(--success-color); } .toast-success .toast-icon { color: var(--success-color); }
+        .toast-error { border-color: var(--danger-color); } .toast-error .toast-icon { color: var(--danger-color); }
+        .toast-info { border-color: var(--info-color); } .toast-info .toast-icon { color: var(--info-color); }
+        .toast-icon { font-size: 1.5rem; }
+        @keyframes slideInToast { from { transform: translateX(120%); } to { transform: translateX(0); } }
+        @keyframes fadeOutToast { from { opacity: 1; } to { opacity: 0; transform: translateX(120%); } }
+
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(5px);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 9999; font-size: 1.2rem; color: var(--heading-color);
+        }
+        #loading-overlay .fa-spinner { font-size: 3rem; margin-bottom: 1rem; color: var(--primary-color); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .fa-spinner { animation: spin 1s linear infinite; }
+
+        .sidebar-footer { padding: 1rem; border-top: 1px solid #495057; }
+        #logout-btn { background: none; border: none; color: var(--sidebar-text); width: 100%; text-align: left; padding: 0.75rem 1rem; cursor: pointer; font-size: 1rem; border-radius: var(--border-radius); }
+        #logout-btn:hover { background-color: #495057; color: var(--sidebar-text-hover); }
+        
+        .user-only { display: none; }
+        body.role-user .admin-only { display: none !important; }
+        body.role-user .user-only { display: block; }
+
+        .visits-filter-bar { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .quick-filters { display: flex; gap: 0.5rem; flex-wrap: wrap;}
+        .date-range-filters { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;}
+        .date-range-filters input { padding: 0.5rem 0.75rem; font-size: 0.9rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); }
+        .btn.btn-sm { padding: 0.5rem 1rem; font-size: 0.8rem; }
+        .quick-filters .btn.active { background-color: var(--primary-color); color: #fff; box-shadow: var(--shadow); }
+        .quick-filters .btn:not(.active) { background-color: #e9ecef; color: var(--text-color); }
+        .quick-filters .btn:not(.active):hover { background-color: #dee2e6; transform: translateY(-1px); box-shadow: none; }
+        .visit-row.overdue td:first-child { color: var(--danger-color); font-weight: 600; }
+        .visit-row.today td:first-child { color: var(--info-color); font-weight: 600; }
+        
+        #bulk-add-instructions { font-size: 0.9rem; color: var(--secondary-color); background-color: #f8fafc; padding: 1rem; border-radius: var(--border-radius); margin-top: 1.5rem; }
+        #bulk-add-instructions code { background-color: #e2e8f0; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: monospace; word-break: break-all; }
+        #download-sample-csv { color: var(--primary-color); text-decoration: none; font-weight: 600; }
+        #download-sample-csv:hover { text-decoration: underline; }
+        #bulk-add-form .form-group { margin-bottom: 1rem; }
+
+        #app-wrapper { display: flex; width: 100%; height: 100%; }
+
+        #login-wrapper {
+            width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center;
+            background-color: var(--bg-color);
+        }
+        .login-card {
+            background-color: var(--card-bg); padding: 2.5rem; border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg); width: 100%; max-width: 400px; text-align: center;
+        }
+        .login-card h2 { color: var(--heading-color); margin-bottom: 2rem; }
+        .login-card h2 i { color: var(--primary-color); }
+        .login-card .form-group { text-align: left; margin-bottom: 1.5rem; }
+        .login-card .btn { width: 100%; padding: 0.75rem; }
+        #login-error { color: var(--danger-color); margin-top: 1rem; min-height: 1.2em; }
+        
+        #attendance-card .content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        #attendance-card .attendance-info { flex-grow: 1; }
+        #attendance-card .attendance-info p { margin: 0; font-size: 0.9rem; }
+        #attendance-card .attendance-info span { font-weight: 600; color: var(--heading-color); }
+        #attendance-card .actions { display: flex; gap: 0.5rem; }
+
+        #activity-report-output { border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 1.5rem; background-color: #f8fafc;}
+        #activity-report-output h4 { font-size: 1.1rem; color: var(--heading-color); }
+        #activity-report-output .report-meta { margin: 0.5rem 0 1.5rem; line-height: 1.6;}
+        .timeline-container { display: flex; margin-top: 1.5rem; }
+        .time-axis { padding-right: 1.5rem; text-align: right; font-size: 0.8rem; color: var(--secondary-color); border-right: 2px solid var(--border-color); }
+        .time-label { height: 60px; position: relative; }
+        .time-label::after { content: '—'; position: absolute; right: -6px; top: -8px; }
+        .events-container { flex-grow: 1; padding-left: 1.5rem; position: relative; min-height: 600px; }
+        .event-block { position: absolute; left: 1.5rem; right: 0; border-radius: var(--border-radius); padding: 0.75rem; color: white; border-left: 4px solid; }
+        .event-block p { margin: 0; font-size: 0.85rem; line-height: 1.4; }
+        .event-block strong { font-weight: 600; }
+        .event-start { background-color: var(--success-color); border-color: #1e7e34; }
+        .event-end { background-color: var(--danger-color); border-color: #b21f2d; }
+        .event-visit { background-color: var(--secondary-color); border-color: #4e555b; }
+        .event-note { margin-top: 0.5rem; font-style: italic; opacity: 0.9; max-height: 40px; overflow: hidden; }
+        .timeline-empty-state {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; justify-content: center; align-items: center;
+            flex-direction: column; color: var(--secondary-color); opacity: 0.8;
+        }
+        .timeline-empty-state i { font-size: 2.5rem; margin-bottom: 0.75rem; }
+        .timeline-empty-state p { font-weight: 500; }
+
+        @media (max-width: 1200px) {
+            #visits-page-layout { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            #app-wrapper { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; flex-direction: row; justify-content: space-around; padding: 0.5rem 0; box-shadow: var(--shadow); z-index: 10; }
+            .sidebar-header, .sidebar-footer { display: none; }
+            .nav-menu { display: flex; flex-direction: row; margin-top: 0; width: 100%; justify-content: space-around; padding: 0; }
+            .nav-item a { padding: 0.75rem; margin-bottom: 0; } .nav-item a span { display: none; } .nav-item a i { margin-right: 0; }
+            .main-content { padding: 1rem; }
+            .filter-bar, .visits-filter-bar { flex-direction: column; align-items: stretch; }
+            .charts-grid, .stats-grid, .detail-grid, .form-grid { grid-template-columns: 1fr; }
+            .modal-content { width: 95%; padding: 1.5rem; }
+            h1 { font-size: 1.75rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay" style="display: none;">
+        <i class="fas fa-spinner"></i>
+        <p>Loading Data from Database...</p>
+    </div>
+    <div id="toast-container"></div>
+
+    <div id="login-wrapper">
+        <div class="login-card">
+            <h2><i class="fas fa-hand-holding-dollar"></i> Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+                <p id="login-error"></p>
+            </form>
+        </div>
+    </div>
+    
+    <div id="app-wrapper" style="display: none;">
+        <nav class="sidebar">
+            <div class="sidebar-header"><h2><i class="fas fa-hand-holding-dollar"></i>Recovery App</h2></div>
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="#dashboard" class="nav-link active"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+                <li class="nav-item"><a href="#customers" class="nav-link"><i class="fas fa-users"></i><span>Customers</span></a></li>
+                <li class="nav-item"><a href="#visits" class="nav-link"><i class="fas fa-calendar-days"></i><span>Visits</span></a></li>
+                <li class="nav-item admin-only"><a href="#analytics" class="nav-link"><i class="fas fa-chart-line"></i><span>Analytics</span></a></li>
+                <li class="nav-item admin-only"><a href="#reports" class="nav-link"><i class="fas fa-file-invoice"></i><span>Reports</span></a></li>
+                <li class="nav-item admin-only"><a href="#consultants" class="nav-link"><i class="fas fa-user-tie"></i><span>Consultants</span></a></li>
+                <li class="nav-item admin-only"><a href="#usermanagement" class="nav-link"><i class="fas fa-user-cog"></i><span>User Management</span></a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <div id="user-info" style="padding: 0 1rem 1rem; color: var(--sidebar-text-hover);"></div>
+                <button id="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+             <div id="dashboard-page" class="page active">
+                <h1>Dashboard</h1>
+                <div id="attendance-card" class="card user-only">
+                    <div class="content">
+                        <div class="attendance-info">
+                            <p><strong>Start Time:</strong> <span id="start-time-display">Not recorded</span></p>
+                            <p><strong>End Time:</strong> <span id="end-time-display">Not recorded</span></p>
+                        </div>
+                        <div class="actions">
+                            <button id="start-day-btn" class="btn btn-success"><i class="fas fa-play-circle"></i> Start Day</button>
+                            <button id="end-day-btn" class="btn btn-danger" disabled><i class="fas fa-stop-circle"></i> End Day</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="icon" style="background-color: var(--primary-color);"><i class="fas fa-users"></i></div><div class="info"><h4>Total Customers</h4><p id="total-customers-stat">0</p></div></div>
+                    <div class="stat-card"><div class="icon" style="background-color: var(--danger-color);"><i class="fas fa-file-invoice-dollar"></i></div><div class="info"><h4>Total Outstanding</h4><p id="total-outstanding-stat">AED 0</p></div></div>
+                    <div class="stat-card"><div class="icon" style="background-color: var(--success-color);"><i class="fas fa-check-circle"></i></div><div class="info"><h4>Active Accounts</h4><p id="active-accounts-stat">0</p></div></div>
+                    <div class="stat-card"><div class="icon" style="background-color: var(--info-color);"><i class="fas fa-calendar-check"></i></div><div class="info"><h4>Visits This Month</h4><p id="visits-month-stat">0</p></div></div>
+                </div>
+                <div class="charts-grid">
+                    <div class="card"><div class="card-header"><h3>Outstanding by Emirate</h3></div><canvas id="outstandingByEmirateChart"></canvas></div>
+                    <div class="card"><div class="card-header"><h3>Customer Classification</h3></div><canvas id="customerStatusChart" style="max-height: 300px; margin: auto;"></canvas></div>
+                </div>
+                 <div class="card">
+                    <div class="card-header">
+                        <h3>Next 10 Upcoming Visits</h3>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Company Name</th>
+                                    <th>Sales Consultant</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-upcoming-visits-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="customers-page" class="page">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Customer Management</h3>
+                        <div class="actions">
+                            <button class="btn btn-secondary admin-only" id="bulk-add-btn"><i class="fas fa-upload"></i> Bulk Add</button>
+                            <button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button>
+                        </div>
+                    </div>
+                    <div class="filter-bar">
+                        <input type="text" id="search-input" placeholder="Search by Name, Emirate, etc...">
+                        <select id="status-filter">
+                            <option value="">All Statuses</option>
+                            <option value="Active">Active</option>
+                            <option value="On Hold">On Hold</option>
+                            <option value="Closed">Closed</option>
+                            <option value="Priority">Priority Customers</option>
+                        </select>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="accountNumber">Account #<i class="fas fa-sort sort-icon"></i></th>
+                                    <th data-sort="companyName">Company Name<i class="fas fa-sort sort-icon"></i></th>
+                                    <th data-sort="emirate">Emirate<i class="fas fa-sort sort-icon"></i></th>
+                                    <th data-sort="outstandingAmount">Outstanding<i class="fas fa-sort sort-icon"></i></th>
+                                    <th data-sort="priorityScore">Priority<i class="fas fa-sort sort-icon"></i></th>
+                                    <th data-sort="status">Status<i class="fas fa-sort sort-icon"></i></th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customer-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="visits-page" class="page">
+                 <div id="visits-page-layout">
+                    <div class="card"><div id="calendar"></div></div>
+                    <div class="card">
+                        <div class="card-header"><h3 id="visit-list-title">Upcoming Visits</h3></div>
+                        <div class="visits-filter-bar">
+                            <div class="quick-filters">
+                                <button class="btn btn-sm" data-filter="overdue">Overdue</button>
+                                <button class="btn btn-sm" data-filter="today">Today</button>
+                                <button class="btn btn-sm active" data-filter="upcoming">Upcoming</button>
+                                <button class="btn btn-sm" data-filter="all">All Visits</button>
+                            </div>
+                            <div class="date-range-filters">
+                                <input type="date" id="visit-start-date" title="Start Date">
+                                <input type="date" id="visit-end-date" title="End Date">
+                                <button id="apply-date-filter-btn" class="btn btn-sm btn-primary">Apply Range</button>
+                            </div>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead><tr><th>Date</th><th>Company Name</th><th>Emirate</th><th>Sales Consultant</th><th>Actions</th></tr></thead>
+                                <tbody id="visit-list-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="analytics-page" class="page admin-only">
+                <h1>Analytics</h1>
+                <div class="stats-grid">
+                    <div class="stat-card" style="border-color: var(--success-color);"><div class="icon" style="background-color: var(--success-color);"><i class="fas fa-piggy-bank"></i></div><div class="info"><h4>Total Recovered</h4><p id="total-recovered-stat">AED 0</p></div></div>
+                    <div class="stat-card" style="border-color: var(--info-color);"><div class="icon" style="background-color: var(--info-color);"><i class="fas fa-chart-pie"></i></div><div class="info"><h4>Recovery Rate</h4><p id="recovery-rate-stat">0%</p></div></div>
+                    <div class="stat-card" style="border-color: var(--warning-color);"><div class="icon" style="background-color: var(--warning-color);"><i class="fas fa-user-tie"></i></div><div class="info"><h4>Top Sales Consultant</h4><p id="top-consultant-stat">N/A</p></div></div>
+                </div>
+                <div class="charts-grid">
+                    <div class="card"><div class="card-header"><h3>Recovery Performance (YTD)</h3></div><canvas id="recoveryPerformanceChart"></canvas></div>
+                    <div class="card"><div class="card-header"><h3>Customers by Payment Status</h3></div><canvas id="paymentStatusChart"></canvas></div>
+                </div>
+                <div class="card"><div class="card-header"><h3>Sales Consultant Workload (Outstanding Amount)</h3></div><canvas id="consultantWorkloadChart"></canvas></div>
+            </div>
+
+            <div id="reports-page" class="page admin-only">
+                 <div class="card">
+                    <div class="card-header"><h3>Customer List Report</h3></div>
+                    <div class="filter-bar">
+                        <select id="report-status-filter"><option value="">All Statuses</option><option value="Active">Active</option><option value="On Hold">On Hold</option><option value="Closed">Closed</option></select>
+                         <select id="report-payment-status-filter"><option value="">All Payment Statuses</option><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Overdue">Overdue</option></select>
+                        <input type="text" id="report-consultant-filter" placeholder="Filter by Sales Consultant...">
+                    </div>
+                    <div class="report-actions">
+                         <button id="generate-report-btn" class="btn btn-primary"><i class="fas fa-cogs"></i> Generate</button>
+                         <button id="export-csv-btn" class="btn btn-secondary" style="display:none;"><i class="fas fa-file-csv"></i> Export CSV</button>
+                         <button id="export-pdf-btn" class="btn btn-secondary" style="display:none;"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                    </div>
+                    <div id="report-output" style="margin-top: 20px; overflow-x: auto;"><p>Select filters and click "Generate" to see results.</p></div>
+                 </div>
+                 <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+                 <div class="card">
+                    <div class="card-header"><h3>Consultant Daily Activity Report</h3></div>
+                    <div class="filter-bar">
+                        <select id="report-consultant-select"><option value="">Select Consultant...</option></select>
+                        <input type="date" id="report-date-select">
+                    </div>
+                    <div class="report-actions">
+                         <button id="generate-activity-report-btn" class="btn btn-primary"><i class="fas fa-cogs"></i> Generate</button>
+                         <button id="export-activity-pdf-btn" class="btn btn-secondary" style="display:none;"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                    </div>
+                    <div id="activity-report-output" style="margin-top: 20px;"><p>Select a consultant and date to generate a report.</p></div>
+                 </div>
+            </div>
+
+            <div id="consultants-page" class="page admin-only">
+                 <div class="card">
+                    <div class="card-header">
+                        <h3>Sales Consultant Management</h3>
+                        <button class="btn btn-primary" id="add-consultant-btn"><i class="fas fa-user-plus"></i> Add Consultant</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Consultant Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="consultant-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="usermanagement-page" class="page admin-only">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>User Management</h3>
+                        <button class="btn btn-primary" id="add-user-btn"><i class="fas fa-user-plus"></i> Add User</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Role</th>
+                                    <th>Assigned Consultant</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ALL MODALS -->
+    <div id="customerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="modal-title">Add New Customer</h2><span class="close-btn">&times;</span></div>
+            <form id="customer-form">
+                <input type="hidden" id="customer-id">
+                <div class="form-grid">
+                    <div class="form-group"><label for="account-number">Account Number</label><input type="text" id="account-number" required></div>
+                    <div class="form-group"><label for="company-name">Company Name</label><input type="text" id="company-name" required></div>
+                    <div class="form-group"><label for="emirate">Emirate</label><input list="emirates-list" type="text" id="emirate" required></div>
+                    <div class="form-group"><label for="area">Area</label><input type="text" id="area" required></div>
+                    <div class="form-group"><label for="status">Status</label><select id="status" required><option value="Active">Active</option><option value="On Hold">On Hold</option><option value="Closed">Closed</option></select></div>
+                    <div class="form-group"><label for="payment-status">Payment Status</label><select id="payment-status" required><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Overdue">Overdue</option></select></div>
+                    <div class="form-group"><label for="outstanding-amount">Outstanding Amount (AED)</label><input type="number" id="outstanding-amount" step="0.01" required></div>
+                    <div class="form-group"><label for="sales-consultant">Sales Consultant</label><input list="consultants-list" type="text" id="sales-consultant" required></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary close-btn">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div>
+            </form>
+            <datalist id="emirates-list"></datalist>
+            <datalist id="consultants-list"></datalist>
+        </div>
+    </div>
+    <div id="bulkAddModal" class="modal">
+        <div class="modal-content small">
+            <div class="modal-header"><h2 id="bulk-modal-title">Bulk Add Customers via CSV</h2><span class="close-btn">&times;</span></div>
+            <form id="bulk-add-form">
+                <div class="form-group">
+                    <label for="csv-file-input">Upload CSV File</label>
+                    <input type="file" id="csv-file-input" accept=".csv" required>
+                </div>
+                <div id="bulk-add-instructions">
+                    <p>Ensure your CSV file has the correct headers:</p>
+                    <code>id,accountNumber,companyName,emirate,area,status,paymentStatus,outstandingAmount,salesConsultant,notes,scheduledVisits,recoveredAmount,dateAdded,dateRecovered</code>
+                    <p style="margin-top: 0.5rem;"><a href="#" id="download-sample-csv"><i class="fas fa-download"></i> Download Sample Template</a></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload & Process</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="customerDetailModal" class="modal">
+       <div class="modal-content">
+             <div class="modal-header"><h2 id="detail-modal-title">Customer Details</h2><span class="close-btn">&times;</span></div>
+             <div id="detail-content">
+                <div class="detail-grid">
+                    <div class="detail-item"><strong>Account #:</strong> <span id="detail-account-number"></span></div>
+                    <div class="detail-item"><strong>Location:</strong> <span id="detail-location"></span></div>
+                    <div class="detail-item"><strong>Status:</strong> <span id="detail-status"></span></div>
+                    <div class="detail-item"><strong>Payment Status:</strong> <span id="detail-payment-status"></span></div>
+                    <div class="detail-item"><strong>Outstanding:</strong> <span id="detail-outstanding"></span></div>
+                    <div class="detail-item"><strong>Sales Consultant:</strong> <span id="detail-consultant"></span></div>
+                </div>
+                <div class="notes-section">
+                    <h4>Visit Notes History</h4><div id="notes-history"></div>
+                    <h4>Add New Visit Note / Schedule Visit</h4><div id="note-editor-container"></div>
+                    <div class="form-grid" style="margin-top: 1.5rem;"><div class="form-group"><label for="scheduled-visit-date">Schedule Next Visit</label><input type="date" id="scheduled-visit-date"></div></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary close-btn">Close</button><button type="button" id="save-note-btn" class="btn btn-primary">Save Note & Schedule</button></div>
+        </div>
+    </div>
+    <div id="scheduleVisitModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="schedule-modal-title">Schedule Visit</h2><span class="close-btn">&times;</span></div>
+            <form id="schedule-visit-form">
+                <input type="hidden" id="schedule-customer-id">
+                <div class="form-group">
+                    <label for="quick-schedule-date">Select Visit Date</label>
+                    <input type="date" id="quick-schedule-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="quick-visit-notes">Visit Notes (Optional)</label>
+                    <textarea id="quick-visit-notes" rows="4" placeholder="Add any notes for this visit..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Visit & Notes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="userModal" class="modal">
+        <div class="modal-content small">
+            <div class="modal-header"><h2 id="user-modal-title">Add New User</h2><span class="close-btn">&times;</span></div>
+            <form id="user-form">
+                <input type="hidden" id="user-id">
+                <div class="form-group">
+                    <label for="user-username">Username</label>
+                    <input type="text" id="user-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-fullname">Full Name</label>
+                    <input type="text" id="user-fullname" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-password">Password</label>
+                    <input type="password" id="user-password" placeholder="Leave blank to keep unchanged">
+                </div>
+                 <div class="form-group">
+                    <label for="user-role">Role</label>
+                    <select id="user-role" required>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group" id="consultant-name-group">
+                    <label for="user-consultant-name">Assigned Sales Consultant Name</label>
+                    <select id="user-consultant-name"></select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="consultantModal" class="modal">
+        <div class="modal-content small">
+            <div class="modal-header"><h2 id="consultant-modal-title">Add New Consultant</h2><span class="close-btn">&times;</span></div>
+            <form id="consultant-form">
+                <input type="hidden" id="consultant-id">
+                <div class="form-group">
+                    <label for="consultant-name">Consultant Name</label>
+                    <input type="text" id="consultant-name" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Consultant</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // --- CONFIGURATION ---
+            const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwklKyhXXDeanzuM_OyjbDfFVlf9J-viPqnTDwh9_UstoG5gI9zdVP3PAiicNmOqGmtgQ/exec';
+
+            // --- GLOBAL VARIABLES ---
+            let customers = []; let users = []; let consultants = []; let attendance = [];
+            let currentUser = null;
+            let currentEditingId = null; let noteEditor; let calendar; let chartInstances = {};
+            const UI_COLORS = { primary: '#dc3545', info: '#6c757d', success: '#28a745', warning: '#ffc107', danger: '#dc3545' };
+            let sortConfig = { key: 'priorityScore', direction: 'desc' };
+            let currentVisitFilter = 'upcoming';
+            const loadingOverlay = document.getElementById('loading-overlay');
+            let lastGeneratedReportData = [];
+
+            // --- GOOGLE SHEET DATA SYNC ---
+            async function loadInitialData() {
+                if (!SCRIPT_URL || SCRIPT_URL === 'PASTE_YOUR_WEB_APP_URL_HERE') {
+                    alert('ERROR: Database Script URL is not set. Please update the SCRIPT_URL variable in the HTML file.');
+                    return;
+                }
+                loadingOverlay.style.display = 'flex';
+                try {
+                    const response = await fetch(SCRIPT_URL);
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+                    const data = await response.json();
+                    if (data.error) throw new Error(`Apps Script Error: ${data.error}`);
+                    
+                    customers = data.customers || [];
+                    consultants = data.consultants || [];
+                    users = data.users || [];
+                    attendance = data.attendance || [];
+                } catch (error) {
+                    console.error('Failed to load initial data:', error);
+                    showToast(`Error loading data: ${error.message}`, 'error');
+                } finally {
+                    loadingOverlay.style.display = 'none';
+                }
+            }
+            
+            async function syncAllData() {
+                showToast('Syncing data with Database...', 'info');
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', 
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            action: 'SYNC_DATA',
+                            payload: { customers, consultants, users }
+                        })
+                    });
+                    showToast('Data sync initiated!', 'success');
+                } catch (error) {
+                    console.error('Sync failed:', error);
+                    showToast('Data sync failed. Check console for details.', 'error');
+                }
+            }
+            
+            async function syncAttendance(attendanceData) {
+                 try {
+                    await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({ action: 'SYNC_ATTENDANCE', payload: attendanceData })
+                    });
+                } catch (error) {
+                    console.error('Attendance sync failed:', error);
+                    showToast('Failed to save attendance.', 'error');
+                }
+            }
+
+            // --- AUTHENTICATION & INITIALIZATION ---
+            const checkLoginState = () => {
+                const loggedInUser = JSON.parse(sessionStorage.getItem('loggedInUser'));
+                if (loggedInUser) {
+                    initializeApp(loggedInUser);
+                } else {
+                    showLoginScreen();
+                }
+            };
+
+            const initializeApp = (user) => {
+                currentUser = user;
+                showAppScreen();
+                
+                document.getElementById('user-info').innerHTML = `Welcome, <strong>${user.name}</strong>`;
+                const isAdmin = (user.role || '').trim().toLowerCase() === 'admin';
+                document.body.classList.toggle('role-user', !isAdmin);
+
+                updateDatalists();
+                showPage('dashboard');
+            };
+
+            const showLoginScreen = () => {
+                document.getElementById('login-wrapper').style.display = 'flex';
+                document.getElementById('app-wrapper').style.display = 'none';
+            };
+
+            const showAppScreen = () => {
+                document.getElementById('login-wrapper').style.display = 'none';
+                document.getElementById('app-wrapper').style.display = 'flex';
+            };
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const errorEl = document.getElementById('login-error');
+                
+                const foundUser = users.find(u => u.username === username && u.password == password);
+
+                if (foundUser) {
+                    sessionStorage.setItem('loggedInUser', JSON.stringify(foundUser));
+                    errorEl.textContent = '';
+                    initializeApp(foundUser);
+                } else {
+                    errorEl.textContent = 'Invalid username or password.';
+                }
+            };
+
+            const handleLogout = () => {
+                sessionStorage.removeItem('loggedInUser');
+                currentUser = null;
+                location.reload();
+            };
+
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+            document.getElementById('logout-btn').addEventListener('click', handleLogout);
+
+            // --- DATA HELPERS ---
+            const getVisibleCustomers = () => {
+                if (!currentUser) return [];
+                if ((currentUser.role || '').trim().toLowerCase() === 'admin') {
+                    return customers;
+                }
+                return customers.filter(c => c.salesConsultant === currentUser.consultantName);
+            };
+
+            // --- UI LOGIC ---
+            const navLinks = document.querySelectorAll('.nav-link'); const pages = document.querySelectorAll('.page');
+            const showPage = (pageId) => {
+                pages.forEach(p => p.classList.remove('active'));
+                document.getElementById(`${pageId}-page`).classList.add('active');
+                navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === `#${pageId}`));
+                const pageRenderers = { dashboard: renderDashboard, customers: renderCustomerList, visits: renderVisitsPage, analytics: renderAnalyticsPage, reports: renderReportsPage, consultants: renderConsultantsPage, usermanagement: renderUserManagementPage };
+                if (pageRenderers[pageId]) pageRenderers[pageId]();
+            };
+            navLinks.forEach(l => l.addEventListener('click', (e) => { e.preventDefault(); showPage(e.currentTarget.getAttribute('href').substring(1)); }));
+            
+            const customerModal = document.getElementById('customerModal'); 
+            const detailModal = document.getElementById('customerDetailModal'); 
+            const scheduleModal = document.getElementById('scheduleVisitModal');
+            const bulkAddModal = document.getElementById('bulkAddModal');
+            const userModal = document.getElementById('userModal');
+            const consultantModal = document.getElementById('consultantModal');
+            const openModal = (modal) => modal.classList.add('active'); const closeModal = (modal) => modal.classList.remove('active');
+            [customerModal, detailModal, scheduleModal, bulkAddModal, userModal, consultantModal].forEach(modal => {
+                modal.querySelectorAll('.close-btn').forEach(btn => btn.addEventListener('click', () => closeModal(modal)));
+                modal.addEventListener('click', e => { if (e.target === modal) closeModal(modal); });
+            });
+
+            const formatCurrency = (amount) => `AED ${Number(amount || 0).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
+            const formatDate = (dateString) => dateString ? new Date(dateString.replace(/-/g, '/')).toLocaleDateString() : 'N/A';
+            const generateId = (prefix) => prefix + Date.now();
+            const destroyChart = (chartId) => { if (chartInstances[chartId]) chartInstances[chartId].destroy(); };
+
+            Chart.defaults.font.family = "'Inter', sans-serif"; Chart.defaults.color = '#495057'; Chart.defaults.borderColor = '#dee2e6';
+
+            function showToast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+                const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-times-circle' : 'fa-info-circle';
+                toast.innerHTML = `<i class="fas ${icon} toast-icon"></i><div class="toast-message">${message}</div>`;
+                container.appendChild(toast);
+                setTimeout(() => toast.remove(), 4500);
+            }
+
+            function calculatePriorityScore(customer) {
+                if (customer.status !== 'Active') return 0;
+                let score = customer.outstandingAmount / 10000;
+                if (customer.paymentStatus === 'Overdue') score *= 2.0;
+                if (customer.paymentStatus === 'Pending') score *= 1.5;
+                return Math.round(score);
+            }
+
+            function renderDashboard() {
+                const visibleCustomers = getVisibleCustomers();
+                document.getElementById('total-customers-stat').textContent = visibleCustomers.length;
+                document.getElementById('total-outstanding-stat').textContent = formatCurrency(visibleCustomers.reduce((s, c) => s + c.outstandingAmount, 0));
+                document.getElementById('active-accounts-stat').textContent = visibleCustomers.filter(c => c.status === 'Active').length;
+                const thisMonthStart = new Date(); thisMonthStart.setDate(1); thisMonthStart.setHours(0,0,0,0);
+                document.getElementById('visits-month-stat').textContent = visibleCustomers.reduce((count, c) => count + (c.scheduledVisits || []).filter(v => new Date(v) >= thisMonthStart).length, 0);
+                
+                destroyChart('outstandingByEmirateChart');
+                const emirateData = visibleCustomers.reduce((acc, c) => { acc[c.emirate] = (acc[c.emirate] || 0) + c.outstandingAmount; return acc; }, {});
+                chartInstances['outstandingByEmirateChart'] = new Chart(document.getElementById('outstandingByEmirateChart'), {
+                    type: 'bar', data: { labels: Object.keys(emirateData), datasets: [{ data: Object.values(emirateData), backgroundColor: UI_COLORS.primary, borderRadius: 4 }] },
+                    options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+                });
+                destroyChart('customerStatusChart');
+                const statusCounts = visibleCustomers.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc; }, {});
+                chartInstances['customerStatusChart'] = new Chart(document.getElementById('customerStatusChart'), {
+                    type: 'doughnut', data: { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: [UI_COLORS.success, UI_COLORS.warning, UI_COLORS.info] }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+                
+                const dashboardVisitListBody = document.getElementById('dashboard-upcoming-visits-body');
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const upcomingVisits = visibleCustomers
+                    .flatMap(c => (c.scheduledVisits || []).map(v => ({ 
+                        date: v, 
+                        companyName: c.companyName, 
+                        salesConsultant: c.salesConsultant 
+                    })))
+                    .filter(v => new Date(v.date.replace(/-/g, '/')) >= today)
+                    .sort((a, b) => new Date(a.date.replace(/-/g, '/')) - new Date(b.date.replace(/-/g, '/')))
+                    .slice(0, 10);
+
+                if (upcomingVisits.length > 0) {
+                    dashboardVisitListBody.innerHTML = upcomingVisits.map(v => {
+                        const visitDate = new Date(v.date.replace(/-/g, '/'));
+                        const isToday = visitDate.getTime() === today.getTime();
+                        return `
+                            <tr>
+                                <td>${formatDate(v.date)} ${isToday ? '<span class="status-badge status-active" style="margin-left: 5px;">Today</span>' : ''}</td>
+                                <td>${v.companyName}</td>
+                                <td>${v.salesConsultant}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    dashboardVisitListBody.innerHTML = `
+                        <tr>
+                            <td colspan="3">
+                                <div class="empty-state" style="padding: 1rem 0;">
+                                    <i class="fas fa-calendar-check"></i>No upcoming visits found.
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                updateAttendanceUI();
+            }
+
+            const startDayBtn = document.getElementById('start-day-btn');
+            const endDayBtn = document.getElementById('end-day-btn');
+
+            function updateAttendanceUI() {
+                if (!currentUser || (currentUser.role || '').trim().toLowerCase() !== 'user') return;
+                const today = new Date().toISOString().split('T')[0];
+                const attendanceKey = `${currentUser.username}_${today}`;
+                const attendanceData = attendance.find(a => a.key === attendanceKey) || {};
+                document.getElementById('start-time-display').textContent = attendanceData.start || "Not recorded";
+                document.getElementById('end-time-display').textContent = attendanceData.end || "Not recorded";
+                startDayBtn.disabled = !!attendanceData.start;
+                endDayBtn.disabled = !attendanceData.start || !!attendanceData.end;
+            }
+            
+            startDayBtn.addEventListener('click', () => {
+                const today = new Date().toISOString().split('T')[0];
+                const key = `${currentUser.username}_${today}`;
+                const now = new Date().toLocaleTimeString();
+                const attendanceData = { key, username: currentUser.username, date: today, start: now, end: null };
+                const existingIndex = attendance.findIndex(a => a.key === key);
+                if (existingIndex > -1) attendance[existingIndex] = attendanceData;
+                else attendance.push(attendanceData);
+                syncAttendance(attendanceData);
+                updateAttendanceUI();
+                showToast('Day started successfully!');
+            });
+
+            endDayBtn.addEventListener('click', () => {
+                const today = new Date().toISOString().split('T')[0];
+                const key = `${currentUser.username}_${today}`;
+                const attendanceData = attendance.find(a => a.key === key);
+                if (!attendanceData) return;
+                const now = new Date().toLocaleTimeString();
+                attendanceData.end = now;
+                syncAttendance(attendanceData);
+                updateAttendanceUI();
+                showToast('Day ended successfully!');
+            });
+            
+            function renderAnalyticsPage() {
+                const visibleCustomers = getVisibleCustomers();
+                const totalRecovered = visibleCustomers.reduce((s, c) => s + (c.recoveredAmount || 0), 0); 
+                const totalOutstanding = visibleCustomers.reduce((s, c) => s + c.outstandingAmount, 0);
+                const totalValue = totalRecovered + totalOutstanding; 
+                const recoveryRate = totalValue > 0 ? (totalRecovered / totalValue) * 100 : 0;
+                const consultantPerf = visibleCustomers.reduce((acc, c) => { acc[c.salesConsultant] = (acc[c.salesConsultant] || 0) + (c.recoveredAmount || 0); return acc; }, {});
+                const topConsultant = Object.keys(consultantPerf).length ? Object.keys(consultantPerf).reduce((a, b) => consultantPerf[a] > consultantPerf[b] ? a : b) : 'N/A';
+                
+                document.getElementById('total-recovered-stat').textContent = formatCurrency(totalRecovered);
+                document.getElementById('recovery-rate-stat').textContent = `${recoveryRate.toFixed(1)}%`; 
+                document.getElementById('top-consultant-stat').textContent = topConsultant;
+
+                const months = Array.from({length: 12}, (_, i) => new Date(0, i).toLocaleString('default', {month: 'short'}));
+                const recoveryByMonth = months.reduce((acc, m) => ({...acc, [m]: 0}), {}); 
+                const outstandingByMonth = months.reduce((acc, m) => ({...acc, [m]: 0}), {});
+                visibleCustomers.forEach(c => {
+                    if (c.dateRecovered) { 
+                        const month = new Date(c.dateRecovered).toLocaleString('default', { month: 'short' }); 
+                        if(recoveryByMonth[month] !== undefined) recoveryByMonth[month] += (c.recoveredAmount || 0); 
+                    }
+                    if (c.dateAdded) { 
+                        const month = new Date(c.dateAdded).toLocaleString('default', { month: 'short' }); 
+                        if(outstandingByMonth[month] !== undefined) outstandingByMonth[month] += c.outstandingAmount + (c.recoveredAmount || 0); 
+                    }
+                });
+                
+                destroyChart('recoveryPerformanceChart');
+                chartInstances['recoveryPerformanceChart'] = new Chart(document.getElementById('recoveryPerformanceChart'), { type: 'bar', data: { labels: months, datasets: [{ label: 'Total Value Added', data: Object.values(outstandingByMonth), backgroundColor: UI_COLORS.danger, borderRadius: 4 }, { label: 'Recovered', data: Object.values(recoveryByMonth), backgroundColor: UI_COLORS.success, borderRadius: 4 }] }, options: { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } } });
+                
+                destroyChart('paymentStatusChart');
+                const paymentStatusCounts = visibleCustomers.reduce((acc, c) => { acc[c.paymentStatus] = (acc[c.paymentStatus] || 0) + 1; return acc; }, {});
+                chartInstances['paymentStatusChart'] = new Chart(document.getElementById('paymentStatusChart'), { 
+                    type: 'bar', 
+                    data: { 
+                        labels: Object.keys(paymentStatusCounts), 
+                        datasets: [{ 
+                            label: '# of Customers',
+                            data: Object.values(paymentStatusCounts), 
+                            backgroundColor: [UI_COLORS.success, UI_COLORS.warning, UI_COLORS.danger],
+                            borderRadius: 4
+                        }] 
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+                
+                destroyChart('consultantWorkloadChart');
+                const workload = visibleCustomers.reduce((acc, c) => { if(c.outstandingAmount > 0) acc[c.salesConsultant] = (acc[c.salesConsultant] || 0) + c.outstandingAmount; return acc; }, {});
+                chartInstances['consultantWorkloadChart'] = new Chart(document.getElementById('consultantWorkloadChart'), { type: 'bar', data: { labels: Object.keys(workload), datasets: [{ label: 'Outstanding Amount', data: Object.values(workload), backgroundColor: UI_COLORS.info, borderRadius: 4 }] }, options: { indexAxis: 'y', scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } } });
+            }
+            
+            const customerTableBody = document.getElementById('customer-table-body'); const searchInput = document.getElementById('search-input'); const statusFilter = document.getElementById('status-filter');
+            function renderCustomerList() {
+                const visibleCustomers = getVisibleCustomers();
+                const searchTerm = searchInput.value.toLowerCase(); const status = statusFilter.value;
+                let filtered = visibleCustomers.map(c => ({...c, priorityScore: calculatePriorityScore(c)}))
+                    .filter(c => (c.companyName.toLowerCase().includes(searchTerm) || c.emirate.toLowerCase().includes(searchTerm) || c.accountNumber.toLowerCase().includes(searchTerm)) && 
+                                   (status ? (status === 'Priority' ? c.priorityScore > 15 : c.status === status) : true));
+                
+                filtered.sort((a, b) => {
+                    const valA = a[sortConfig.key]; const valB = b[sortConfig.key];
+                    let comparison = 0; if (valA > valB) comparison = 1; else if (valA < valB) comparison = -1;
+                    return sortConfig.direction === 'desc' ? comparison * -1 : comparison;
+                });
+                
+                document.querySelectorAll('#customers-page .data-table th').forEach(th => {
+                    const icon = th.querySelector('.sort-icon'); if (!icon) return;
+                    if (th.dataset.sort === sortConfig.key) icon.className = sortConfig.direction === 'asc' ? 'fas fa-sort-up sort-icon' : 'fas fa-sort-down sort-icon';
+                    else icon.className = 'fas fa-sort sort-icon';
+                });
+
+                customerTableBody.innerHTML = filtered.length ? filtered.map(c => {
+                    const score = c.priorityScore;
+                    let priorityClass = 'low'; let priorityText = 'Low';
+                    if (score > 25) { priorityClass = 'high'; priorityText = 'High'; } else if (score > 15) { priorityClass = 'medium'; priorityText = 'Medium'; }
+                    
+                    const adminButtons = `
+                        <button class="action-btn edit-btn" title="Edit Customer"><i class="fas fa-pencil-alt"></i></button>
+                        <button class="action-btn delete-btn" title="Delete Customer"><i class="fas fa-trash"></i></button>`;
+
+                    return `
+                    <tr data-id="${c.id}">
+                        <td>${c.accountNumber}</td><td>${c.companyName}</td><td>${c.emirate}</td>
+                        <td>${formatCurrency(c.outstandingAmount)}</td>
+                        <td><span class="priority-badge priority-${priorityClass}">${priorityText}</span></td>
+                        <td><span class="status-badge status-${c.status.toLowerCase().replace(' ', '-')}">${c.status}</span></td>
+                        <td class="action-buttons">
+                            <button class="action-btn view-btn" title="View Details"><i class="fas fa-eye"></i></button>
+                            <button class="action-btn schedule-btn" title="Schedule Visit"><i class="fas fa-calendar-plus"></i></button>
+                            ${(currentUser.role || '').trim().toLowerCase() === 'admin' ? adminButtons : ''}
+                        </td>
+                    </tr>`}).join('') : `<tr><td colspan="7"><div class="empty-state"><i class="fas fa-folder-open"></i>No customers found matching your criteria.</div></td></tr>`;
+            }
+            document.querySelectorAll('#customers-page .data-table th').forEach(header => {
+                header.addEventListener('click', () => {
+                    const key = header.dataset.sort;
+                    if (sortConfig.key === key) sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+                    else { sortConfig.key = key; sortConfig.direction = 'asc'; }
+                    renderCustomerList();
+                });
+            });
+            customerTableBody.addEventListener('click', e => {
+                const btn = e.target.closest('button.action-btn'); if (!btn) return;
+                const id = e.target.closest('tr').dataset.id;
+                if (btn.classList.contains('view-btn')) openDetailModal(id);
+                if (btn.classList.contains('edit-btn')) openCustomerForm(id);
+                if (btn.classList.contains('schedule-btn')) openScheduleModal(id);
+                if (btn.classList.contains('delete-btn')) {
+                    if (confirm('Are you sure you want to permanently delete this customer?')) {
+                        customers = customers.filter(c => c.id != id);
+                        syncAllData(); renderCustomerList(); showToast('Customer deleted successfully.', 'error');
+                    }
+                }
+            });
+            [searchInput, statusFilter].forEach(el => el.addEventListener('input', renderCustomerList));
+            
+            function updateDatalists() {
+                const emirates = [...new Set(customers.map(c => c.emirate))];
+                document.getElementById('emirates-list').innerHTML = emirates.map(e => `<option value="${e}"></option>`).join('');
+                document.getElementById('consultants-list').innerHTML = consultants.map(c => `<option value="${c.name}"></option>`).join('');
+                const userConsultantSelect = document.getElementById('user-consultant-name');
+                if (userConsultantSelect) {
+                    userConsultantSelect.innerHTML = consultants.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+                }
+            }
+
+            const customerForm = document.getElementById('customer-form');
+            document.getElementById('add-customer-btn').addEventListener('click', () => openCustomerForm());
+            function openCustomerForm(id = null) {
+                customerForm.reset(); document.getElementById('customer-id').value = id || '';
+                
+                const salesConsultantInput = document.getElementById('sales-consultant');
+                if((currentUser.role || '').trim().toLowerCase() !== 'admin') {
+                    salesConsultantInput.value = currentUser.consultantName;
+                    salesConsultantInput.readOnly = true;
+                } else {
+                    salesConsultantInput.readOnly = false;
+                }
+
+                if (id) {
+                    const c = customers.find(c => c.id == id);
+                    document.getElementById('modal-title').textContent = 'Edit Customer';
+                    ['accountNumber', 'companyName', 'emirate', 'area', 'status', 'paymentStatus', 'outstandingAmount', 'salesConsultant'].forEach(key => {
+                        const el = document.getElementById(key.replace(/([A-Z])/g, "-$1").toLowerCase());
+                        if(el) el.value = c[key];
+                    });
+                } else { document.getElementById('modal-title').textContent = 'Add New Customer';}
+                openModal(customerModal);
+            }
+            customerForm.addEventListener('submit', e => {
+                e.preventDefault(); const id = document.getElementById('customer-id').value;
+                let data = {
+                    accountNumber: document.getElementById('account-number').value, companyName: document.getElementById('company-name').value,
+                    emirate: document.getElementById('emirate').value, area: document.getElementById('area').value,
+                    status: document.getElementById('status').value, paymentStatus: document.getElementById('payment-status').value,
+                    outstandingAmount: parseFloat(document.getElementById('outstanding-amount').value),
+                    salesConsultant: document.getElementById('sales-consultant').value
+                };
+                if (id) {
+                    const index = customers.findIndex(c => c.id == id); const original = customers[index];
+                    if (data.status === 'Closed' && data.paymentStatus === 'Paid' && original.outstandingAmount > 0) {
+                        data.recoveredAmount = (original.recoveredAmount || 0) + original.outstandingAmount;
+                        data.outstandingAmount = 0; data.dateRecovered = new Date().toISOString();
+                    }
+                    customers[index] = { ...original, ...data };
+                } else { customers.push({ ...data, id: generateId('c'), notes: [], scheduledVisits: [], dateAdded: new Date().toISOString(), recoveredAmount: 0, dateRecovered: null }); }
+                syncAllData(); renderCustomerList(); closeModal(customerModal); showToast('Customer saved successfully!'); updateDatalists();
+            });
+            
+            document.getElementById('bulk-add-btn').addEventListener('click', () => openModal(bulkAddModal));
+            
+            document.getElementById('download-sample-csv').addEventListener('click', (e) => {
+                e.preventDefault();
+                const headers = "id,accountNumber,companyName,emirate,area,status,paymentStatus,outstandingAmount,salesConsultant,notes,scheduledVisits,recoveredAmount,dateAdded,dateRecovered";
+                const sampleRow = "c123,AUH-002,Test Corp,Abu Dhabi,Mussafah,Active,Pending,50000,Fatima Al-Hashemi,[],[],0,2024-05-28T12:00:00.000Z,";
+                const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + sampleRow;
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "template.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            document.getElementById('bulk-add-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const fileInput = document.getElementById('csv-file-input');
+                const file = fileInput.files[0];
+                if (!file) {
+                    showToast("Please select a file to upload.", "error");
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const text = event.target.result;
+                    const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+                    const headers = rows.shift().trim().split(',');
+                    
+                    let addedCount = 0;
+                    rows.forEach(row => {
+                        try {
+                            const cols = row.split(',');
+                            const newCustomer = {};
+                            headers.forEach((header, i) => newCustomer[header] = cols[i]);
+                            if (!newCustomer.id) newCustomer.id = generateId('c');
+
+                            newCustomer.outstandingAmount = parseFloat(newCustomer.outstandingAmount || 0);
+                            newCustomer.recoveredAmount = parseFloat(newCustomer.recoveredAmount || 0);
+                            newCustomer.notes = JSON.parse(newCustomer.notes || '[]');
+                            newCustomer.scheduledVisits = JSON.parse(newCustomer.scheduledVisits || '[]');
+                            
+                            customers.push(newCustomer);
+                            addedCount++;
+                        } catch (err) {
+                            console.error("Error parsing row: ", row, err);
+                        }
+                    });
+
+                    if (addedCount > 0) {
+                        syncAllData();
+                        renderCustomerList();
+                        updateDatalists();
+                        showToast(`Successfully added ${addedCount} new customers.`, "success");
+                    }
+                    closeModal(bulkAddModal);
+                    fileInput.value = '';
+                };
+                reader.readAsText(file);
+            });
+            
+            function openDetailModal(id) {
+                currentEditingId = id; const c = customers.find(c => c.id == id);
+                document.getElementById('detail-modal-title').textContent = c.companyName;
+                document.getElementById('detail-account-number').textContent = c.accountNumber; document.getElementById('detail-location').textContent = `${c.area}, ${c.emirate}`;
+                document.getElementById('detail-status').innerHTML = `<span class="status-badge status-${c.status.toLowerCase().replace(' ', '-')}">${c.status}</span>`;
+                document.getElementById('detail-payment-status').innerHTML = `<span class="payment-${c.paymentStatus.toLowerCase()}">${c.paymentStatus}</span>`;
+                document.getElementById('detail-outstanding').textContent = formatCurrency(c.outstandingAmount); document.getElementById('detail-consultant').textContent = c.salesConsultant;
+                renderNotesHistory(c);
+                if (!noteEditor) noteEditor = new Quill('#note-editor-container', { theme: 'snow', placeholder: 'Enter visit notes...' });
+                noteEditor.setContents([]); document.getElementById('scheduled-visit-date').value = ''; openModal(detailModal);
+            }
+            function renderNotesHistory(c) {
+                const container = document.getElementById('notes-history');
+                const notes = c.notes || [];
+                container.innerHTML = notes.length ? [...notes].reverse().map(note => `<div class="note-item"><div class="note-meta">Added on: ${new Date(note.timestamp).toLocaleString()}</div><div class="note-content">${note.text}</div></div>`).join('') : '<p>No notes for this customer yet.</p>';
+            }
+            document.getElementById('save-note-btn').addEventListener('click', () => {
+                const customer = customers.find(c => c.id == currentEditingId);
+                if (!customer.notes) customer.notes = [];
+                if (noteEditor.getLength() > 1) customer.notes.push({ timestamp: new Date().toISOString(), text: noteEditor.root.innerHTML });
+                const visitDate = document.getElementById('scheduled-visit-date').value;
+                if (!customer.scheduledVisits) customer.scheduledVisits = [];
+                if (visitDate) customer.scheduledVisits.push(visitDate);
+                syncAllData(); renderNotesHistory(customer); noteEditor.setContents([]); document.getElementById('scheduled-visit-date').value = '';
+                showToast('Note and schedule updated.');
+            });
+            
+            function openScheduleModal(id) {
+                const customer = customers.find(c => c.id == id);
+                document.getElementById('schedule-modal-title').textContent = `Schedule Visit for ${customer.companyName}`;
+                document.getElementById('schedule-customer-id').value = id;
+                document.getElementById('schedule-visit-form').reset();
+                openModal(scheduleModal);
+            }
+
+            document.getElementById('schedule-visit-form').addEventListener('submit', e => {
+                e.preventDefault();
+                const customerId = document.getElementById('schedule-customer-id').value;
+                const visitDate = document.getElementById('quick-schedule-date').value;
+                const visitNotes = document.getElementById('quick-visit-notes').value.trim();
+                const customer = customers.find(c => c.id == customerId);
+                
+                if (!customer.scheduledVisits) customer.scheduledVisits = [];
+                customer.scheduledVisits.push(visitDate);
+
+                if (visitNotes) {
+                    if (!customer.notes) customer.notes = [];
+                    const noteText = `<strong>Note for visit on ${formatDate(visitDate)}:</strong><br>${visitNotes.replace(/\n/g, '<br>')}`;
+                    customer.notes.push({ timestamp: new Date().toISOString(), text: noteText });
+                }
+
+                syncAllData(); showToast(`Visit scheduled for ${customer.companyName}`);
+                closeModal(scheduleModal);
+                if(document.getElementById('visits-page').classList.contains('active')) renderVisitsPage();
+            });
+
+            function renderVisitsPage() {
+                if(calendar) calendar.destroy();
+                const visibleCustomers = getVisibleCustomers();
+                const events = visibleCustomers.flatMap(c => (c.scheduledVisits || []).map(v => ({ title: c.companyName, start: v, allDay: true, extendedProps: { customerId: c.id } })));
+                calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+                    initialView: 'dayGridMonth',
+                    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
+                    events,
+                    eventClick: info => openDetailModal(info.event.extendedProps.customerId)
+                });
+                calendar.render();
+                
+                const quickFilterButtons = document.querySelectorAll('.quick-filters .btn');
+                quickFilterButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        quickFilterButtons.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        currentVisitFilter = btn.dataset.filter;
+                        document.getElementById('visit-start-date').value = '';
+                        document.getElementById('visit-end-date').value = '';
+                        renderVisitList();
+                    });
+                });
+
+                document.getElementById('apply-date-filter-btn').addEventListener('click', () => {
+                    quickFilterButtons.forEach(b => b.classList.remove('active'));
+                    currentVisitFilter = 'range';
+                    renderVisitList();
+                });
+
+                renderVisitList();
+            }
+
+            function renderVisitList() {
+                const listTitle = document.getElementById('visit-list-title');
+                const visitListBody = document.getElementById('visit-list-body');
+                const startDateVal = document.getElementById('visit-start-date').value;
+                const endDateVal = document.getElementById('visit-end-date').value;
+                const visibleCustomers = getVisibleCustomers();
+
+                const allVisits = visibleCustomers.flatMap(c => 
+                    (c.scheduledVisits || []).map(v => ({ 
+                        date: v, companyName: c.companyName, emirate: c.emirate, 
+                        salesConsultant: c.salesConsultant, customerId: c.id 
+                    }))
+                );
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                let filteredVisits = [];
+
+                if (currentVisitFilter === 'range' && startDateVal && endDateVal) {
+                    listTitle.textContent = 'Visits by Date Range';
+                    const start = new Date(startDateVal.replace(/-/g, '/'));
+                    const end = new Date(endDateVal.replace(/-/g, '/'));
+                    start.setHours(0, 0, 0, 0);
+                    end.setHours(23, 59, 59, 999);
+                    filteredVisits = allVisits.filter(v => {
+                        const visitDate = new Date(v.date.replace(/-/g, '/'));
+                        return visitDate >= start && visitDate <= end;
+                    });
+                } else {
+                    switch (currentVisitFilter) {
+                        case 'overdue':
+                            listTitle.textContent = 'Overdue Visits';
+                            filteredVisits = allVisits.filter(v => new Date(v.date.replace(/-/g, '/')) < today);
+                            break;
+                        case 'today':
+                            listTitle.textContent = "Today's Visits";
+                            filteredVisits = allVisits.filter(v => new Date(v.date.replace(/-/g, '/')).getTime() === today.getTime());
+                            break;
+                        case 'upcoming':
+                            listTitle.textContent = 'Upcoming Visits';
+                            filteredVisits = allVisits.filter(v => new Date(v.date.replace(/-/g, '/')) >= today);
+                            break;
+                        case 'all':
+                        default:
+                            listTitle.textContent = 'All Scheduled Visits';
+                            filteredVisits = allVisits;
+                            break;
+                    }
+                }
+
+                filteredVisits.sort((a, b) => new Date(a.date.replace(/-/g, '/')) - new Date(b.date.replace(/-/g, '/')));
+
+                visitListBody.innerHTML = filteredVisits.length ? filteredVisits.map(v => {
+                    const visitDate = new Date(v.date.replace(/-/g, '/'));
+                    let rowClass = '';
+                    if (visitDate < today) rowClass = 'overdue';
+                    else if (visitDate.getTime() === today.getTime()) rowClass = 'today';
+
+                    return `<tr class="visit-row ${rowClass}" data-id="${v.customerId}">
+                                <td>${formatDate(v.date)}</td><td>${v.companyName}</td><td>${v.emirate}</td>
+                                <td>${v.salesConsultant}</td>
+                                <td class="action-buttons"><button class="action-btn view-btn" title="View Customer"><i class="fas fa-eye"></i></button></td>
+                            </tr>`;
+                }).join('') : `<tr><td colspan="5"><div class="empty-state"><i class="fas fa-calendar-times"></i>No visits match the current filter.</div></td></tr>`;
+            }
+            document.getElementById('visit-list-body').addEventListener('click', e => { if (e.target.closest('button.view-btn')) openDetailModal(e.target.closest('tr').dataset.id); });
+
+            let lastActivityReportData = {};
+            function renderReportsPage() {
+                const consultantSelect = document.getElementById('report-consultant-select');
+                consultantSelect.innerHTML = `<option value="">Select Consultant...</option>` + consultants.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+            }
+            
+            // --- Reports Page Event Listeners (attached once) ---
+            document.getElementById('generate-report-btn').addEventListener('click', generateCustomerListReport);
+            document.getElementById('export-csv-btn').addEventListener('click', exportReportToCSV);
+            document.getElementById('export-pdf-btn').addEventListener('click', exportReportToPDF);
+
+            document.getElementById('generate-activity-report-btn').addEventListener('click', () => {
+                const consultantName = document.getElementById('report-consultant-select').value;
+                const reportDateStr = document.getElementById('report-date-select').value;
+                const outputDiv = document.getElementById('activity-report-output');
+                
+                if (!consultantName || !reportDateStr) {
+                    showToast('Please select a consultant and a date.', 'error');
+                    return;
+                }
+
+                const reportDate = new Date(reportDateStr.replace(/-/g, '/'));
+                const consultantUser = users.find(u => u.consultantName === consultantName);
+                let attendanceRecord = consultantUser ? attendance.find(a => a.username === consultantUser.username && a.date === reportDateStr) : null;
+                let attendanceInfo = { start: attendanceRecord?.start || 'N/A', end: attendanceRecord?.end || 'N/A' };
+                
+                const consultantCustomers = customers.filter(c => c.salesConsultant === consultantName);
+                const visitedCustomers = consultantCustomers.flatMap(c => 
+                    (c.notes || [])
+                     .filter(note => new Date(note.timestamp).toISOString().split('T')[0] === reportDateStr)
+                     .map(note => ({
+                         accountNumber: c.accountNumber,
+                         companyName: c.companyName,
+                         emirate: c.emirate,
+                         noteText: note.text.replace(/<[^>]*>/g, ''),
+                         timestamp: new Date(note.timestamp)
+                     }))
+                );
+                
+                let timelineEvents = [];
+                const timeStringToDate = (timeStr, date) => {
+                    if (!timeStr || timeStr === 'N/A') return null;
+                    const [time, modifier] = timeStr.split(' ');
+                    let [hours, minutes, seconds] = time.split(':');
+                    hours = parseInt(hours);
+                    if (modifier === 'PM' && hours < 12) hours += 12;
+                    if (modifier === 'AM' && hours === 12) hours = 0;
+                    const d = new Date(date);
+                    d.setHours(hours, parseInt(minutes), parseInt(seconds));
+                    return d;
+                };
+
+                const startTimestamp = timeStringToDate(attendanceInfo.start, reportDate);
+                const endTimestamp = timeStringToDate(attendanceInfo.end, reportDate);
+
+                if (startTimestamp) timelineEvents.push({ type: 'start', time: attendanceInfo.start, timestamp: startTimestamp });
+                if (endTimestamp) timelineEvents.push({ type: 'end', time: attendanceInfo.end, timestamp: endTimestamp });
+                visitedCustomers.forEach(visit => timelineEvents.push({ type: 'visit', timestamp: visit.timestamp, data: visit }));
+
+                timelineEvents.sort((a,b) => a.timestamp - b.timestamp);
+                lastActivityReportData = { consultantName, reportDateStr, attendance: attendanceInfo, visitedCustomers, timelineEvents };
+                
+                let timeAxisHTML = Array.from({length: 11}, (_, i) => i + 8).map(i => `<div class="time-label">${i > 12 ? i - 12 : i} ${i >= 12 ? 'PM' : 'AM'}</div>`).join('');
+                
+                let eventsHTML = '';
+                if (timelineEvents.length > 0) {
+                     eventsHTML = timelineEvents.map((event, index) => {
+                        const startHour = 8, pixelsPerMinute = 1, minutes = event.timestamp.getHours() * 60 + event.timestamp.getMinutes();
+                        const top = (minutes - (startHour * 60)) * pixelsPerMinute;
+                        let nextEventMinutes = (18 * 60);
+                        if(index + 1 < timelineEvents.length) nextEventMinutes = timelineEvents[index+1].timestamp.getHours() * 60 + timelineEvents[index+1].timestamp.getMinutes();
+                        else if (endTimestamp) nextEventMinutes = endTimestamp.getHours() * 60 + endTimestamp.getMinutes();
+                        let duration = Math.max(20, nextEventMinutes - minutes);
+                        if (event.type === 'start' || event.type === 'end') duration = 20;
+                        const height = duration * pixelsPerMinute;
+                        let content = '';
+                        switch(event.type) {
+                            case 'start': content = `<p><strong>Day Started:</strong> ${event.time}</p>`; break;
+                            case 'end': content = `<p><strong>Day Ended:</strong> ${event.time}</p>`; break;
+                            case 'visit': content = `<p><strong>${event.timestamp.toLocaleTimeString()} - ${event.data.companyName}</strong></p><p class="event-note">${event.data.noteText}</p>`; break;
+                        }
+                        return `<div class="event-block event-${event.type}" style="top: ${top}px; height: ${height}px;">${content}</div>`;
+                    }).join('');
+                } else {
+                    eventsHTML = `<div class="timeline-empty-state"><i class="fas fa-moon"></i><p>No Activity Logged</p></div>`;
+                }
+
+                outputDiv.innerHTML = `<h4>Daily Activity Report</h4><div class="report-meta"><p><strong>Consultant:</strong> ${consultantName}<br><strong>Date:</strong> ${formatDate(reportDateStr)}<br><strong>Day Started:</strong> ${attendanceInfo.start}<br><strong>Day Ended:</strong> ${attendanceInfo.end}</p></div><div class="timeline-container"><div class="time-axis">${timeAxisHTML}</div><div class="events-container">${eventsHTML}</div></div>`;
+                document.getElementById('export-activity-pdf-btn').style.display = 'inline-flex';
+            });
+
+            document.getElementById('export-activity-pdf-btn').addEventListener('click', () => {
+                // *** FIX: Correct way to instantiate jsPDF and call autoTable ***
+                const jsPDF = window.jspdf.jsPDF; 
+                const doc = new jsPDF();
+
+                const { consultantName, reportDateStr, timelineEvents } = lastActivityReportData;
+                doc.setFontSize(18); doc.text("Daily Activity Report", 14, 22); doc.setFontSize(11);
+                doc.text(`Consultant: ${consultantName}`, 14, 32); doc.text(`Date: ${formatDate(reportDateStr)}`, 14, 38);
+                const bodyData = timelineEvents.map(event => {
+                    if (event.type === 'start') return [event.timestamp.toLocaleTimeString(), 'Day Started', '', ''];
+                    if (event.type === 'end') return [event.timestamp.toLocaleTimeString(), 'Day Ended', '', ''];
+                    return [event.timestamp.toLocaleTimeString(), event.data.companyName, event.data.emirate, event.data.noteText];
+                });
+                
+                doc.autoTable({ 
+                    head: [['Time', 'Activity/Customer', 'Emirate', 'Notes']], 
+                    body: bodyData, 
+                    startY: 45, 
+                    theme: 'grid', 
+                    styles: { fontSize: 8 }, 
+                    headStyles: { fillColor: [220, 53, 69] } 
+                });
+
+                doc.save(`Activity_Report_${consultantName}_${reportDateStr}.pdf`);
+            });
+            
+            function generateCustomerListReport() {
+                const status = document.getElementById('report-status-filter').value;
+                const paymentStatus = document.getElementById('report-payment-status-filter').value;
+                const consultant = document.getElementById('report-consultant-filter').value.toLowerCase();
+                const outputDiv = document.getElementById('report-output');
+
+                let filteredCustomers = customers.filter(c => {
+                    const statusMatch = status ? c.status === status : true;
+                    const paymentStatusMatch = paymentStatus ? c.paymentStatus === paymentStatus : true;
+                    const consultantMatch = consultant ? c.salesConsultant.toLowerCase().includes(consultant) : true;
+                    return statusMatch && paymentStatusMatch && consultantMatch;
+                });
+
+                lastGeneratedReportData = filteredCustomers;
+
+                if (filteredCustomers.length === 0) {
+                    outputDiv.innerHTML = '<p>No customers found matching the selected criteria.</p>';
+                    document.getElementById('export-csv-btn').style.display = 'none';
+                    document.getElementById('export-pdf-btn').style.display = 'none';
+                    return;
+                }
+
+                const tableHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Account #</th>
+                                <th>Company Name</th>
+                                <th>Emirate</th>
+                                <th>Consultant</th>
+                                <th>Outstanding</th>
+                                <th>Status</th>
+                                <th>Payment Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredCustomers.map(c => `
+                                <tr>
+                                    <td>${c.accountNumber}</td>
+                                    <td>${c.companyName}</td>
+                                    <td>${c.emirate}</td>
+                                    <td>${c.salesConsultant}</td>
+                                    <td>${formatCurrency(c.outstandingAmount)}</td>
+                                    <td><span class="status-badge status-${c.status.toLowerCase().replace(' ', '-')}">${c.status}</span></td>
+                                    <td><span class="payment-${c.paymentStatus.toLowerCase()}">${c.paymentStatus}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                outputDiv.innerHTML = tableHTML;
+                document.getElementById('export-csv-btn').style.display = 'inline-flex';
+                document.getElementById('export-pdf-btn').style.display = 'inline-flex';
+            }
+
+            function exportReportToCSV() {
+                const headers = ['Account #', 'Company Name', 'Emirate', 'Consultant', 'Outstanding', 'Status', 'Payment Status'];
+                const rows = lastGeneratedReportData.map(c => [
+                    c.accountNumber, c.companyName, c.emirate, c.salesConsultant, 
+                    c.outstandingAmount, c.status, c.paymentStatus
+                ]);
+
+                let csvContent = "data:text/csv;charset=utf-8," 
+                    + headers.join(",") + "\n" 
+                    + rows.map(e => e.join(",")).join("\n");
+                
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "customer_report.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            function exportReportToPDF() {
+                // *** FIX: Correct way to instantiate jsPDF and call autoTable ***
+                const jsPDF = window.jspdf.jsPDF;
+                const doc = new jsPDF();
+                
+                doc.setFontSize(18);
+                doc.text("Customer List Report", 14, 22);
+                doc.setFontSize(11);
+                
+                const head = [['Account #', 'Company Name', 'Emirate', 'Consultant', 'Outstanding', 'Status', 'Payment Status']];
+                const body = lastGeneratedReportData.map(c => [
+                    c.accountNumber, c.companyName, c.emirate, c.salesConsultant, 
+                    formatCurrency(c.outstandingAmount), c.status, c.paymentStatus
+                ]);
+
+                doc.autoTable({
+                    head: head,
+                    body: body,
+                    startY: 30,
+                    theme: 'grid',
+                    styles: { fontSize: 8 },
+                    headStyles: { fillColor: [220, 53, 69] } 
+                });
+
+                doc.save('customer_report.pdf');
+            }
+
+
+            const userTableBody = document.getElementById('user-table-body'); const userForm = document.getElementById('user-form');
+            const userModalTitle = document.getElementById('user-modal-title'); const consultantNameGroup = document.getElementById('consultant-name-group');
+            const consultantTableBody = document.getElementById('consultant-table-body'); const consultantForm = document.getElementById('consultant-form');
+
+            function renderUserManagementPage() {
+                userTableBody.innerHTML = users.map(user => `
+                    <tr data-id="${user.id}">
+                        <td>${user.username}</td><td>${user.name}</td><td>${user.role}</td><td>${user.consultantName || 'N/A'}</td>
+                        <td class="action-buttons">
+                            <button class="action-btn edit-btn" title="Edit User"><i class="fas fa-pencil-alt"></i></button>
+                            <button class="action-btn delete-btn" title="Delete User"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`).join('');
+            }
+            function renderConsultantsPage() {
+                consultantTableBody.innerHTML = consultants.map(c => `
+                    <tr data-id="${c.id}">
+                        <td>${c.name}</td>
+                        <td class="action-buttons">
+                            <button class="action-btn edit-btn" title="Edit Consultant"><i class="fas fa-pencil-alt"></i></button>
+                            <button class="action-btn delete-btn" title="Delete Consultant"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`).join('');
+            }
+
+            document.getElementById('add-user-btn').addEventListener('click', () => openUserForm());
+            document.getElementById('add-consultant-btn').addEventListener('click', () => openConsultantForm());
+
+            userTableBody.addEventListener('click', e => {
+                const btn = e.target.closest('button.action-btn'); if (!btn) return;
+                const id = parseInt(e.target.closest('tr').dataset.id);
+                if (btn.classList.contains('edit-btn')) openUserForm(id);
+                if (btn.classList.contains('delete-btn')) deleteUser(id);
+            });
+            consultantTableBody.addEventListener('click', e => {
+                const btn = e.target.closest('button.action-btn'); if (!btn) return;
+                const id = e.target.closest('tr').dataset.id;
+                if (btn.classList.contains('edit-btn')) openConsultantForm(id);
+                if (btn.classList.contains('delete-btn')) deleteConsultant(id);
+            });
+            document.getElementById('user-role').addEventListener('change', (e) => consultantNameGroup.style.display = e.target.value === 'user' ? 'block' : 'none');
+
+            function openUserForm(id = null) {
+                userForm.reset(); const usernameInput = document.getElementById('user-username');
+                const passwordInput = document.getElementById('user-password'); document.getElementById('user-id').value = id || '';
+                updateDatalists();
+                if (id) {
+                    const user = users.find(u => u.id === id); userModalTitle.textContent = "Edit User";
+                    usernameInput.value = user.username; usernameInput.readOnly = true;
+                    document.getElementById('user-fullname').value = user.name; document.getElementById('user-role').value = user.role;
+                    passwordInput.required = false; passwordInput.placeholder = "Leave blank to keep unchanged";
+                    if ((user.role || '').trim().toLowerCase() === 'user') {
+                        consultantNameGroup.style.display = 'block';
+                        document.getElementById('user-consultant-name').value = user.consultantName || '';
+                    } else consultantNameGroup.style.display = 'none';
+                } else {
+                    userModalTitle.textContent = "Add New User"; usernameInput.readOnly = false;
+                    passwordInput.required = true; passwordInput.placeholder = "Enter password";
+                    consultantNameGroup.style.display = document.getElementById('user-role').value === 'user' ? 'block' : 'none';
+                }
+                openModal(userModal);
+            }
+
+            userForm.addEventListener('submit', (e) => {
+                e.preventDefault(); const id = document.getElementById('user-id').value;
+                const username = document.getElementById('user-username').value;
+                const password = document.getElementById('user-password').value;
+                const role = document.getElementById('user-role').value;
+                if (!id && users.some(u => u.username === username)) { showToast('Username already exists.', 'error'); return; }
+                const userData = {
+                    username: username, name: document.getElementById('user-fullname').value, role: role,
+                    consultantName: role === 'user' ? document.getElementById('user-consultant-name').value : ''
+                };
+                if (password) userData.password = password;
+                if (id) {
+                    const userIndex = users.findIndex(u => u.id == parseInt(id));
+                    users[userIndex] = { ...users[userIndex], ...userData };
+                } else {
+                    userData.id = Date.now();
+                    if (!userData.password) { showToast('Password is required for new users.', 'error'); return; }
+                    users.push(userData);
+                }
+                syncAllData(); renderUserManagementPage(); closeModal(userModal); showToast('User saved successfully!');
+            });
+
+            function deleteUser(id) {
+                if (id === currentUser.id) { showToast("You cannot delete your own account.", "error"); return; }
+                const user = users.find(u => u.id === id);
+                if (confirm(`Are you sure you want to delete user: ${user.username}?`)) {
+                    users = users.filter(u => u.id !== id);
+                    syncAllData(); renderUserManagementPage(); showToast(`User ${user.username} deleted.`, 'error');
+                }
+            }
+            
+            function openConsultantForm(id = null) {
+                consultantForm.reset(); document.getElementById('consultant-id').value = id || '';
+                if (id) {
+                    const consultant = consultants.find(c => c.id === id);
+                    document.getElementById('consultant-modal-title').textContent = "Edit Consultant";
+                    document.getElementById('consultant-name').value = consultant.name;
+                } else document.getElementById('consultant-modal-title').textContent = "Add New Consultant";
+                openModal(consultantModal);
+            }
+
+            consultantForm.addEventListener('submit', e => {
+                e.preventDefault(); const id = document.getElementById('consultant-id').value;
+                const name = document.getElementById('consultant-name').value.trim();
+                if (consultants.some(c => c.name.toLowerCase() === name.toLowerCase() && c.id !== id)) { showToast('Consultant name already exists.', 'error'); return; }
+                if (id) {
+                    const index = consultants.findIndex(c => c.id === id);
+                    consultants[index].name = name;
+                } else consultants.push({ id: generateId('con'), name: name });
+                syncAllData(); renderConsultantsPage(); updateDatalists(); closeModal(consultantModal); showToast('Consultant saved successfully!');
+            });
+
+            function deleteConsultant(id) {
+                const consultant = consultants.find(c => c.id === id);
+                if (confirm(`Are you sure you want to delete consultant: ${consultant.name}?`)) {
+                    consultants = consultants.filter(c => c.id !== id);
+                    syncAllData(); renderConsultantsPage(); updateDatalists(); showToast(`Consultant ${consultant.name} deleted.`, 'error');
+                }
+            }
+            
+            // Main execution
+            await loadInitialData();
+            checkLoginState();
+        });
+    </script>
+</body>
+</html>
