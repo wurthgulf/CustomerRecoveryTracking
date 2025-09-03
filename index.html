@@ -1,8 +1,8 @@
 <!--
 Enhanced Recovery Pro - Version 4.8.9 (Definitive Workflow Fix)
 Changelog v4.8.9:
-- FIX (Critical): Corrected the payment saving workflow. It no longer causes a page re-render when initiated from the "Mark as Done" modal, preventing the modal from closing and preserving user-entered data.
-- FEATURE: The "Record Payment" button in the "Mark as Done" modal now becomes disabled and shows "Payment Logged" after a payment is submitted.
+- WORKFLOW FIX (Critical): Corrected the payment saving workflow. It no longer causes a page re-render when initiated from the "Mark as Done" modal, preventing the modal from closing and preserving user-entered data.
+- FEATURE: The "Record Payment" button in the "Mark as Done" modal now becomes disabled and shows "Payment Logged" after a payment is submitted, preventing duplicate entries and providing clear user feedback.
 - UI FIX (Critical): Implemented dynamic z-index management for modals.
 -->
 <!DOCTYPE html>
@@ -340,6 +340,9 @@ Changelog v4.8.9:
             if (id === 'visit-notes-modal') {
                 App.state.paymentFlowOrigin = null; 
             }
+            if (id === 'payment-modal' && App.state.paymentFlowOrigin) {
+                App.Visits.updateVisitNotesUI();
+            }
         }, 
         toast: (title, icon = 'success') => Swal.fire({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, icon, title, background: 'var(--card-bg)', color: 'var(--text-primary)' }), confirm: (title, text, cb) => Swal.fire({ title, text, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--primary)', cancelButtonColor: 'var(--danger)', confirmButtonText: 'Yes, do it!', background: 'var(--card-bg)', color: 'var(--text-primary)' }).then(r => r.isConfirmed && cb()) });
     
@@ -514,6 +517,7 @@ Changelog v4.8.9:
             document.getElementById('log-location-hidden').value = ''; 
             if (!this.logNotesQuill) this.logNotesQuill = new Quill('#log-notes-editor', { theme: 'snow', placeholder: 'Enter contact notes...' }); 
             this.logNotesQuill.root.innerHTML = ''; 
+            App.state.paymentFlowOrigin = null; 
             this.updateVisitNotesUI();
             App.UI.openModal('visit-notes-modal'); 
         }, 
@@ -639,7 +643,6 @@ Changelog v4.8.9:
             if (App.state.paymentFlowOrigin) {
                 App.state.paymentFlowOrigin.paymentLogged = true;
                 App.UI.closeModal('payment-modal');
-                // The closeModal function will trigger the UI update on the visit modal
             } else {
                 App.UI.closeModal('payment-modal');
                 this.render(); 
@@ -778,7 +781,7 @@ Changelog v4.8.9:
             this.displayReport('Customer Risk Analysis Report', headers, data);
         },
         generateCustomerReport: function() { const c = App.Helpers.getScopedData('customers'), h = ['Account #', 'Company Name', 'Emirate', 'Outstanding', 'Consultant', 'Status'], d = c.map(i => [i.accountNo, i.companyName, i.emirate, App.Helpers.formatCurrency(i.outstanding), i.salesConsultant, i.status]); this.displayReport('Customer List Report', h, d); },
-        generateConsultantReport: function() { const c = App.Helpers.getScopedData('customers'), v = App.Helpers.getScopedData('visits'); const rd = c.reduce((a, i) => { const con = i.salesConsultant; if (!a[con]) a[con] = { customers: 0, totalDebt: 0, visits: 0 }; a[con].customers++; a[con].totalDebt += i.outstanding; return a; }, {}); v.forEach(i => { if (rd[i.collector]) rd[i.collector].visits++; }); const h = ['Consultant', 'Assigned Customers', 'Total Outstanding', 'Total Visits'], d = Object.entries(rd).map(([n, s]) => [n, s.customers, App.Helpers.formatCurrency(s.totalDebt), s.visits]); this.displayReport('Consultant Activity Report', h, d); },
+        generateConsultantReport: function() { const c = App.Helpers.getScopedData('customers'), v = App.DB.get('visits'); const rd = c.reduce((a, i) => { const con = i.salesConsultant; if (!a[con]) a[con] = { customers: 0, totalDebt: 0, visits: 0 }; a[con].customers++; a[con].totalDebt += i.outstanding; return a; }, {}); v.forEach(i => { if (rd[i.collector]) rd[i.collector].visits++; }); const h = ['Consultant', 'Assigned Customers', 'Total Outstanding', 'Total Visits'], d = Object.entries(rd).map(([n, s]) => [n, s.customers, App.Helpers.formatCurrency(s.totalDebt), s.visits]); this.displayReport('Consultant Activity Report', h, d); },
         generateOverdueReport: function() { const customers = App.Helpers.getScopedData('customers').filter(c => c.paymentStatus === 'Overdue'); const headers = ['Account #', 'Company Name', 'Outstanding', 'Consultant', 'Emirate']; const data = customers.map(c => [c.accountNo, c.companyName, App.Helpers.formatCurrency(c.outstanding), c.salesConsultant, c.emirate]); this.displayReport('Overdue Accounts Report', headers, data); },
         generateRecoveryPerformanceReport: function() { const consultants = App.DB.get('consultants'); const customers = App.Helpers.getScopedData('customers'); const headers = ['Consultant', 'Total Initial Debt', 'Total Outstanding', 'Total Recovered', 'Recovery Rate']; const data = consultants.map(consultant => { const assignedCustomers = customers.filter(c => c.salesConsultant === consultant.name); const initialDebt = assignedCustomers.reduce((sum, c) => sum + c.initialDebt, 0); const outstandingDebt = assignedCustomers.reduce((sum, c) => sum + c.outstanding, 0); const recovered = initialDebt - outstandingDebt; const recoveryRate = initialDebt > 0 ? ((recovered / initialDebt) * 100).toFixed(2) + '%' : 'N/A'; return [consultant.name, App.Helpers.formatCurrency(initialDebt), App.Helpers.formatCurrency(outstandingDebt), App.Helpers.formatCurrency(recovered), recoveryRate]; }); this.displayReport('Debt Recovery Performance Report', headers, data); },
         generateCustomerStatement: function() { const customerId = document.getElementById('statement-customer-select').value; if (!customerId) { App.UI.toast('Please select a customer.', 'warning'); return; } const customer = App.DB.get('customers').find(c => c.accountNo === customerId); const payments = App.DB.get('payments').filter(p => p.customerId === customerId && p.status === 'Completed').sort((a,b) => new Date(a.date) - new Date(b.date)); let transactions = []; transactions.push({ date: 'Initial', description: 'Initial Debt Amount', debit: customer.initialDebt, credit: 0 }); payments.forEach(p => { transactions.push({ date: p.date, description: `Payment Received (${p.method})`, debit: 0, credit: p.amount }); }); let balance = 0; const transactionsWithBalance = transactions.map(t => { balance += t.debit - t.credit; return {...t, balance}; }); const body = transactionsWithBalance.map(t => { return `<tr><td>${t.date === 'Initial' ? 'N/A' : App.Helpers.formatDate(t.date)}</td><td>${t.description}</td><td>${t.debit > 0 ? App.Helpers.formatCurrency(t.debit) : '-'}</td><td>${t.credit > 0 ? App.Helpers.formatCurrency(t.credit) : '-'}</td><td>${App.Helpers.formatCurrency(t.balance)}</td></tr>` }).join(''); const reportTitle = `Statement for ${customer.companyName} (${customer.accountNo})`; this.currentStatementData = { customer, transactionsWithBalance }; const exportButtons = `<div class="d-flex gap-2"><button class="btn btn-outline" onclick="App.Reports.exportStatementCSV()"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" onclick="App.Reports.exportStatementPDF()"><i class="fas fa-file-pdf"></i> PDF</button></div>`; document.getElementById('report-output').innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">${reportTitle}</h3>${exportButtons}</div><div class="detail-info-grid" style="grid-template-columns: repeat(3, 1fr);"><div class="detail-info-card"><div class="label">Total Billed</div><div class="value">${App.Helpers.formatCurrency(customer.initialDebt)}</div></div><div class="detail-info-card"><div class="label">Total Paid</div><div class="value">${App.Helpers.formatCurrency(customer.initialDebt - customer.outstanding)}</div></div><div class="detail-info-card"><div class="label">Balance Due</div><div class="value" style="color:var(--danger);">${App.Helpers.formatCurrency(customer.outstanding)}</div></div></div><div class="table-container mt-4"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Debit (Billed)</th><th>Credit (Paid)</th><th>Balance</th></tr></thead><tbody>${body}</tbody></table></div></div>`; },
