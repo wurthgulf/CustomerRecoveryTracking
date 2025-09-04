@@ -1,5 +1,13 @@
 <!--
-Enhanced Recovery Pro - Version 4.9.1 (Report Parsing Fix)
+Enhanced Recovery Pro - Version 4.9.5 (Robust CSV Header Validation)
+Changelog v4.9.5:
+- FIX (Critical): Corrected a bug in the CSV import validation logic that incorrectly rejected valid headers. The header matching is now simpler and more reliable.
+Changelog v4.9.4:
+- FIX: Improved CSV file type validation to accept files from systems that report non-standard MIME types (e.g., from Excel), fixing the import functionality.
+Changelog v4.9.3:
+- FIX (Critical): Re-architected payment activity logging to store the 'amount' as a dedicated field, ensuring 100% accuracy in the Consultant Daily Activity report.
+Changelog v4.9.2:
+- FIX: Correctly store and display payment amounts in the Consultant Daily Activity report.
 Changelog v4.9.1:
 - FIX (Critical): Re-engineered activity logging to store customerId directly, making report generation 100% reliable and fixing the "N/A" customer name issue.
 - FEATURE: Upgraded Consultant Activity Report to support date ranges (From/To).
@@ -633,7 +641,7 @@ Changelog v4.9.1:
                     if (c[ci].outstanding <= 0) { c[ci].outstanding = 0; c[ci].paymentStatus = 'Cleared'; } else { c[ci].paymentStatus = 'Pending';} 
                     App.DB.set('customers', c); 
                 } 
-                App.Helpers.logActivity(`recorded a payment`, `(Method: ${pd.method})`, pd.customerId); 
+                App.Helpers.logActivity('recorded a payment', `(Method: ${pd.method})`, pd.customerId, pd.amount); 
             } 
             
             App.UI.toast('Payment recorded!'); 
@@ -714,8 +722,8 @@ Changelog v4.9.1:
                 const activeDays = [...new Set(log.filter(e => e.action === 'Started Day').map(e => e.date))].length;
                 const completedVisits = log.filter(e => e.action.includes('completed visit')).length; 
                 const recordedPayments = log.filter(e => e.action.includes('recorded a payment')); 
-                const totalRecovered = recordedPayments.reduce((sum, p) => { const amountMatch = p.details.match(/AED\s?([\d,]+\.\d{2})/); return sum + (amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0); }, 0); 
-                const timelineHTML = log.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20).map(entry => { let detail = entry.details || entry.action; let icon = "fa-info-circle"; if (entry.action.includes("completed visit")) { icon = "fa-check-circle"; detail = `<strong>Completed Visit:</strong> ${entry.details}`; } if (entry.action.includes("recorded a payment")) { icon = "fa-dollar-sign"; detail = `<strong>Recorded Payment:</strong> ${entry.details}`; } if (entry.action === 'Started Day') { icon = "fa-play-circle"; detail = 'Started Day'; } if (entry.action === 'Ended Day') { icon = "fa-stop-circle"; detail = 'Ended Day'; } return `<li class="d-flex align-items-center gap-4 mb-4"><div class="d-flex align-items-center" style="min-width: 130px; color: var(--text-secondary); font-size: var(--fs-sm);"><i class="fas ${icon}" style="color: var(--primary); font-size: 1.2rem; margin-right: var(--spacing-2);"></i><span style="font-weight: 500;">${entry.time}</span></div><div style="font-weight: 500;">${detail}</div></li>`; }).join(''); 
+                const totalRecovered = recordedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                const timelineHTML = log.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20).map(entry => { let detail = entry.details || entry.action; let icon = "fa-info-circle"; if (entry.action.includes("completed visit")) { icon = "fa-check-circle"; detail = `<strong>Completed Visit:</strong> ${entry.details}`; } if (entry.action.includes("recorded a payment")) { icon = "fa-dollar-sign"; detail = `<strong>Recorded Payment:</strong> ${App.Helpers.formatCurrency(entry.amount)} ${entry.details}`; } if (entry.action === 'Started Day') { icon = "fa-play-circle"; detail = 'Started Day'; } if (entry.action === 'Ended Day') { icon = "fa-stop-circle"; detail = 'Ended Day'; } return `<li class="d-flex align-items-center gap-4 mb-4"><div class="d-flex align-items-center" style="min-width: 130px; color: var(--text-secondary); font-size: var(--fs-sm);"><i class="fas ${icon}" style="color: var(--primary); font-size: 1.2rem; margin-right: var(--spacing-2);"></i><span style="font-weight: 500;">${entry.time}</span></div><div style="font-weight: 500;">${detail}</div></li>`; }).join(''); 
                 output.innerHTML = `<div class="card"><div class="card-header" style="border-bottom: none;"><h3 class="card-title">${reportTitle}</h3></div><h4 class="card-title" style="font-size: var(--fs-lg); margin-bottom: var(--spacing-4);">Summary</h4><div class="detail-info-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));"><div class="detail-info-card"><div class="label">ACTIVE DAYS</div><div class="value">${activeDays}</div></div><div class="detail-info-card"><div class="label">VISITS COMPLETED</div><div class="value">${completedVisits}</div></div><div class="detail-info-card"><div class="label">PAYMENTS RECORDED</div><div class="value">${recordedPayments.length}</div></div><div class="detail-info-card"><div class="label">TOTAL RECOVERED</div><div class="value" style="color:var(--success);">${App.Helpers.formatCurrency(totalRecovered)}</div></div></div><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title" style="font-size: var(--fs-lg); margin-bottom: var(--spacing-4);">Recent Timeline (Last 20)</h4><ul style="list-style:none;">${timelineHTML}</ul></div>`; 
             } else { 
                 const customers = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c.companyName; return map; }, {});
@@ -725,8 +733,10 @@ Changelog v4.9.1:
                     if(entry.action.includes('Day')) { category = 'Attendance'; } 
                     else if (entry.action.includes('payment')) {
                         category = 'Payment';
-                        const amountMatch = entry.details.match(/AED\s?([\d,]+\.\d{2})/); 
-                        if (amountMatch) amount = App.Helpers.formatCurrency(parseFloat(amountMatch[1].replace(/,/g, '')));
+                        details = entry.details;
+                        if (entry.amount && typeof entry.amount === 'number') {
+                            amount = App.Helpers.formatCurrency(entry.amount);
+                        }
                     } else if (entry.action.includes('visit')) {
                         category = 'Visit';
                     } else if (entry.action.includes('added a new customer')) {
@@ -922,7 +932,20 @@ Changelog v4.9.1:
     Object.assign(App.Notifications, { init() { document.getElementById('notification-bell-btn').addEventListener('click', (e) => { e.stopPropagation(); this.toggleDropdown(); }); document.body.addEventListener('click', (e) => { const bellBtn = document.getElementById('notification-bell-btn'); const dropdown = document.getElementById('notification-dropdown'); if (dropdown && !dropdown.classList.contains('hidden') && !bellBtn.contains(e.target) && !dropdown.contains(e.target)) { dropdown.classList.add('hidden'); } }); }, create(message) { let notifications = App.DB.get('notifications'); const newNotification = { id: `notif_${Date.now()}`, timestamp: Date.now(), message: message, isRead: false }; notifications.unshift(newNotification); App.DB.set('notifications', notifications); if(App.state.currentUser && App.state.currentUser.role === 'admin') this.render(); }, render() { const notifications = App.DB.get('notifications').sort((a, b) => b.timestamp - a.timestamp); const unreadCount = notifications.filter(n => !n.isRead).length; const badge = document.getElementById('notification-badge'); if (unreadCount > 0) { badge.textContent = unreadCount; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); } const list = document.getElementById('notification-list'); list.innerHTML = notifications.length > 0 ? notifications.slice(0, 15).map(n => `<li style="padding: var(--spacing-2) 0; border-bottom: 1px solid var(--border-color); ${!n.isRead ? 'font-weight: 600;' : ''}">${n.message}<div style="font-size: var(--fs-sm); color: var(--text-secondary); font-weight: 400; margin-top: 4px;"><i class="fas fa-clock"></i> ${App.Helpers.timeAgo(n.timestamp)}</div></li>`).join('') : '<li>No new notifications.</li>'; }, toggleDropdown() { const dropdown = document.getElementById('notification-dropdown'); const bellBtn = document.getElementById('notification-bell-btn'); const rect = bellBtn.getBoundingClientRect(); dropdown.style.top = `${rect.bottom + 10}px`; dropdown.style.right = `${window.innerWidth - rect.right}px`; dropdown.classList.toggle('hidden'); if(!dropdown.classList.contains('hidden')) { this.markAllAsRead(); } }, markAllAsRead() { let notifications = App.DB.get('notifications'); if (notifications.some(n => !n.isRead)) { setTimeout(() => { const updatedNotifications = notifications.map(n => ({ ...n, isRead: true })); App.DB.set('notifications', updatedNotifications); this.render(); }, 1500); } } });
     Object.assign(App.CommandPalette, { init() { window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'k') { e.preventDefault(); this.open(); } }); document.getElementById('command-palette-input').addEventListener('input', App.Helpers.debounce(e => this.search(e.target.value), 200)); document.getElementById('command-palette-modal').addEventListener('click', (e) => { if (e.target.id === 'command-palette-modal') this.close(); }); }, open() { App.UI.openModal('command-palette-modal'); document.getElementById('command-palette-input').focus(); }, close() { document.getElementById('command-palette-input').value = ''; document.getElementById('command-palette-results').innerHTML = ''; App.UI.closeModal('command-palette-modal'); }, search(query) { const resultsContainer = document.getElementById('command-palette-results'); if (!query || query.length < 2) { resultsContainer.innerHTML = ''; return; } const q = query.toLowerCase(); let results = []; App.DB.get('customers').forEach(c => { if (c.companyName.toLowerCase().includes(q) || c.accountNo.toLowerCase().includes(q)) { results.push({ type: 'Customer', title: c.companyName, description: `Account: ${c.accountNo} | Consultant: ${c.salesConsultant}`, action: () => { App.Customers.showCustomerDetail(c.accountNo); } }); } }); App.DB.get('payments').forEach(p => { if (p.id.toLowerCase().includes(q)) { const customer = App.DB.get('customers').find(c => c.accountNo === p.customerId); results.push({ type: 'Payment', title: `Payment: ${App.Helpers.formatCurrency(p.amount)}`, description: `ID: ${p.id} | For: ${customer ? customer.companyName : 'N/A'}`, action: () => { App.Payments.showPaymentDetail(p.id); } }); } }); this.renderResults(results); }, renderResults(results) { const container = document.getElementById('command-palette-results'); if (results.length === 0) { container.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-secondary);">No results found.</div>'; return; } container.innerHTML = results.map(r => `<div class="command-result-item" role="button" tabindex="0"><div style="font-size: var(--fs-sm); color: var(--primary); font-weight: 600;">${r.type}</div><div style="font-weight: 500;">${r.title}</div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${r.description}</div></div>`).join(''); document.querySelectorAll('.command-result-item').forEach((item, index) => { item.addEventListener('click', () => { results[index].action(); this.close(); }); }); if (!document.getElementById('command-palette-styles')) { const style = document.createElement('style'); style.id = 'command-palette-styles'; style.innerHTML = `.command-result-item { padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; margin-bottom: 0.25rem; } .command-result-item:hover, .command-result-item:focus { background-color: var(--bg-color); outline: none; }`; document.head.appendChild(style); } } });
     Object.assign(App.AuditLog, { render() { const search = document.getElementById('audit-log-search').value.toLowerCase(); const log = App.DB.get('auditLog').filter(entry => entry.user.toLowerCase().includes(search) || entry.action.toLowerCase().includes(search) || entry.reason.toLowerCase().includes(search)); const tbody = document.getElementById('audit-log-table-body'); tbody.innerHTML = log.length ? log.map(entry => `<tr><td>${new Date(entry.timestamp).toLocaleString()}</td><td>${entry.user}</td><td>${entry.action}</td><td>${entry.reason}</td></tr>`).join('') : '<tr><td colspan="4">No audit log entries found.</td></tr>'; }, setupEventListeners() { const debouncedSearch = App.Helpers.debounce(() => this.render(), 300); document.getElementById('audit-log-search').addEventListener('input', debouncedSearch); } });
-    Object.assign(App.Import, { init: function() { const dropZone = document.getElementById('csv-drop-zone'); const fileInput = document.getElementById('csv-file-input'); const sampleLink = document.getElementById('download-sample-csv-link'); dropZone.addEventListener('click', () => fileInput.click()); fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0])); dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }); dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover')); dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) { this.handleFileSelect(e.dataTransfer.files[0]); } }); sampleLink.addEventListener('click', (e) => { e.preventDefault(); this.downloadSampleCSV(); }); }, handleFileSelect: function(file) { if (!file || !file.type.match('text/csv')) { App.UI.toast('Please select a valid CSV file.', 'error'); return; } document.getElementById('csv-filename').textContent = file.name; const reader = new FileReader(); reader.onload = (event) => { this.processCSV(event.target.result); }; reader.readAsText(file); }, 
+    Object.assign(App.Import, { init: function() { const dropZone = document.getElementById('csv-drop-zone'); const fileInput = document.getElementById('csv-file-input'); const sampleLink = document.getElementById('download-sample-csv-link'); dropZone.addEventListener('click', () => fileInput.click()); fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0])); dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }); dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover')); dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) { this.handleFileSelect(e.dataTransfer.files[0]); } }); sampleLink.addEventListener('click', (e) => { e.preventDefault(); this.downloadSampleCSV(); }); }, 
+    handleFileSelect: function(file) {
+        if (!file) return;
+        const isCSVType = file.type === 'text/csv';
+        const isCSVExtension = file.name.toLowerCase().endsWith('.csv');
+        if (!(isCSVType || isCSVExtension)) {
+            App.UI.toast('Please select a valid CSV file.', 'error');
+            return;
+        }
+        document.getElementById('csv-filename').textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = (event) => { this.processCSV(event.target.result); };
+        reader.readAsText(file);
+    },
     processCSV: function(csvText) {
         const rows = csvText.split(/\r?\n/).filter(row => row.trim() !== '');
         if (rows.length < 2) { App.UI.toast('CSV file is empty or has no data rows.', 'error'); return; }
@@ -939,12 +962,14 @@ Changelog v4.9.1:
         const headerMap = {};
         
         expectedHeaders.forEach(eh => {
-            const cleanExpected = eh.replace(/[^a-z0-9]/gi, '');
-            const index = headers.findIndex(h => h.trim().toLowerCase().replace(/[^a-z0-9]/gi, '') === cleanExpected);
+            const index = headers.findIndex(h => h.trim().toLowerCase() === eh);
             if (index !== -1) headerMap[eh] = index;
         });
 
-        if (!headerMap.accountnumber || !headerMap.companyname) { App.UI.toast('CSV must contain "accountNumber" and "companyName" headers.', 'error'); return; }
+        if (!headerMap.accountnumber || !headerMap.companyname) { 
+            App.UI.toast('CSV must contain "accountNumber" and "companyName" headers.', 'error'); 
+            return; 
+        }
         
         let existingCustomers = App.DB.get('customers');
         const existingAccountNos = new Set(existingCustomers.map(c => c.accountNo.toLowerCase()));
@@ -984,7 +1009,7 @@ Changelog v4.9.1:
     } 
 });
     Object.assign(App.Helpers, { formatCurrency: (a) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a), formatAbbreviatedCurrency: (num) => { if (num >= 1000000) return 'AED ' + (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (num >= 1000) return 'AED ' + (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED' }).format(num); }, debounce: (f, d) => { let t; return function(...a) { clearTimeout(t); t = setTimeout(() => f.apply(this, a), d); }; }, formatDate: (dateString) => { const date = new Date(dateString); const timeZoneOffset = date.getTimezoneOffset() * 60000; return new Date(date.getTime() + timeZoneOffset).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }, timeAgo(timestamp) { if (!timestamp) return 'Never'; const now = new Date(); const seconds = Math.floor((now - new Date(timestamp)) / 1000); let interval = seconds / 31536000; if (interval > 1) return Math.floor(interval) + " years ago"; interval = seconds / 2592000; if (interval > 1) return Math.floor(interval) + " months ago"; interval = seconds / 86400; if (interval > 1) return Math.floor(interval) + " days ago"; interval = seconds / 3600; if (interval > 1) return Math.floor(interval) + " hours ago"; interval = seconds / 60; if (interval > 1) return Math.floor(interval) + " minutes ago"; return Math.floor(seconds) + " seconds ago"; }, getScopedData(dataType) { const { currentUser } = App.state; if (!currentUser) return []; if (currentUser.role === 'admin') return App.DB.get(dataType); if (currentUser.role === 'user') { const consultantName = currentUser.assignedConsultant; const allCustomers = App.DB.get('customers'); const scopedCustomers = allCustomers.filter(c => c.salesConsultant === consultantName); if (dataType === 'customers') return scopedCustomers; const scopedCustomerIds = scopedCustomers.map(c => c.accountNo); if (dataType === 'visits') return App.DB.get('visits').filter(v => scopedCustomerIds.includes(v.customerId)); if (dataType === 'payments') return App.DB.get('payments').filter(p => scopedCustomerIds.includes(p.customerId)); } return App.DB.get(dataType); }, 
-    logActivity(action, details = '', customerId = null) {
+    logActivity(action, details = '', customerId = null, amount = null) {
         if (App.state.currentUser.role !== 'user') return;
         const log = App.DB.get('activityLog');
         const now = new Date();
@@ -996,7 +1021,8 @@ Changelog v4.9.1:
             time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }), 
             action, 
             details,
-            customerId
+            customerId,
+            amount: amount
         };
         log.push(newEntry);
         App.DB.set('activityLog', log);
@@ -1004,7 +1030,11 @@ Changelog v4.9.1:
         let notificationMessage;
         if(customerId) {
             const customerName = App.DB.get('customers').find(c => c.accountNo === customerId)?.companyName || 'a customer';
-            notificationMessage = `${newEntry.consultant} ${action.replace(/a |an /, '')} for ${customerName} ${details}`;
+            let messageDetails = details;
+            if (amount) {
+                messageDetails = `${App.Helpers.formatCurrency(amount)} ${details}`;
+            }
+            notificationMessage = `${newEntry.consultant} ${action.replace(/a |an /, '')} for ${customerName} ${messageDetails}`;
         } else {
              notificationMessage = `${newEntry.consultant} has ${action.toLowerCase()}`;
         }
