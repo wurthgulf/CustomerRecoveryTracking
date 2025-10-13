@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Recovery App - v1.9</title>
+    <title>Customer Recovery App - v1.13</title>
 
     <!-- Dependencies -->
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -163,7 +163,7 @@
         .btn:hover:not(:disabled) { transform: translateY(-2px); }
         .btn:active:not(:disabled) { transform: translateY(0); box-shadow: inset 0 2px 2px rgba(0,0,0,0.1); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-primary { background: linear-gradient(to bottom, #ff1a28, #e2000f); color: white; border-color: #c0000d; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), var(--shadow); } .btn-primary:hover:not(:disabled) { background: linear-gradient(to bottom, #ff333f, #e2000f); }
+		        .btn-primary { background: linear-gradient(to bottom, #ff1a28, #e2000f); color: white; border-color: #c0000d; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), var(--shadow); } .btn-primary:hover:not(:disabled) { background: linear-gradient(to bottom, #ff333f, #e2000f); }
         .btn-success { background: linear-gradient(to bottom, #12d493, #10b981); color: white; border-color: #0e9a6b; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), var(--shadow); } .btn-success:hover:not(:disabled) { background: linear-gradient(to bottom, #24e0a1, #10b981); }
         .btn-danger { background: linear-gradient(to bottom, #e34654, #dc3545); color: white; border-color: #b02a37; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), var(--shadow); } .btn-danger:hover:not(:disabled) { background: linear-gradient(to bottom, #ea5c69, #dc3545); }
         .btn-warning { background: linear-gradient(to bottom, #ffca2c, #ffc107); color: var(--dark); border-color: #d39e00; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), var(--shadow); } .btn-warning:hover:not(:disabled) { background: linear-gradient(to bottom, #ffd55b, #ffc107); }
@@ -500,7 +500,7 @@
                     <div class="mt-4" style="color: var(--text-secondary); font-size: var(--fs-sm);"></div>
                 </div>`; 
             document.getElementById('app').innerHTML = `<aside class="sidebar"><div class="logo logo-text"><img src="https://i.ibb.co/pvvsMy1X/Wurth-Gulf-CMYK-PNG-01.png" alt="Wuerth Gulf Logo"></div><nav><div class="sidebar-heading">Main</div><ul style="list-style:none;"><li><a href="#dashboard" class="nav-link active" data-page="dashboard"><i class="fas fa-chart-pie"></i> <span class="nav-text">Dashboard</span></a></li><li><a href="#customers" class="nav-link" data-page="customers"><i class="fas fa-users"></i> <span class="nav-text">Customers</span></a></li><li><a href="#visits" class="nav-link" data-page="visits"><i class="fas fa-calendar-alt"></i> <span class="nav-text">Visits & Follow-ups</span></a></li><li><a href="#payments" class="nav-link" data-page="payments"><i class="fas fa-credit-card"></i> <span class="nav-text">Payments</span></a></li><li data-role="admin"><a href="#analytics" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> <span class="nav-text">Analytics</span></a></li><li data-role="admin"><a href="#reports" class="nav-link" data-page="reports"><i class="fas fa-file-alt"></i> <span class="nav-text">Reports</span></a></li></ul><div data-role="admin"><div class="sidebar-heading">Administration</div><ul style="list-style:none;"><li><a href="#consultants" class="nav-link" data-page="consultants"><i class="fas fa-user-tie"></i> <span class="nav-text">Consultants</span></a></li><li><a href="#users" class="nav-link" data-page="users"><i class="fas fa-users-cog"></i> <span class="nav-text">User Management</span></a></li><li><a href="#changelog" class="nav-link" data-page="changelog"><i class="fas fa-history"></i> <span class="nav-text">Change Log</span></a></li><li><a href="#settings" class="nav-link" data-page="settings"><i class="fas fa-cog"></i> <span class="nav-text">Settings</span></a></li></ul></div></nav></aside><header class="main-header"><button class="hamburger" id="hamburger-menu"><i class="fas fa-bars"></i></button><div id="page-title" style="font-weight: 600; font-size: var(--fs-lg);">Dashboard</div><div class="d-flex gap-4 align-items-center"><div id="notification-bell-wrapper" data-role="admin" style="position: relative;"><button id="notification-bell-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-bell"></i></button><span id="notification-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background-color: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: var(--fs-sm); display: flex; justify-content: center; align-items: center; font-weight: 600; border: 2px solid var(--card-bg);">0</span></div><button id="theme-toggle-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-moon"></i></button><div class="d-flex gap-2 align-items-center"><span id="username-display" style="font-weight: 500;"></span><button id="logout-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem;"><i class="fas fa-sign-out-alt"></i></button></div></div></header><main class="main-content"><section id="dashboard-page" class="page active"></section><section id="customers-page" class="page"></section><section id="visits-page" class="page"></section><section id="payments-page" class="page"></section><section id="analytics-page" class="page" data-role="admin"></section><section id="reports-page" class="page" data-role="admin"></section><section id="consultants-page" class="page" data-role="admin"></section><section id="users-page" class="page" data-role="admin"></section><section id="changelog-page" class="page" data-role="admin"></section><section id="settings-page" class="page" data-role="admin"></section></main>`; 
-            document.getElementById('customers-page').innerHTML = `<div class="kpi-card-grid" data-role="admin"><div class="kpi-card"><div class="title">Total Customers</div><div id="customer-kpi-total" class="value">0</div></div><div class="kpi-card"><div class="title">Total Outstanding</div><div id="customer-kpi-outstanding" class="value">0</div></div><div class="kpi-card"><div class="title">Active Accounts</div><div id="customer-kpi-active" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Manage Customers</h3><div class="d-flex gap-2 flex-wrap align-items-center"><input type="search" id="customer-search" placeholder="Search customers..." class="form-control" style="width: auto;"><select id="customer-status-filter" class="form-control" style="width: auto;"><option value="all">All Status</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select><select id="customer-payment-filter" class="form-control" style="width: auto;"><option value="all">All Payments</option><option value="Pending">Pending</option><option value="Paid">Paid</option><option value="Cleared">Cleared</option><option value="Overdue">Overdue</option></select><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-customers-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-customers-pdf"><i class="fas fa-file-pdf"></i> PDF</button><button class="btn btn-outline" id="import-customer-btn"><i class="fas fa-upload"></i> Import</button><button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button></div></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="accountNo">Account #</th><th data-sort="companyName">Company Name</th><th data-sort="outstanding">Outstanding</th><th data-sort="forecastAmount">Forecast</th><th data-sort="salesConsultantId">Consultant</th><th data-sort="paymentStatus">Payment Status</th><th>Actions</th></tr></thead><tbody id="customer-table-body"></tbody></table></div><div id="customers-pagination" class="pagination-controls"></div></div>`; 
+            document.getElementById('customers-page').innerHTML = `<div class="kpi-card-grid" data-role="admin"><div class="kpi-card"><div class="title">Total Customers</div><div id="customer-kpi-total" class="value">0</div></div><div class="kpi-card"><div class="title">Total Outstanding</div><div id="customer-kpi-outstanding" class="value">0</div></div><div class="kpi-card"><div class="title">Active Accounts</div><div id="customer-kpi-active" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Manage Customers</h3><div class="d-flex gap-2 flex-wrap align-items-center"><input type="search" id="customer-search" placeholder="Search customers..." class="form-control" style="width: auto;"><select id="customer-account-status-filter" class="form-control" style="width: auto;"><option value="all">All Account Status</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select><select id="customer-custom-status-filter" class="form-control" style="width: auto;"><option value="all">All Customer Status</option><option value="Connectors">Connectors</option><option value="Sales_gt_360">Sales (> 360 Days)</option><option value="Sales_gt_90">Sales (> 3 Months)</option></select><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-customers-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-customers-pdf"><i class="fas fa-file-pdf"></i> PDF</button><button class="btn btn-outline" id="import-customer-btn"><i class="fas fa-upload"></i> Import</button><button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button></div></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="accountNo">Account #</th><th data-sort="companyName">Company Name</th><th data-sort="customerStatus">Customer Status</th><th data-sort="outstanding">Outstanding</th><th data-sort="forecastAmount">Forecast</th><th data-sort="salesConsultantId">Consultant</th><th data-sort="paymentStatus">Payment Status</th><th>Actions</th></tr></thead><tbody id="customer-table-body"></tbody></table></div><div id="customers-pagination" class="pagination-controls"></div></div>`; 
             document.getElementById('users-page').innerHTML = `<div class="page-header"><h2 >User Management</h2><p >Home > Users</p></div><div class="card"><div class="card-header"><h3 class="card-title">User List</h3><button id="add-user-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add User</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="username">Username</th><th data-sort="fullName">Full Name</th><th data-sort="role">Role</th><th data-sort="assignedConsultantId">Assigned Consultant</th><th data-sort="department">Department</th><th data-sort="lastLogin">Last Login</th><th>Actions</th></tr></thead><tbody id="user-table-body"></tbody></table></div><div id="users-pagination" class="pagination-controls"></div></div>`; 
             document.getElementById('user-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="user-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">&times;</button></div><form id="user-form"><input type="hidden" id="user-id-hidden"><div class="form-grid"><div class="form-group"><label for="username">Username*</label><input type="text" id="username" class="form-control" required></div><div class="form-group"><label for="fullName">Full Name*</label><input type="text" id="fullName" class="form-control" required></div></div><div class="form-group"><label for="password">Password*</label><input type="password" id="password" class="form-control" required></div><div class="form-group"><label for="department">Department</label><input type="text" id="department" class="form-control" placeholder="e.g., Collections"></div><div class="form-group"><label for="role">Role</label><select id="role" class="form-control"><option value="user">User</option><option value="admin">Admin</option></select></div><div class="form-group" id="assigned-consultant-group"><label for="assignedConsultantId">Assigned Sales Consultant</label><select id="assignedConsultantId" class="form-control"></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save User</button></div></form></div>`;
             document.getElementById('dashboard-page').innerHTML = `<div id="admin-dashboard-wrapper" class="hidden"><div class="d-flex justify-content-between align-items-center mb-4 flex-wrap"><h2 class="page-header" style="margin-bottom: 0;">Admin Dashboard</h2><button id="toggle-dashboard-view-btn" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Switch to Chart View</button></div><div id="admin-dashboard-content"></div></div><div id="chart-dashboard-wrapper"><div id="attendance-controls" class="mb-4"></div><div id="todays-agenda" class="mb-4"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);"><div class="card"><div class="card-title">Total Customers</div><div id="stat-total-customers" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card"><div class="card-title">Total Outstanding</div><div id="stat-outstanding-debt" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card" id="user-dashboard-forecast-card"><div class="card-title">Total Forecast</div><div id="stat-total-forecast" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card"><div class="card-title">Recovered This Month</div><div id="stat-recovered-this-month" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card"><div class="card-title">Upcoming Visits</div><div id="stat-upcoming-visits" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div></div><div id="recovery-progress-card" class="card mb-4"></div><div id="dashboard-bottom-content"></div></div>`; 
@@ -523,25 +523,27 @@
                     </div>
                     <button id="generate-collection-report-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                 </div>
-                 <div class="card mb-4"><div class="card-header"><h3 class="card-title">Other Key Performance Reports</h3></div>
-                    <div class="report-grid">
-                        <a href="#" class="report-card" id="generate-aging-report-btn">
-                            <div class="icon"><i class="fas fa-hourglass-half"></i></div>
-                            <h4>Customer Aging Report</h4><p>Outstanding balance aging analysis</p>
-                        </a>
-                        <a href="#" class="report-card" id="generate-collector-perf-btn">
-                            <div class="icon"><i class="fas fa-user-check"></i></div>
-                            <h4>Collector Performance</h4><p>Individual collector performance metrics</p>
-                        </a>
-                        <a href="#" class="report-card" id="generate-risk-analysis-btn">
-                            <div class="icon"><i class="fas fa-shield-alt"></i></div>
-                            <h4>Risk Analysis Report</h4><p>Customer risk score distribution</p>
-                        </a>
+                 <div class="card mb-4">
+                    <div class="card-header"><h3 class="card-title">Consultant Target Performance</h3></div>
+                     <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly target vs. actual collections for selected consultants.</p>
+                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                        <div class="form-group">
+                            <label for="report-target-consultant-select">Consultant</label>
+                            <select id="report-target-consultant-select" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="report-target-month">Month</label>
+                            <div class="input-with-icon">
+                                <input type="month" id="report-target-month" class="form-control">
+                                <label for="report-target-month" class="icon fas fa-calendar-alt"></label>
+                            </div>
+                        </div>
                     </div>
+                    <button id="generate-target-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                 </div>
                  <div class="card mb-4">
-                    <div class="card-header"><h3 class="card-title">Forecast Performance Report</h3></div>
-                     <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Track monthly forecast vs actual collections for selected consultants.</p>
+                    <div class="card-header"><h3 class="card-title">Consultant Forecast Performance</h3></div>
+                     <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly forecast vs. actual collections for selected consultants.</p>
                     <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
                         <div class="form-group">
                             <label for="report-forecast-consultant-select">Consultant</label>
@@ -555,7 +557,7 @@
                             </div>
                         </div>
                     </div>
-                    <button id="generate-forecast-report-btn-new" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
+                    <button id="generate-forecast-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                 </div>
                 <div class="card mb-4">
                     <div class="card-header"><h3 class="card-title">Consultant Visits Report</h3></div>
@@ -576,8 +578,18 @@
                     </div>
                     <button id="generate-consultant-visits-btn-new" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div><div class="card mb-4" data-role="admin"><div class="card-header"><h3 class="card-title">Consultant Daily Activity</h3></div><div class="d-flex gap-4 flex-wrap align-items-center"><div class="d-flex gap-2 align-items-center"><select id="report-consultant-select" class="form-control" style="width:auto;"></select><input type="date" id="report-activity-start-date" class="form-control" style="width:auto;"> <span class="mx-2">to</span> <input type="date" id="report-activity-end-date" class="form-control" style="width:auto;"><button id="generate-activity-report-btn" class="btn btn-primary"><i class="fas fa-cogs"></i> Generate</button></div><div class="d-flex gap-2"><button id="activity-report-summary-btn" class="btn btn-outline filter-btn active"><i class="fas fa-chart-pie"></i> Summary</button><button id="activity-report-table-btn" class="btn btn-outline filter-btn"><i class="fas fa-table"></i> Table</button></div></div></div><div class="card mb-4"><div class="card-header"><h3 class="card-title">Standard Reports</h3></div><div class="d-flex gap-2 flex-wrap"><button id="generate-customer-report-btn" class="btn btn-primary"><i class="fas fa-users"></i> Customer Report</button><button id="generate-consultant-report-btn" class="btn btn-primary"><i class="fas fa-user-tie"></i> Consultant Report</button><button id="generate-overdue-report-btn" class="btn btn-warning"><i class="fas fa-exclamation-triangle"></i> Overdue Accounts</button><button id="generate-recovery-report-btn" class="btn btn-success"><i class="fas fa-chart-line"></i> Recovery Performance</button></div></div></div><div><div class="card mb-4"><div class="card-header"><h3 class="card-title">Customer Statement of Account</h3></div><div class="form-group"><label for="statement-customer-select">Select Customer</label><div id="statement-customer-select-container"></div></div><button id="generate-statement-btn" class="btn btn-primary"><i class="fas fa-file-invoice-dollar"></i> Generate Statement</button></div><div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis Report</h3></div><p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyzes the results of all completed visits.</p><button id="generate-outcome-analysis-btn" class="btn btn-primary"><i class="fas fa-poll"></i> Generate Analysis</button></div></div></div><div id="report-output" class="mt-4"></div>`; 
-            document.getElementById('consultants-page').innerHTML = `<div class="page-header"><h2 >Sales Consultant Management</h2><p >Home > Consultants</p></div><div class="card"><div class="card-header"><h3 class="card-title">Consultant List</h3><button id="add-consultant-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Consultant</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="name">Consultant Name</th><th data-sort="noOfCustomers">No. of Customers</th><th data-sort="totalOutstanding">Total Outstanding</th><th data-sort="overdueCustomers">Overdue Customers</th><th data-sort="upcomingVisits">Upcoming Visits</th><th>Actions</th></tr></thead><tbody id="consultant-table-body"></tbody></table></div><div id="consultants-pagination" class="pagination-controls"></div></div>`; 
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);">
+                    <div>
+                        <div class="card mb-4" data-role="admin"><div class="card-header"><h3 class="card-title">Consultant Daily Activity</h3></div><div class="d-flex gap-4 flex-wrap align-items-center"><div class="d-flex gap-2 align-items-center"><select id="report-consultant-select" class="form-control" style="width:auto;"></select><input type="date" id="report-activity-start-date" class="form-control" style="width:auto;"> <span class="mx-2">to</span> <input type="date" id="report-activity-end-date" class="form-control" style="width:auto;"><button id="generate-activity-report-btn" class="btn btn-primary"><i class="fas fa-cogs"></i> Generate</button></div><div class="d-flex gap-2"><button id="activity-report-summary-btn" class="btn btn-outline filter-btn active"><i class="fas fa-chart-pie"></i> Summary</button><button id="activity-report-table-btn" class="btn btn-outline filter-btn"><i class="fas fa-table"></i> Table</button></div></div></div>
+                        <div class="card mb-4"><div class="card-header"><h3 class="card-title">Standard Reports</h3></div><div class="d-flex gap-2 flex-wrap"><button id="generate-customer-report-btn" class="btn btn-primary"><i class="fas fa-users"></i> Customer Report</button><button id="generate-consultant-report-btn" class="btn btn-primary"><i class="fas fa-user-tie"></i> Consultant Report</button><button id="generate-overdue-report-btn" class="btn btn-warning"><i class="fas fa-exclamation-triangle"></i> Overdue Accounts</button><button id="generate-recovery-report-btn" class="btn btn-success"><i class="fas fa-chart-line"></i> Recovery Performance</button></div></div>
+                    </div>
+                    <div>
+                        <div class="card mb-4"><div class="card-header"><h3 class="card-title">Customer Statement of Account</h3></div><div class="form-group"><label for="statement-customer-select">Select Customer</label><div id="statement-customer-select-container"></div></div><button id="generate-statement-btn" class="btn btn-primary"><i class="fas fa-file-invoice-dollar"></i> Generate Statement</button></div>
+                        <div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis Report</h3></div><p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyzes the results of all completed visits.</p><button id="generate-outcome-analysis-btn" class="btn btn-primary"><i class="fas fa-poll"></i> Generate Analysis</button></div>
+                    </div>
+                </div>
+                <div id="report-output" class="mt-4"></div>`; 
+            document.getElementById('consultants-page').innerHTML = `<div class="page-header"><h2 >Sales Consultant Management</h2><p >Home > Consultants</p></div><div class="card"><div class="card-header"><h3 class="card-title">Consultant List</h3><button id="add-consultant-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Consultant</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="name">Consultant Name</th><th data-sort="noOfCustomers">No. of Customers</th><th data-sort="totalOutstanding">Total Outstanding</th><th data-sort="totalForecast">Total Forecast</th><th data-sort="currentTarget">Current Month Target</th><th data-sort="overdueCustomers">Overdue Customers</th><th data-sort="upcomingVisits">Upcoming Visits</th><th>Actions</th></tr></thead><tbody id="consultant-table-body"></tbody></table></div><div id="consultants-pagination" class="pagination-controls"></div></div>`; 
             document.getElementById('changelog-page').innerHTML = `<div class="page-header"><h2>Change Log</h2><p>Tracks all data modifications in the system.</p></div><div class="card"><div class="card-header"><h3 class="card-title">Log Entries</h3><input type="search" id="changelog-search" placeholder="Search log..." class="form-control" style="width: auto;"></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="timestamp">Timestamp</th><th data-sort="user">User</th><th data-sort="action">Action</th><th data-sort="entityName">Entity</th><th>Change Details</th></tr></thead><tbody id="changelog-table-body"></tbody></table></div><div id="changelog-pagination" class="pagination-controls"></div></div>`; 
             document.getElementById('settings-page').innerHTML = `
                 <div class="page-header"><h2>System Settings</h2><p>Manage application-wide configurations and data.</p></div>
@@ -602,7 +614,7 @@
                     </div>
                     <button id="restore-data-btn" class="btn btn-warning" disabled><i class="fas fa-upload"></i> Restore Data</button>
                 </div>`;
-            document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group"><label for="status">Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Pending</option><option>Paid</option><option>Cleared</option><option>Overdue</option></select></div><div class="form-group"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group"><label for="outstanding">Current Outstanding (AED)*</label><input type="number" id="outstanding" class="form-control" required></div><div class="form-group"><label for="forecastAmount">Forecast Amount (AED)</label><input type="number" id="forecastAmount" class="form-control"></div><div class="form-group"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
+            document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Pending</option><option>Paid</option><option>Cleared</option><option>Overdue</option></select></div><div class="form-group"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group"><label for="outstanding">Current Outstanding (AED)*</label><input type="number" id="outstanding" class="form-control" required></div><div class="form-group"><label for="forecastAmount">Forecast Amount (AED)</label><input type="number" id="forecastAmount" class="form-control"></div><div class="form-group"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="debtDate">Debt Date</label><input type="date" id="debtDate" class="form-control"></div><div class="form-group"><label for="category">Category</label><select id="category" class="form-control"><option value="">None</option><option value="Connectors">Connectors</option><option value="Sales">Sales</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
             document.getElementById('payment-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Record a Payment</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-modal')">&times;</button></div><form id="payment-form"><div class="form-group"><label for="payment-customer-id">Customer*</label><div id="payment-customer-select-container"></div></div><div class="form-group"><label for="payment-amount">Amount*</label><input type="number" id="payment-amount" class="form-control" required></div><div class="form-group"><label for="payment-method">Payment Method*</label><select id="payment-method" class="form-control" required><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="form-group"><label for="payment-date">Date*</label><input type="date" id="payment-date" class="form-control" required></div><div class="form-group"><label for="payment-status">Status</label><select id="payment-status" class="form-control"><option>Completed</option><option>Pending</option><option>Failed</option></select></div><button type="submit" class="btn btn-primary">Record Payment</button></form></div>`; 
             document.getElementById('visit-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Schedule Visit</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-modal')">&times;</button></div><form id="visit-form"><input type="hidden" id="visit-id"><div class="form-group"><label for="visit-customer-id">Customer*</label><div id="visit-customer-select-container"></div></div><div class="form-group"><label for="visit-purpose">Purpose*</label><input type="text" id="visit-purpose" class="form-control" required></div><div class="form-group"><label for="visit-date">Date & Time*</label><input type="datetime-local" id="visit-date" class="form-control" required></div><button type="submit" class="btn btn-primary">Save Visit</button></form></div>`; 
             document.getElementById('import-csv-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Upload CSV File</h3><button class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">&times;</button></div><div class="file-upload-wrapper" id="csv-drop-zone"><i class="fas fa-upload" style="font-size: 1.5rem; color: var(--text-secondary);"></i><p>Click to browse or drag & drop file here</p><span id="csv-filename" style="font-weight: 600; color: var(--primary);"></span><input type="file" id="csv-file-input" class="hidden" accept=".csv"></div><div class="info-box"><p>Ensure headers match:</p><code>accountNumber,companyName,emirate,area,status,paymentStatus,initialDebt,outstandingAmount,salesConsultant</code></div><a href="#" id="download-sample-csv-link"><i class="fas fa-download"></i> Download Sample Template</a><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">Close</button></div></div>`; 
@@ -881,13 +893,88 @@
                     document.getElementById('admin-dashboard-content').innerHTML = ''; 
                     toggleBtn.innerHTML = `<i class="fas fa-tachometer-alt"></i> Switch to Overview`; 
                     this.renderUserDashboard();
+                    this.renderAdminChartDashboard(); // Special render for admin chart view
                 } 
             } else { 
                 adminWrapper.classList.add('hidden'); 
                 chartWrapper.classList.remove('hidden'); 
                 this.renderUserDashboard(); 
             } 
-        }, 
+        },
+        renderAdminChartDashboard() {
+            const bottomContainer = document.getElementById('dashboard-bottom-content');
+            let bottomHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);">
+                    <div class="card"><div class="card-header"><h3 class="card-title">Target vs. Collected (by Consultant)</h3></div><div class="chart-container"><canvas id="target-performance-chart"></canvas></div></div>
+                    <div class="card"><div class="card-header"><h3 class="card-title">Forecast vs. Collected (by Consultant)</h3></div><div class="chart-container"><canvas id="forecast-performance-chart"></canvas></div></div>
+                    <div class="card"><div class="card-header"><h3 class="card-title">Outstanding Debt by Emirate</h3></div><div class="chart-container"><canvas id="debt-chart"></canvas></div></div>
+                    <div class="card"><div class="card-header"><h3 class="card-title">Monthly Payment Recovery</h3></div><div class="chart-container"><canvas id="payment-chart"></canvas></div></div>
+                </div>
+            `;
+            bottomContainer.innerHTML = bottomHTML;
+            this.renderCharts(); // Re-render general charts
+            this.renderAdminPerformanceCharts(); // Render new admin-specific charts
+        },
+        renderAdminPerformanceCharts() {
+            const consultants = App.DB.get('consultants');
+            const customers = App.DB.get('customers');
+            const payments = App.DB.get('payments');
+            const forecasts = App.DB.get('forecasts');
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+            const recoveredThisMonth = payments.filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr));
+
+            const labels = consultants.map(c => c.name);
+
+            // Chart 1: Target vs Collected
+            const targetData = consultants.map(consultant => {
+                const targetEntry = forecasts.find(f => f.consultantId === consultant.id && f.month === currentMonthStr);
+                const collected = recoveredThisMonth
+                    .filter(p => customers.find(c => c.accountNo === p.customerId)?.salesConsultantId === consultant.id)
+                    .reduce((sum, p) => sum + p.amount, 0);
+                return {
+                    target: targetEntry ? targetEntry.amount : 0,
+                    collected: collected
+                };
+            });
+            const targetCtx = document.getElementById('target-performance-chart').getContext('2d');
+            if (this.charts.targetPerformance) this.charts.targetPerformance.destroy();
+            this.charts.targetPerformance = new Chart(targetCtx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Target', data: targetData.map(d => d.target), backgroundColor: 'rgba(220, 53, 69, 0.5)' },
+                        { label: 'Collected', data: targetData.map(d => d.collected), backgroundColor: 'rgba(16, 185, 129, 0.7)' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Chart 2: Forecast vs Collected
+            const forecastData = consultants.map(consultant => {
+                const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id);
+                const totalForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+                const collected = recoveredThisMonth
+                    .filter(p => assignedCustomers.some(c => c.accountNo === p.customerId))
+                    .reduce((sum, p) => sum + p.amount, 0);
+                return { forecast: totalForecast, collected };
+            });
+
+            const forecastCtx = document.getElementById('forecast-performance-chart').getContext('2d');
+            if (this.charts.forecastPerformance) this.charts.forecastPerformance.destroy();
+            this.charts.forecastPerformance = new Chart(forecastCtx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Forecast', data: forecastData.map(d => d.forecast), backgroundColor: 'rgba(255, 193, 7, 0.5)' },
+                        { label: 'Collected', data: forecastData.map(d => d.collected), backgroundColor: 'rgba(16, 185, 129, 0.7)' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        },
         renderAdminDashboard() { 
             const container = document.getElementById('admin-dashboard-content'); 
             const customers = App.DB.get('customers'); 
@@ -896,10 +983,15 @@
             const payments = App.DB.get('payments');
 
             const now = new Date();
-            const recoveredThisMonth = payments.filter(p => p.status === 'Completed' && new Date(p.date).getMonth() === now.getMonth() && new Date(p.date).getFullYear() === now.getFullYear()).reduce((sum, p) => sum + p.amount, 0);
+            const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+            const recoveredThisMonth = payments.filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr)).reduce((sum, p) => sum + p.amount, 0);
 
-            const currentCustomerForecasts = customers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
-            const totalForecastTarget = currentCustomerForecasts + recoveredThisMonth;
+            const totalForecastTarget = App.DB.get('forecasts')
+                .filter(f => f.month === currentMonthStr)
+                .reduce((sum, f) => sum + f.amount, 0);
+            
+            const totalForecastedAmount = customers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+
             const forecastPercentage = totalForecastTarget > 0 ? ((recoveredThisMonth / totalForecastTarget) * 100).toFixed(0) : 0;
             
             const totalInitial = customers.reduce((s, c) => s + c.initialDebt, 0); 
@@ -907,23 +999,24 @@
             const totalRecovered = totalInitial - totalOutstanding; 
             const companyRecoveryRate = totalInitial > 0 ? ((totalRecovered / totalInitial) * 100).toFixed(2) : 0; 
             
-            let forecastHTML = `<div class="card"><div class="card-title">Forecast (This Month)</div><div style="font-size: var(--fs-3xl); font-weight: 700;">${App.Helpers.formatCurrency(totalForecastTarget)}</div><div class="progress-bar mt-4 mb-2"><div class="progress-bar-inner" data-width="${forecastPercentage}"></div></div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${App.Helpers.formatCurrency(recoveredThisMonth)} collected (${forecastPercentage}%)</div></div>`;
+            let targetHTML = `<div class="card"><div class="card-title">Monthly Target</div><div style="font-size: var(--fs-3xl); font-weight: 700;">${App.Helpers.formatCurrency(totalForecastTarget)}</div><div class="progress-bar mt-4 mb-2"><div class="progress-bar-inner" data-width="${forecastPercentage}"></div></div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${App.Helpers.formatCurrency(recoveredThisMonth)} collected (${forecastPercentage}%)</div></div>`;
+            let forecastHTML = `<div class="card"><div class="card-title">Total Forecasted</div><div style="font-size: var(--fs-3xl); font-weight: 700;">${App.Helpers.formatCurrency(totalForecastedAmount)}</div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">From all customers</div></div>`;
             
-            container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);"><div class="card"><div class="card-title">Company Recovery Rate</div><div style="font-size: var(--fs-3xl); font-weight: 700; color:var(--success);">${companyRecoveryRate}%</div></div><div class="card"><div class="card-title">Total Recovered (All Time)</div><div style="font-size: var(--fs-3xl); font-weight: 700;">${App.Helpers.formatCurrency(totalRecovered)}</div></div><div class="card"><div class="card-title">Total Outstanding</div><div style="font-size: var(--fs-3xl); font-weight: 700;">${App.Helpers.formatCurrency(totalOutstanding)}</div></div>${forecastHTML}</div><div id="admin-dashboard-bottom-section"></div>`; 
+            container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);"><div class="card"><div class="card-title">Company Recovery Rate</div><div style="font-size: var(--fs-3xl); font-weight: 700; color:var(--success);">${companyRecoveryRate}%</div></div><div class="card"><div class="card-title">Total Recovered (All Time)</div><div style="font-size: var(--fs-3xl); font-weight: 700;">${App.Helpers.formatCurrency(totalRecovered)}</div></div><div class="card"><div class="card-title">Total Outstanding</div><div style="font-size: var(--fs-3xl); font-weight: 700;">${App.Helpers.formatCurrency(totalOutstanding)}</div></div>${targetHTML}${forecastHTML}</div><div id="admin-dashboard-bottom-section"></div>`; 
 
             const bottomSection = document.getElementById('admin-dashboard-bottom-section');
             bottomSection.innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);">
-                    <div id="admin-consultant-progress"></div>
-                    <div id="admin-customer-progress"></div>
+                    <div id="admin-consultant-target-progress"></div>
+                    <div id="admin-consultant-forecast-progress"></div>
                     <div id="admin-pending-promises"></div>
                     <div id="admin-recent-activities"></div>
                 </div>
                 <div id="admin-upcoming-visits" class="mt-4"></div>
             `;
             
-            this.renderConsultantForecastProgress(document.getElementById('admin-consultant-progress'), consultants, customers, payments, App.DB.get('forecasts'));
-            this.renderCustomerForecastProgress(document.getElementById('admin-customer-progress'), customers);
+            this.renderConsultantTargetProgress(document.getElementById('admin-consultant-target-progress'), consultants, customers, payments, App.DB.get('forecasts'));
+            this.renderConsultantForecastProgress(document.getElementById('admin-consultant-forecast-progress'), consultants, customers, payments);
             this.renderPendingPromisesWidget(document.getElementById('admin-pending-promises'));
 
             const upcomingVisits = App.DB.get('visits').filter(v => new Date(v.dateTime) >= new Date() && v.status === 'Scheduled').sort((a,b) => new Date(a.dateTime) - new Date(b.dateTime)).slice(0, 10);
@@ -955,10 +1048,9 @@
             let totalForecast = 0;
             if(App.state.currentUser.role === 'admin') {
                 const currentCustomerForecasts = App.DB.get('customers').reduce((sum, cust) => sum + (cust.forecastAmount || 0), 0);
-                totalForecast = currentCustomerForecasts + recoveredThisMonth;
+                totalForecast = currentCustomerForecasts; // Do not add recovered amount here for pure forecast view
             } else {
-                const initialForecast = c.reduce((s, i) => s + (i.forecastAmount || 0), 0);
-                totalForecast = initialForecast + recoveredThisMonth;
+                totalForecast = c.reduce((s, i) => s + (i.forecastAmount || 0), 0);
             }
             
             const forecastPercentage = totalForecast > 0 ? ((recoveredThisMonth / totalForecast) * 100).toFixed(0) : 0;
@@ -983,30 +1075,14 @@
             let bottomHTML = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);">
                     <div id="pending-promises-container"></div>
-                    <div class="card"><div class="card-header"><h3 class="card-title">Outstanding Debt by Emirate</h3></div><div class="chart-container"><canvas id="debt-chart"></canvas></div></div>
-                    <div class="card"><div class="card-header"><h3 class="card-title">Monthly Payment Recovery</h3></div><div class="chart-container"><canvas id="payment-chart"></canvas></div></div>
-                    ${App.state.currentUser.role === 'user' ? `
-                        <div id="user-consultant-progress"></div>
-                        <div id="user-customer-progress"></div>
-                    ` : ''}
+                    <div id="debt-chart-container" class="card"><div class="card-header"><h3 class="card-title">Outstanding Debt by Emirate</h3></div><div class="chart-container"><canvas id="debt-chart"></canvas></div></div>
+                    <div id="payment-chart-container" class="card"><div class="card-header"><h3 class="card-title">Monthly Payment Recovery</h3></div><div class="chart-container"><canvas id="payment-chart"></canvas></div></div>
                 </div>
             `;
             
             bottomContainer.innerHTML = bottomHTML;
             this.renderPendingPromisesWidget(document.getElementById('pending-promises-container'));
-            this.renderCharts(); 
-
-            if(App.state.currentUser.role === 'user'){
-                this.renderConsultantForecastProgress(
-                    document.getElementById('user-consultant-progress'), 
-                    App.DB.get('consultants').filter(con => con.id === App.state.currentUser.assignedConsultantId), 
-                    c, p, App.DB.get('forecasts')
-                );
-                this.renderCustomerForecastProgress(
-                    document.getElementById('user-customer-progress'),
-                    c
-                );
-            }
+            this.renderCharts();
             
             App.UI.observeProgressBars();
         },
@@ -1061,18 +1137,43 @@
             }
             container.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Pending Promises</h3></div>${content}</div>`;
         },
+        renderConsultantTargetProgress(container, consultants, allCustomers, allPayments, allForecasts) {
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+            const recoveredThisMonth = allPayments.filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr));
+
+            const progressHTML = consultants.map(consultant => {
+                const forecastEntry = allForecasts.find(f => f.consultantId === consultant.id && f.month === currentMonthStr);
+                const totalTarget = forecastEntry ? forecastEntry.amount : 0;
+                
+                const assignedCustomerIds = new Set(allCustomers.filter(c => c.salesConsultantId === consultant.id).map(c => c.accountNo));
+                const collectedThisMonth = recoveredThisMonth.filter(p => assignedCustomerIds.has(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
+
+                const percentage = totalTarget > 0 ? ((collectedThisMonth / totalTarget) * 100).toFixed(0) : 0;
+
+                return `<div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span style="font-weight: 600;">${consultant.name}</span>
+                                <span style="font-size: var(--fs-sm); color: var(--text-secondary);">${percentage}%</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-bar-inner" data-width="${percentage}"></div></div>
+                            <div style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedThisMonth)} of ${App.Helpers.formatCurrency(totalTarget)}</div>
+                        </div>`;
+            }).join('');
+            
+            container.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Consultant Target Progress (This Month)</h3></div><div style="max-height: 400px; overflow-y: auto; padding-right: 1rem;">${progressHTML}</div></div>`;
+        },
         renderConsultantForecastProgress(container, consultants, allCustomers, allPayments) {
             const now = new Date();
-            const recoveredThisMonth = allPayments.filter(p => p.status === 'Completed' && new Date(p.date).getMonth() === now.getMonth() && new Date(p.date).getFullYear() === now.getFullYear());
+            const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+            const recoveredThisMonth = allPayments.filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr));
 
             const progressHTML = consultants.map(consultant => {
                 const assignedCustomers = allCustomers.filter(c => c.salesConsultantId === consultant.id);
-                const assignedCustomerIds = new Set(assignedCustomers.map(c => c.accountNo));
-
-                const collectedThisMonth = recoveredThisMonth.filter(p => assignedCustomerIds.has(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
+                const totalForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
                 
-                const remainingForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
-                const totalForecast = remainingForecast + collectedThisMonth;
+                const assignedCustomerIds = new Set(assignedCustomers.map(c => c.accountNo));
+                const collectedThisMonth = recoveredThisMonth.filter(p => assignedCustomerIds.has(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
 
                 const percentage = totalForecast > 0 ? ((collectedThisMonth / totalForecast) * 100).toFixed(0) : 0;
 
@@ -1081,30 +1182,12 @@
                                 <span style="font-weight: 600;">${consultant.name}</span>
                                 <span style="font-size: var(--fs-sm); color: var(--text-secondary);">${percentage}%</span>
                             </div>
-                            <div class="progress-bar"><div class="progress-bar-inner" data-width="${percentage}"></div></div>
+                            <div class="progress-bar"><div class="progress-bar-inner" data-width="${percentage}" style="background-color: var(--warning);"></div></div>
                             <div style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedThisMonth)} of ${App.Helpers.formatCurrency(totalForecast)}</div>
                         </div>`;
             }).join('');
             
             container.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Consultant Forecast Progress (This Month)</h3></div><div style="max-height: 400px; overflow-y: auto; padding-right: 1rem;">${progressHTML}</div></div>`;
-        },
-        renderCustomerForecastProgress(container, customers) {
-            const progressHTML = customers.filter(c => (c.initialDebt > 0 && c.outstanding < c.initialDebt) || (c.forecastAmount || 0) > 0).map(customer => {
-                const collected = customer.initialDebt - customer.outstanding;
-                const totalTarget = collected + (customer.forecastAmount || 0);
-                const percentage = totalTarget > 0 ? ((collected / totalTarget) * 100).toFixed(0) : (customer.outstanding <= 0 ? 100 : 0);
-
-                return `<div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span style="font-weight: 600;">${customer.companyName}</span>
-                                <span style="font-size: var(--fs-sm); color: var(--text-secondary);">${percentage}%</span>
-                            </div>
-                            <div class="progress-bar"><div class="progress-bar-inner" data-width="${percentage}"></div></div>
-                            <div style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collected)} of ${App.Helpers.formatCurrency(totalTarget)}</div>
-                        </div>`;
-            }).join('');
-
-            container.innerHTML = `<div class="card"><div class="card-header"><h3 class="card-title">Customer Forecast Progress</h3></div><div style="max-height: 400px; overflow-y: auto; padding-right: 1rem;">${progressHTML}</div></div>`;
         },
         renderAttendanceControls() {
             const todayStr = new Date().toISOString().slice(0, 10);
@@ -1260,7 +1343,7 @@
         }, 
         renderRecoveryProgress() { const customers = App.Helpers.getScopedData('customers'); const totalInitialDebt = customers.reduce((sum, c) => sum + c.initialDebt, 0); const totalOutstanding = customers.reduce((sum, c) => sum + c.outstanding, 0); const totalCollected = totalInitialDebt - totalOutstanding; const percentage = totalInitialDebt > 0 ? ((totalCollected / totalInitialDebt) * 100).toFixed(0) : 0; const container = document.getElementById('recovery-progress-card'); container.innerHTML = `<div class="d-flex align-items-center gap-2 mb-4"><i class="fas fa-bullseye" style="color: var(--primary);"></i><h3 class="card-title" style="margin:0;">Recovery Progress</h3></div><div><div class="mb-2" style="font-weight: 600; text-transform: uppercase; font-size: var(--fs-sm); color: var(--text-secondary);">Total Debt vs Collected</div><div class="progress-bar mb-2"><div class="progress-bar-inner" data-width="${percentage}"></div></div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${App.Helpers.formatCurrency(totalCollected)} collected of ${App.Helpers.formatCurrency(totalInitialDebt)} (${percentage}%)</div></div>`; App.UI.observeProgressBars(); } 
     });
-	    Object.assign(App.Customers, { quill: null, setupEventListeners: function() { document.getElementById('add-customer-btn').addEventListener('click', () => this.showCustomerForm()); document.getElementById('import-customer-btn').addEventListener('click', () => { document.getElementById('csv-filename').textContent = ''; App.UI.openModal('import-csv-modal'); }); document.getElementById('export-customers-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('export-customers-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('customer-form').addEventListener('submit', (e) => this.saveCustomer(e)); document.getElementById('customer-forecast-form').addEventListener('submit', (e) => this.saveCustomerForecast(e)); document.querySelector('#customers-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('customers', th.dataset.sort); }); const debouncedSearch = App.Helpers.debounce(() => {App.state.pagination.customers.currentPage = 1; this.render()}, 300); document.getElementById('customer-search').addEventListener('input', debouncedSearch); document.getElementById('customer-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-payment-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-table-body').addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; const id = button.dataset.id; if (button.classList.contains('view-customer')) this.showCustomerDetail(id); else if (button.classList.contains('edit-customer')) this.showCustomerForm(id); else if (button.classList.contains('delete-customer')) this.deleteCustomer(id); else if (button.classList.contains('set-forecast')) this.showCustomerForecastForm(id); }); 
+		    Object.assign(App.Customers, { quill: null, setupEventListeners: function() { document.getElementById('add-customer-btn').addEventListener('click', () => this.showCustomerForm()); document.getElementById('import-customer-btn').addEventListener('click', () => { document.getElementById('csv-filename').textContent = ''; App.UI.openModal('import-csv-modal'); }); document.getElementById('export-customers-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('export-customers-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('customer-form').addEventListener('submit', (e) => this.saveCustomer(e)); document.getElementById('customer-forecast-form').addEventListener('submit', (e) => this.saveCustomerForecast(e)); document.querySelector('#customers-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('customers', th.dataset.sort); }); const debouncedSearch = App.Helpers.debounce(() => {App.state.pagination.customers.currentPage = 1; this.render()}, 300); document.getElementById('customer-search').addEventListener('input', debouncedSearch); document.getElementById('customer-account-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-custom-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-table-body').addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; const id = button.dataset.id; if (button.classList.contains('view-customer')) this.showCustomerDetail(id); else if (button.classList.contains('edit-customer')) this.showCustomerForm(id); else if (button.classList.contains('delete-customer')) this.deleteCustomer(id); else if (button.classList.contains('set-forecast')) this.showCustomerForecastForm(id); }); 
         const detailModal = document.getElementById('customer-detail-modal');
         detailModal.addEventListener('click', (e) => { 
             const button = e.target.closest('button'); 
@@ -1276,18 +1359,44 @@
             }
         }); 
     }, 
+    getCustomerStatus(customer) {
+        if (customer.category === 'Connectors') {
+            return 'Connectors';
+        }
+        if (customer.category === 'Sales' && customer.debtDate) {
+            const debtDate = new Date(customer.debtDate);
+            const now = new Date();
+            const diffTime = Math.abs(now - debtDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays > 360) return 'Sales (> 360 Days)';
+            if (diffDays > 90) return 'Sales (> 3 Months)';
+        }
+        return 'N/A';
+    },
     getCurrentFilteredData: function() {
         const { value: search } = document.getElementById('customer-search'); 
-        const { value: statusFilter } = document.getElementById('customer-status-filter'); 
-        const { value: paymentFilter } = document.getElementById('customer-payment-filter'); 
+        const { value: accountStatusFilter } = document.getElementById('customer-account-status-filter'); 
+        const { value: customStatusFilter } = document.getElementById('customer-custom-status-filter'); 
         const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
-        let customers = App.Helpers.getScopedData('customers').filter(c => 
-            (c.companyName.toLowerCase().includes(search.toLowerCase()) || 
-             c.accountNo.toLowerCase().includes(search.toLowerCase()) || 
-             (consultantMap[c.salesConsultantId] || '').toLowerCase().includes(search.toLowerCase())) &&
-            (statusFilter === 'all' || c.status === statusFilter) && 
-            (paymentFilter === 'all' || c.paymentStatus === paymentFilter)
-        );
+        
+        let customers = App.Helpers.getScopedData('customers').map(c => ({...c, customerStatus: this.getCustomerStatus(c)}));
+
+        customers = customers.filter(c => {
+            const searchMatch = (c.companyName.toLowerCase().includes(search.toLowerCase()) || 
+                                 c.accountNo.toLowerCase().includes(search.toLowerCase()) || 
+                                 (consultantMap[c.salesConsultantId] || '').toLowerCase().includes(search.toLowerCase()));
+            
+            const accountStatusMatch = (accountStatusFilter === 'all' || c.status === accountStatusFilter);
+
+            const customStatusMatch = (customStatusFilter === 'all' || 
+                (customStatusFilter === 'Connectors' && c.customerStatus === 'Connectors') ||
+                (customStatusFilter === 'Sales_gt_360' && c.customerStatus === 'Sales (> 360 Days)') ||
+                (customStatusFilter === 'Sales_gt_90' && (c.customerStatus === 'Sales (> 3 Months)' || c.customerStatus === 'Sales (> 360 Days)'))
+            );
+
+            return searchMatch && accountStatusMatch && customStatusMatch;
+        });
+
         const { column, order } = App.state.tableSorts.customers; 
         customers.sort((a, b) => {
             let valA = a[column];
@@ -1336,6 +1445,7 @@
                 return `<tr>
                     <td>${c.accountNo}</td>
                     <td><div class="company-info"><div class="name">${c.companyName}${promiseIcon}</div><div class="location" style="color: var(--text-secondary); font-size: var(--fs-sm);">${c.emirate}</div></div></td>
+                    <td>${c.customerStatus}</td>
                     <td>${App.Helpers.formatCurrency(c.outstanding)}</td>
                     <td>${App.Helpers.formatCurrency(c.forecastAmount || 0)}</td>
                     <td>${consultantMap[c.salesConsultantId] || 'N/A'}</td>
@@ -1356,7 +1466,45 @@
         App.UI.updateSortIndicators('customers');
     }, 
     showCustomerForm: function(accountNo = null) { const form = document.getElementById('customer-form'); const accountNoInput = form.elements.accountNo; form.reset(); const consultantSelect = form.elements['salesConsultantId']; consultantSelect.innerHTML = App.DB.get('consultants').map(c => `<option value="${c.id}">${c.name}</option>`).join(''); let originalCustomer = null; if (accountNo) { const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); originalCustomer = {...customer}; document.getElementById('customer-modal-title').textContent = 'Edit Customer'; document.getElementById('customer-id-hidden').value = customer.accountNo; Object.keys(customer).forEach(key => { if (form.elements[key]) form.elements[key].value = customer[key]; }); accountNoInput.readOnly = true; accountNoInput.required = false; } else { document.getElementById('customer-modal-title').textContent = 'Add New Customer'; document.getElementById('customer-id-hidden').value = ''; accountNoInput.readOnly = false; accountNoInput.required = true; accountNoInput.placeholder = 'e.g., DXB-007'; } App.UI.openModal('customer-modal'); form.originalData = originalCustomer; }, 
-    saveCustomer: function(e) { e.preventDefault(); const form = e.target; const id = form.elements['customer-id-hidden'].value; let customers = App.DB.get('customers'); const customerData = { companyName: form.elements.companyName.value, emirate: form.elements.emirate.value, area: form.elements.area.value, initialDebt: parseFloat(form.elements.initialDebt.value), outstanding: parseFloat(form.elements.outstanding.value), salesConsultantId: parseInt(form.elements.salesConsultantId.value), status: form.elements.status.value, paymentStatus: form.elements.paymentStatus.value, forecastAmount: parseFloat(form.elements.forecastAmount.value) || 0 }; if (id) { const index = customers.findIndex(c => c.accountNo === id); const original = form.originalData; const changes = App.Helpers.getObjectChanges(original, {...original, ...customerData}); customers[index] = { ...customers[index], ...customerData }; App.Helpers.logChange('Updated', 'Customer', `${customerData.companyName} (${id})`, changes); } else { const newAccountNo = form.elements.accountNo.value.trim(); if (!newAccountNo) { App.UI.toast('Account Number is required.', 'error'); return; } const accountExists = customers.some(c => c.accountNo.toLowerCase() === newAccountNo.toLowerCase()); if (accountExists) { App.UI.toast('Account Number already exists.', 'error'); return; } customerData.accountNo = newAccountNo; customers.push(customerData); App.Helpers.logActivity('added a new customer', customerData.companyName, customerData.accountNo); App.Helpers.logChange('Created', 'Customer', `${customerData.companyName} (${newAccountNo})`); } App.DB.set('customers', customers); App.UI.closeModal('customer-modal'); App.UI.toast(`Customer ${id ? 'updated' : 'added'}!`); this.render(); }, 
+    saveCustomer: function(e) { 
+        e.preventDefault(); 
+        const form = e.target; 
+        const id = form.elements['customer-id-hidden'].value; 
+        let customers = App.DB.get('customers'); 
+        const customerData = { 
+            companyName: form.elements.companyName.value, 
+            emirate: form.elements.emirate.value, 
+            area: form.elements.area.value, 
+            initialDebt: parseFloat(form.elements.initialDebt.value), 
+            outstanding: parseFloat(form.elements.outstanding.value), 
+            salesConsultantId: parseInt(form.elements.salesConsultantId.value), 
+            status: form.elements.status.value, 
+            paymentStatus: form.elements.paymentStatus.value, 
+            forecastAmount: parseFloat(form.elements.forecastAmount.value) || 0,
+            debtDate: form.elements.debtDate.value,
+            category: form.elements.category.value
+        }; 
+        if (id) { 
+            const index = customers.findIndex(c => c.accountNo === id); 
+            const original = form.originalData; 
+            const changes = App.Helpers.getObjectChanges(original, {...original, ...customerData}); 
+            customers[index] = { ...customers[index], ...customerData }; 
+            App.Helpers.logChange('Updated', 'Customer', `${customerData.companyName} (${id})`, changes); 
+        } else { 
+            const newAccountNo = form.elements.accountNo.value.trim(); 
+            if (!newAccountNo) { App.UI.toast('Account Number is required.', 'error'); return; } 
+            const accountExists = customers.some(c => c.accountNo.toLowerCase() === newAccountNo.toLowerCase()); 
+            if (accountExists) { App.UI.toast('Account Number already exists.', 'error'); return; } 
+            customerData.accountNo = newAccountNo; 
+            customers.push(customerData); 
+            App.Helpers.logActivity('added a new customer', customerData.companyName, customerData.accountNo); 
+            App.Helpers.logChange('Created', 'Customer', `${customerData.companyName} (${newAccountNo})`); 
+        } 
+        App.DB.set('customers', customers); 
+        App.UI.closeModal('customer-modal'); 
+        App.UI.toast(`Customer ${id ? 'updated' : 'added'}!`); 
+        this.render(); 
+    },
     showCustomerForecastForm(accountNo) {
         const customer = App.DB.get('customers').find(c => c.accountNo === accountNo);
         if (!customer) return App.UI.toast('Customer not found.', 'error');
@@ -1777,7 +1925,7 @@
     }, 
     deleteVisit(visitId) { const visit = App.DB.get('visits').find(v => v.id === visitId); Swal.fire({ title: `Delete this visit?`, text: "This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let visits = App.DB.get('visits'); App.DB.set('visits', visits.filter(v => v.id !== visitId)); App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose} for customer ${visit.customerId}`, `Reason: ${result.value}`); App.UI.toast('Visit deleted.', 'success'); this.render(); } }); } 
     });
-	Object.assign(App.Payments, { 
+		    Object.assign(App.Payments, { 
         getCurrentFilteredData: function() {
             let payments = App.Helpers.getScopedData('payments');
             const { search, statusFilter, methodFilter } = App.state.payments;
@@ -1951,13 +2099,19 @@
             document.getElementById('report-visits-end-date').valueAsDate = today;
         }
 
+        const targetConsultantSelect = document.getElementById('report-target-consultant-select');
+        if(targetConsultantSelect) {
+            targetConsultantSelect.innerHTML = '<option value="all">All Consultants</option>' + App.DB.get('consultants').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
         const forecastConsultantSelect = document.getElementById('report-forecast-consultant-select');
         if(forecastConsultantSelect) {
             forecastConsultantSelect.innerHTML = '<option value="all">All Consultants</option>' + App.DB.get('consultants').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-            const today = new Date();
-            const currentMonth = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
-            document.getElementById('report-forecast-month').value = currentMonth;
         }
+
+        const today = new Date();
+        const currentMonth = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+        document.getElementById('report-target-month').value = currentMonth;
+        document.getElementById('report-forecast-month').value = currentMonth;
         
         const container = document.getElementById('statement-customer-select-container');
         if(container) {
@@ -1970,7 +2124,6 @@
             App.UI.createSearchableDropdown(container, customers, null, 'Search by Name, Account #, or Consultant...');
         }
         
-        const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         document.getElementById('report-collection-start-date').value = firstDayOfMonth.toISOString().slice(0, 10);
         document.getElementById('report-collection-end-date').valueAsDate = today;
@@ -2004,7 +2157,8 @@
                     'generate-collector-perf-btn': () => this.generateCollectorPerformanceReport(),
                     'generate-risk-analysis-btn': () => this.generateRiskAnalysisReport(),
                     'generate-consultant-visits-btn-new': () => this.generateConsultantVisitsReport(),
-                    'generate-forecast-report-btn-new': () => this.generateForecastPerformanceReport()
+                    'generate-target-perf-btn': () => this.generateTargetPerformanceReport(),
+                    'generate-forecast-perf-btn': () => this.generateForecastPerformanceReport(),
                 };
 
                 if (reportActions[target.id]) {
@@ -2218,13 +2372,13 @@
             this.currentConsultantVisitsData = { summary: { headers: summaryHeaders, data: summaryData }, details: Object.values(consultantData) };
             this.displayReport('Consultant Visits Report', [], [], content, ['csv_visits', 'pdf_visits']);
         },
-        generateForecastPerformanceReport: function() {
-            const consultantIdFilter = document.getElementById('report-forecast-consultant-select').value;
-            const monthFilter = document.getElementById('report-forecast-month').value;
+        generateTargetPerformanceReport: function() {
+            const consultantIdFilter = document.getElementById('report-target-consultant-select').value;
+            const monthFilter = document.getElementById('report-target-month').value;
             if (!monthFilter) return App.UI.toast('Please select a month.', 'warning');
 
             const allConsultants = App.DB.get('consultants');
-            const allForecasts = App.DB.get('forecasts');
+            const allTargets = App.DB.get('forecasts'); // Targets are stored in 'forecasts' table
             const allPayments = App.DB.get('payments');
             const allCustomers = App.DB.get('customers');
             
@@ -2233,19 +2387,59 @@
                 : allConsultants.filter(c => c.id == consultantIdFilter);
 
             const reportData = consultantsToReportOn.map(consultant => {
-                const forecastEntry = allForecasts.find(f => f.consultantId === consultant.id && f.month === monthFilter);
-                const forecastAmount = forecastEntry ? forecastEntry.amount : 0;
+                const targetEntry = allTargets.find(f => f.consultantId === consultant.id && f.month === monthFilter);
+                const targetAmount = targetEntry ? targetEntry.amount : 0;
                 
                 const consultantCustomers = allCustomers.filter(c => c.salesConsultantId === consultant.id).map(c => c.accountNo);
                 const collectedAmount = allPayments
                     .filter(p => p.status === 'Completed' && consultantCustomers.includes(p.customerId) && p.date.startsWith(monthFilter))
                     .reduce((sum, p) => sum + p.amount, 0);
 
-                const performance = forecastAmount > 0 ? ((collectedAmount / forecastAmount) * 100).toFixed(2) + '%' : 'N/A';
+                const performance = targetAmount > 0 ? ((collectedAmount / targetAmount) * 100).toFixed(2) + '%' : 'N/A';
                 
-                return [ consultant.name, App.Helpers.formatCurrency(forecastAmount), App.Helpers.formatCurrency(collectedAmount), performance ];
+                return [ 
+                    consultant.name, 
+                    App.Helpers.formatCurrency(targetAmount),
+                    App.Helpers.formatCurrency(collectedAmount), 
+                    performance 
+                ];
             });
             
+            const headers = ['Consultant', 'Target Amount', 'Collected Amount', 'Performance'];
+            this.displayReport(`Target Performance for ${monthFilter}`, headers, reportData);
+        },
+        generateForecastPerformanceReport: function() {
+            const consultantIdFilter = document.getElementById('report-forecast-consultant-select').value;
+            const monthFilter = document.getElementById('report-forecast-month').value;
+            if (!monthFilter) return App.UI.toast('Please select a month.', 'warning');
+
+            const allConsultants = App.DB.get('consultants');
+            const allPayments = App.DB.get('payments');
+            const allCustomers = App.DB.get('customers');
+            
+            const consultantsToReportOn = consultantIdFilter === 'all' 
+                ? allConsultants 
+                : allConsultants.filter(c => c.id == consultantIdFilter);
+            
+            const reportData = consultantsToReportOn.map(consultant => {
+                const consultantCustomers = allCustomers.filter(c => c.salesConsultantId === consultant.id);
+                const forecastedAmount = consultantCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+
+                const customerAccountNos = consultantCustomers.map(c => c.accountNo);
+                const collectedAmount = allPayments
+                    .filter(p => p.status === 'Completed' && customerAccountNos.includes(p.customerId) && p.date.startsWith(monthFilter))
+                    .reduce((sum, p) => sum + p.amount, 0);
+
+                const performance = forecastedAmount > 0 ? ((collectedAmount / forecastedAmount) * 100).toFixed(2) + '%' : 'N/A';
+
+                return [
+                    consultant.name,
+                    App.Helpers.formatCurrency(forecastedAmount),
+                    App.Helpers.formatCurrency(collectedAmount),
+                    performance
+                ];
+            });
+
             const headers = ['Consultant', 'Forecasted Amount', 'Collected Amount', 'Performance'];
             this.displayReport(`Forecast Performance for ${monthFilter}`, headers, reportData);
         },
@@ -2421,7 +2615,51 @@
             });
         }
     });
-    Object.assign(App.Consultants, { render: function() { const consultants = App.DB.get('consultants'); const customers = App.DB.get('customers'); const visits = App.DB.get('visits'); const tbody = document.getElementById('consultant-table-body'); let data = consultants.map(consultant => { const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id); const totalOutstanding = assignedCustomers.reduce((sum, c) => sum + c.outstanding, 0); const overdueCustomers = assignedCustomers.filter(c => c.paymentStatus === 'Overdue').length; const upcomingVisits = visits.filter(v => v.collectorId === consultant.id && v.status === 'Scheduled' && new Date(v.dateTime) >= new Date()).length; return { ...consultant, noOfCustomers: assignedCustomers.length, totalOutstanding, overdueCustomers, upcomingVisits }; }); const { column, order } = App.state.tableSorts.consultants; data.sort((a, b) => { let valA = a[column]; let valB = b[column]; if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); } if (valA < valB) return order === 'asc' ? -1 : 1; if (valA > valB) return order === 'asc' ? 1 : -1; return 0; }); const { currentPage, rowsPerPage } = App.state.pagination.consultants; const startIndex = (currentPage - 1) * rowsPerPage; const paginatedData = data.slice(startIndex, startIndex + rowsPerPage); if (paginatedData.length > 0) { tbody.innerHTML = paginatedData.map(c => `<tr><td><div style="font-weight:600;">${c.name}</div></td><td>${c.noOfCustomers}</td><td>${App.Helpers.formatCurrency(c.totalOutstanding)}</td><td>${c.overdueCustomers}</td><td>${c.upcomingVisits}</td><td><div class="d-flex gap-2"><button class="btn btn-outline view-customers" data-id="${c.id}" title="View Customers"><i class="fas fa-users"></i></button><button class="btn btn-outline reassign-customers" data-id="${c.id}" title="Reassign Customers"><i class="fas fa-random"></i></button><button class="btn btn-outline set-target-btn" data-id="${c.id}" title="Set Monthly Target"><i class="fas fa-bullseye"></i></button><button class="btn btn-outline edit-consultant" data-id="${c.id}" title="Edit"><i class="fas fa-edit"></i></button><button class="btn btn-danger delete-consultant" data-id="${c.id}" title="Delete"><i class="fas fa-trash"></i></button></div></td></tr>`).join(''); } else { const buttonHTML = `<button class="btn btn-primary" onclick="App.Consultants.showConsultantForm()"><i class="fas fa-plus"></i> Add Consultant</button>`; tbody.innerHTML = App.UI.getEmptyStateHTML('fa-user-tie', 'No Consultants Found', 'Add a consultant to begin assigning customers.', buttonHTML); } App.UI.animateTableRows(tbody); App.UI.renderPaginationControls('consultants', data.length); App.UI.updateSortIndicators('consultants'); }, setupEventListeners: function() { document.getElementById('add-consultant-btn').addEventListener('click', () => this.showConsultantForm()); document.getElementById('consultant-form').addEventListener('submit', (e) => this.saveConsultant(e)); document.getElementById('consultant-table-body').addEventListener('click', e => { const editBtn = e.target.closest('.edit-consultant'); const deleteBtn = e.target.closest('.delete-consultant'); const viewBtn = e.target.closest('.view-customers'); const reassignBtn = e.target.closest('.reassign-customers'); const targetBtn = e.target.closest('.set-target-btn'); if (editBtn) this.showConsultantForm(editBtn.dataset.id); if (deleteBtn) this.deleteConsultant(deleteBtn.dataset.id); if (viewBtn) this.showViewCustomersModal(viewBtn.dataset.id); if (reassignBtn) this.showReassignModal(reassignBtn.dataset.id); if (targetBtn) this.showForecastModal(targetBtn.dataset.id); }); document.getElementById('reassign-customers-form').addEventListener('submit', e => this.reassignCustomers(e)); document.querySelector('#consultants-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('consultants', th.dataset.sort); }); document.getElementById('forecast-form').addEventListener('submit', e => this.saveForecast(e)); document.getElementById('existing-forecasts-body').addEventListener('click', e => { const deleteBtn = e.target.closest('.delete-forecast'); if (deleteBtn) this.deleteForecast(deleteBtn.dataset.id); }); }, showConsultantForm: function(id = null) { const form = document.getElementById('consultant-form'); form.reset(); if (id) { const consultant = App.DB.get('consultants').find(c => c.id == id); document.getElementById('consultant-modal-title').textContent = 'Edit Consultant'; form.elements['consultant-id-hidden'].value = consultant.id; form.elements['consultantName'].value = consultant.name; form.originalData = {...consultant}; } else { document.getElementById('consultant-modal-title').textContent = 'Add New Consultant'; form.elements['consultant-id-hidden'].value = ''; form.originalData = null; } App.UI.openModal('consultant-modal'); }, saveConsultant: function(e) { e.preventDefault(); const form = e.target; const id = form.elements['consultant-id-hidden'].value; const name = form.elements['consultantName'].value.trim(); if (!name) return App.UI.toast('Consultant name cannot be empty.', 'error'); let consultants = App.DB.get('consultants'); if (id) { const index = consultants.findIndex(c => c.id == id); const originalName = form.originalData.name; consultants[index].name = name; App.Helpers.logChange('Updated', 'Consultant', `'${originalName}'`, `Renamed to '${name}'`); } else { const newId = Date.now(); consultants.push({ id: newId, name }); App.Helpers.logChange('Created', 'Consultant', `'${name}'`); } App.DB.set('consultants', consultants); App.UI.closeModal('consultant-modal'); App.UI.toast(`Consultant ${id ? 'updated' : 'added'}!`); this.render(); }, 
+    Object.assign(App.Consultants, { 
+        render: function() { 
+            const consultants = App.DB.get('consultants'); 
+            const customers = App.DB.get('customers'); 
+            const visits = App.DB.get('visits');
+            const forecasts = App.DB.get('forecasts');
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+            let data = consultants.map(consultant => { 
+                const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id); 
+                const totalOutstanding = assignedCustomers.reduce((sum, c) => sum + c.outstanding, 0); 
+                const totalForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0); 
+                const overdueCustomers = assignedCustomers.filter(c => c.paymentStatus === 'Overdue').length; 
+                const upcomingVisits = visits.filter(v => v.collectorId === consultant.id && v.status === 'Scheduled' && new Date(v.dateTime) >= new Date()).length;
+                const currentTarget = forecasts.find(f => f.consultantId === consultant.id && f.month === currentMonthStr)?.amount || 0;
+                return { ...consultant, noOfCustomers: assignedCustomers.length, totalOutstanding, totalForecast, overdueCustomers, upcomingVisits, currentTarget }; 
+            }); 
+            
+            const { column, order } = App.state.tableSorts.consultants; 
+            data.sort((a, b) => { 
+                let valA = a[column]; let valB = b[column]; 
+                if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); } 
+                if (valA < valB) return order === 'asc' ? -1 : 1; 
+                if (valA > valB) return order === 'asc' ? 1 : -1; 
+                return 0; 
+            }); 
+            
+            const { currentPage, rowsPerPage } = App.state.pagination.consultants; 
+            const startIndex = (currentPage - 1) * rowsPerPage; 
+            const paginatedData = data.slice(startIndex, startIndex + rowsPerPage); 
+            const tbody = document.getElementById('consultant-table-body');
+            if (paginatedData.length > 0) { 
+                tbody.innerHTML = paginatedData.map(c => `<tr><td><div style="font-weight:600;">${c.name}</div></td><td>${c.noOfCustomers}</td><td>${App.Helpers.formatCurrency(c.totalOutstanding)}</td><td>${App.Helpers.formatCurrency(c.totalForecast)}</td><td>${App.Helpers.formatCurrency(c.currentTarget)}</td><td>${c.overdueCustomers}</td><td>${c.upcomingVisits}</td><td><div class="d-flex gap-2"><button class="btn btn-outline view-customers" data-id="${c.id}" title="View Customers"><i class="fas fa-users"></i></button><button class="btn btn-outline reassign-customers" data-id="${c.id}" title="Reassign Customers"><i class="fas fa-random"></i></button><button class="btn btn-outline set-target-btn" data-id="${c.id}" title="Set Monthly Target"><i class="fas fa-bullseye"></i></button><button class="btn btn-outline edit-consultant" data-id="${c.id}" title="Edit"><i class="fas fa-edit"></i></button><button class="btn btn-danger delete-consultant" data-id="${c.id}" title="Delete"><i class="fas fa-trash"></i></button></div></td></tr>`).join(''); 
+            } else { 
+                const buttonHTML = `<button class="btn btn-primary" onclick="App.Consultants.showConsultantForm()"><i class="fas fa-plus"></i> Add Consultant</button>`; 
+                tbody.innerHTML = App.UI.getEmptyStateHTML('fa-user-tie', 'No Consultants Found', 'Add a consultant to begin assigning customers.', buttonHTML); 
+            } 
+            App.UI.animateTableRows(tbody); 
+            App.UI.renderPaginationControls('consultants', data.length); 
+            App.UI.updateSortIndicators('consultants'); 
+        }, 
+        setupEventListeners: function() { document.getElementById('add-consultant-btn').addEventListener('click', () => this.showConsultantForm()); document.getElementById('consultant-form').addEventListener('submit', (e) => this.saveConsultant(e)); document.getElementById('consultant-table-body').addEventListener('click', e => { const editBtn = e.target.closest('.edit-consultant'); const deleteBtn = e.target.closest('.delete-consultant'); const viewBtn = e.target.closest('.view-customers'); const reassignBtn = e.target.closest('.reassign-customers'); const targetBtn = e.target.closest('.set-target-btn'); if (editBtn) this.showConsultantForm(editBtn.dataset.id); if (deleteBtn) this.deleteConsultant(deleteBtn.dataset.id); if (viewBtn) this.showViewCustomersModal(viewBtn.dataset.id); if (reassignBtn) this.showReassignModal(reassignBtn.dataset.id); if (targetBtn) this.showForecastModal(targetBtn.dataset.id); }); document.getElementById('reassign-customers-form').addEventListener('submit', e => this.reassignCustomers(e)); document.querySelector('#consultants-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('consultants', th.dataset.sort); }); document.getElementById('forecast-form').addEventListener('submit', e => this.saveForecast(e)); document.getElementById('existing-forecasts-body').addEventListener('click', e => { const deleteBtn = e.target.closest('.delete-forecast'); if (deleteBtn) this.deleteForecast(deleteBtn.dataset.id); }); }, 
+        showConsultantForm: function(id = null) { const form = document.getElementById('consultant-form'); form.reset(); if (id) { const consultant = App.DB.get('consultants').find(c => c.id == id); document.getElementById('consultant-modal-title').textContent = 'Edit Consultant'; form.elements['consultant-id-hidden'].value = consultant.id; form.elements['consultantName'].value = consultant.name; form.originalData = {...consultant}; } else { document.getElementById('consultant-modal-title').textContent = 'Add New Consultant'; form.elements['consultant-id-hidden'].value = ''; form.originalData = null; } App.UI.openModal('consultant-modal'); }, 
+        saveConsultant: function(e) { e.preventDefault(); const form = e.target; const id = form.elements['consultant-id-hidden'].value; const name = form.elements['consultantName'].value.trim(); if (!name) return App.UI.toast('Consultant name cannot be empty.', 'error'); let consultants = App.DB.get('consultants'); if (id) { const index = consultants.findIndex(c => c.id == id); const originalName = form.originalData.name; consultants[index].name = name; App.Helpers.logChange('Updated', 'Consultant', `'${originalName}'`, `Renamed to '${name}'`); } else { const newId = Date.now(); consultants.push({ id: newId, name }); App.Helpers.logChange('Created', 'Consultant', `'${name}'`); } App.DB.set('consultants', consultants); App.UI.closeModal('consultant-modal'); App.UI.toast(`Consultant ${id ? 'updated' : 'added'}!`); this.render(); }, 
         deleteConsultant: function(id) {
             const customers = App.DB.get('customers');
             const assignedCustomers = customers.filter(c => c.salesConsultantId == id);
@@ -2567,7 +2805,7 @@
             });
         }
     });
-	Object.assign(App.Users, { 
+	    Object.assign(App.Users, { 
         render: function() { 
             let users = App.DB.get('users'); 
             const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
