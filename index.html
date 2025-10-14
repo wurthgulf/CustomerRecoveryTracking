@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Recovery App - v1.13</title>
+    <title>Customer Recovery App - v1.0</title>
 
     <!-- Dependencies -->
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -614,7 +614,7 @@
                     </div>
                     <button id="restore-data-btn" class="btn btn-warning" disabled><i class="fas fa-upload"></i> Restore Data</button>
                 </div>`;
-            document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Pending</option><option>Paid</option><option>Cleared</option><option>Overdue</option></select></div><div class="form-group"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group"><label for="outstanding">Current Outstanding (AED)*</label><input type="number" id="outstanding" class="form-control" required></div><div class="form-group"><label for="forecastAmount">Forecast Amount (AED)</label><input type="number" id="forecastAmount" class="form-control"></div><div class="form-group"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="customerStatus">Customer Status</label><select id="customerStatus" class="form-control"><option>Good Standing</option><option>Needs Follow-up</option><option>High Priority</option><option>Disputed</option><option>Legal Action</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
+            document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group" data-admin-only="true"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group" data-admin-only="true"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Pending</option><option>Paid</option><option>Cleared</option><option>Overdue</option></select></div><div class="form-group" data-admin-only="true"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="outstanding">Current Outstanding (AED)*</label><input type="number" id="outstanding" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="forecastAmount">Forecast Amount (AED)</label><input type="number" id="forecastAmount" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="customerStatus">Customer Status</label><select id="customerStatus" class="form-control"><option>Good Standing</option><option>Needs Follow-up</option><option>High Priority</option><option>Disputed</option><option>Legal Action</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
             document.getElementById('payment-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Record a Payment</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-modal')">&times;</button></div><form id="payment-form"><div class="form-group"><label for="payment-customer-id">Customer*</label><div id="payment-customer-select-container"></div></div><div class="form-group"><label for="payment-amount">Amount*</label><input type="number" id="payment-amount" class="form-control" required></div><div class="form-group"><label for="payment-method">Payment Method*</label><select id="payment-method" class="form-control" required><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="form-group"><label for="payment-date">Date*</label><input type="date" id="payment-date" class="form-control" required></div><div class="form-group"><label for="payment-status">Status</label><select id="payment-status" class="form-control"><option>Completed</option><option>Pending</option><option>Failed</option></select></div><button type="submit" class="btn btn-primary">Record Payment</button></form></div>`; 
             document.getElementById('visit-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Schedule Visit</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-modal')">&times;</button></div><form id="visit-form"><input type="hidden" id="visit-id"><div class="form-group"><label for="visit-customer-id">Customer*</label><div id="visit-customer-select-container"></div></div><div class="form-group"><label for="visit-purpose">Purpose*</label><input type="text" id="visit-purpose" class="form-control" required></div><div class="form-group"><label for="visit-date">Date & Time*</label><input type="datetime-local" id="visit-date" class="form-control" required></div><button type="submit" class="btn btn-primary">Save Visit</button></form></div>`; 
             document.getElementById('import-csv-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Upload CSV File</h3><button class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">&times;</button></div><div class="file-upload-wrapper" id="csv-drop-zone"><i class="fas fa-upload" style="font-size: 1.5rem; color: var(--text-secondary);"></i><p>Click to browse or drag & drop file here</p><span id="csv-filename" style="font-weight: 600; color: var(--primary);"></span><input type="file" id="csv-file-input" class="hidden" accept=".csv"></div><div class="info-box"><p>Ensure headers match:</p><code>accountNumber,companyName,emirate,area,status,paymentStatus,initialDebt,outstandingAmount,salesConsultant,customerStatus</code></div><a href="#" id="download-sample-csv-link"><i class="fas fa-download"></i> Download Sample Template</a><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">Close</button></div></div>`; 
@@ -863,7 +863,7 @@
             }
         }
     });
-	    Object.assign(App.Dashboard, { 
+Object.assign(App.Dashboard, { 
         charts: {}, 
         setupEventListeners() { 
             document.getElementById('dashboard-page').addEventListener('click', e => { 
@@ -1343,7 +1343,7 @@
         }, 
         renderRecoveryProgress() { const customers = App.Helpers.getScopedData('customers'); const totalInitialDebt = customers.reduce((sum, c) => sum + c.initialDebt, 0); const totalOutstanding = customers.reduce((sum, c) => sum + c.outstanding, 0); const totalCollected = totalInitialDebt - totalOutstanding; const percentage = totalInitialDebt > 0 ? ((totalCollected / totalInitialDebt) * 100).toFixed(0) : 0; const container = document.getElementById('recovery-progress-card'); container.innerHTML = `<div class="d-flex align-items-center gap-2 mb-4"><i class="fas fa-bullseye" style="color: var(--primary);"></i><h3 class="card-title" style="margin:0;">Recovery Progress</h3></div><div><div class="mb-2" style="font-weight: 600; text-transform: uppercase; font-size: var(--fs-sm); color: var(--text-secondary);">Total Debt vs Collected</div><div class="progress-bar mb-2"><div class="progress-bar-inner" data-width="${percentage}"></div></div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${App.Helpers.formatCurrency(totalCollected)} collected of ${App.Helpers.formatCurrency(totalInitialDebt)} (${percentage}%)</div></div>`; App.UI.observeProgressBars(); } 
     });
-		    Object.assign(App.Customers, { quill: null, setupEventListeners: function() { document.getElementById('add-customer-btn').addEventListener('click', () => this.showCustomerForm()); document.getElementById('import-customer-btn').addEventListener('click', () => { document.getElementById('csv-filename').textContent = ''; App.UI.openModal('import-csv-modal'); }); document.getElementById('export-customers-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('export-customers-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('customer-form').addEventListener('submit', (e) => this.saveCustomer(e)); document.getElementById('customer-forecast-form').addEventListener('submit', (e) => this.saveCustomerForecast(e)); document.querySelector('#customers-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('customers', th.dataset.sort); }); const debouncedSearch = App.Helpers.debounce(() => {App.state.pagination.customers.currentPage = 1; this.render()}, 300); document.getElementById('customer-search').addEventListener('input', debouncedSearch); document.getElementById('customer-account-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-table-body').addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; const id = button.dataset.id; if (button.classList.contains('view-customer')) this.showCustomerDetail(id); else if (button.classList.contains('edit-customer')) this.showCustomerForm(id); else if (button.classList.contains('delete-customer')) this.deleteCustomer(id); else if (button.classList.contains('set-forecast')) this.showCustomerForecastForm(id); }); 
+			    Object.assign(App.Customers, { quill: null, setupEventListeners: function() { document.getElementById('add-customer-btn').addEventListener('click', () => this.showCustomerForm()); document.getElementById('import-customer-btn').addEventListener('click', () => { document.getElementById('csv-filename').textContent = ''; App.UI.openModal('import-csv-modal'); }); document.getElementById('export-customers-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('export-customers-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('customer-form').addEventListener('submit', (e) => this.saveCustomer(e)); document.getElementById('customer-forecast-form').addEventListener('submit', (e) => this.saveCustomerForecast(e)); document.querySelector('#customers-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('customers', th.dataset.sort); }); const debouncedSearch = App.Helpers.debounce(() => {App.state.pagination.customers.currentPage = 1; this.render()}, 300); document.getElementById('customer-search').addEventListener('input', debouncedSearch); document.getElementById('customer-account-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-table-body').addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; const id = button.dataset.id; if (button.classList.contains('view-customer')) this.showCustomerDetail(id); else if (button.classList.contains('edit-customer')) this.showCustomerForm(id); else if (button.classList.contains('delete-customer')) this.deleteCustomer(id); else if (button.classList.contains('set-forecast')) this.showCustomerForecastForm(id); }); 
         const detailModal = document.getElementById('customer-detail-modal');
         detailModal.addEventListener('click', (e) => { 
             const button = e.target.closest('button'); 
@@ -1449,31 +1449,74 @@
         App.UI.renderPaginationControls('customers', filteredCustomers.length);
         App.UI.updateSortIndicators('customers');
     }, 
-    showCustomerForm: function(accountNo = null) { const form = document.getElementById('customer-form'); const accountNoInput = form.elements.accountNo; form.reset(); const consultantSelect = form.elements['salesConsultantId']; consultantSelect.innerHTML = App.DB.get('consultants').map(c => `<option value="${c.id}">${c.name}</option>`).join(''); let originalCustomer = null; if (accountNo) { const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); originalCustomer = {...customer}; document.getElementById('customer-modal-title').textContent = 'Edit Customer'; document.getElementById('customer-id-hidden').value = customer.accountNo; Object.keys(customer).forEach(key => { if (form.elements[key]) form.elements[key].value = customer[key]; }); accountNoInput.readOnly = true; accountNoInput.required = false; } else { document.getElementById('customer-modal-title').textContent = 'Add New Customer'; document.getElementById('customer-id-hidden').value = ''; accountNoInput.readOnly = false; accountNoInput.required = true; accountNoInput.placeholder = 'e.g., DXB-007'; } App.UI.openModal('customer-modal'); form.originalData = originalCustomer; }, 
+    showCustomerForm: function(accountNo = null) { 
+        const form = document.getElementById('customer-form'); 
+        const accountNoInput = form.elements.accountNo; 
+        form.reset(); 
+        const consultantSelect = form.elements['salesConsultantId']; 
+        consultantSelect.innerHTML = App.DB.get('consultants').map(c => `<option value="${c.id}">${c.name}</option>`).join(''); 
+        let originalCustomer = null; 
+        const isAdmin = App.state.currentUser.role === 'admin';
+
+        form.querySelectorAll('.form-group').forEach(el => {
+            const isAdminOnly = el.getAttribute('data-admin-only') === 'true';
+            el.style.display = !isAdmin && isAdminOnly ? 'none' : '';
+        });
+
+        if (accountNo) { 
+            const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); 
+            originalCustomer = {...customer}; 
+            document.getElementById('customer-modal-title').textContent = isAdmin ? 'Edit Customer' : `Update Status for ${customer.companyName}`;
+            document.getElementById('customer-id-hidden').value = customer.accountNo; 
+            Object.keys(customer).forEach(key => { if (form.elements[key]) form.elements[key].value = customer[key]; }); 
+            accountNoInput.readOnly = true; 
+            accountNoInput.required = false; 
+        } else { 
+            document.getElementById('customer-modal-title').textContent = 'Add New Customer'; 
+            document.getElementById('customer-id-hidden').value = ''; 
+            accountNoInput.readOnly = false; 
+            accountNoInput.required = true; 
+            accountNoInput.placeholder = 'e.g., DXB-007'; 
+        } 
+        App.UI.openModal('customer-modal'); 
+        form.originalData = originalCustomer; 
+    }, 
     saveCustomer: function(e) { 
         e.preventDefault(); 
         const form = e.target; 
         const id = form.elements['customer-id-hidden'].value; 
         let customers = App.DB.get('customers'); 
-        const customerData = { 
-            companyName: form.elements.companyName.value, 
-            emirate: form.elements.emirate.value, 
-            area: form.elements.area.value, 
-            initialDebt: parseFloat(form.elements.initialDebt.value), 
-            outstanding: parseFloat(form.elements.outstanding.value), 
-            salesConsultantId: parseInt(form.elements.salesConsultantId.value), 
-            status: form.elements.status.value, 
-            paymentStatus: form.elements.paymentStatus.value, 
-            forecastAmount: parseFloat(form.elements.forecastAmount.value) || 0,
-            customerStatus: form.elements.customerStatus.value
-        }; 
+        const isAdmin = App.state.currentUser.role === 'admin';
+        
+        let customerData;
+        if (isAdmin) {
+            customerData = { 
+                companyName: form.elements.companyName.value, 
+                emirate: form.elements.emirate.value, 
+                area: form.elements.area.value, 
+                initialDebt: parseFloat(form.elements.initialDebt.value), 
+                outstanding: parseFloat(form.elements.outstanding.value), 
+                salesConsultantId: parseInt(form.elements.salesConsultantId.value), 
+                status: form.elements.status.value, 
+                paymentStatus: form.elements.paymentStatus.value, 
+                forecastAmount: parseFloat(form.elements.forecastAmount.value) || 0,
+                customerStatus: form.elements.customerStatus.value
+            }; 
+        } else {
+            // For standard users, only these two fields are updated
+            customerData = {
+                paymentStatus: form.elements.paymentStatus.value,
+                customerStatus: form.elements.customerStatus.value
+            };
+        }
+        
         if (id) { 
             const index = customers.findIndex(c => c.accountNo === id); 
             const original = form.originalData; 
             const changes = App.Helpers.getObjectChanges(original, {...original, ...customerData}); 
             customers[index] = { ...customers[index], ...customerData }; 
-            App.Helpers.logChange('Updated', 'Customer', `${customerData.companyName} (${id})`, changes); 
-        } else { 
+            App.Helpers.logChange('Updated', 'Customer', `${customers[index].companyName} (${id})`, changes); 
+        } else { // This part is only reachable by admins for new customers
             const newAccountNo = form.elements.accountNo.value.trim(); 
             if (!newAccountNo) { App.UI.toast('Account Number is required.', 'error'); return; } 
             const accountExists = customers.some(c => c.accountNo.toLowerCase() === newAccountNo.toLowerCase()); 
@@ -1908,7 +1951,7 @@
     }, 
     deleteVisit(visitId) { const visit = App.DB.get('visits').find(v => v.id === visitId); Swal.fire({ title: `Delete this visit?`, text: "This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let visits = App.DB.get('visits'); App.DB.set('visits', visits.filter(v => v.id !== visitId)); App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose} for customer ${visit.customerId}`, `Reason: ${result.value}`); App.UI.toast('Visit deleted.', 'success'); this.render(); } }); } 
     });
-	  Object.assign(App.Payments, { 
+Object.assign(App.Payments, { 
         getCurrentFilteredData: function() {
             let payments = App.Helpers.getScopedData('payments');
             const { search, statusFilter, methodFilter } = App.state.payments;
@@ -2788,7 +2831,7 @@
             });
         }
     });
- Object.assign(App.Users, { 
+Object.assign(App.Users, { 
         render: function() { 
             let users = App.DB.get('users'); 
             const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
