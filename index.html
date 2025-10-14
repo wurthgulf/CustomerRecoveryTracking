@@ -223,6 +223,19 @@
         .report-card h4 { font-weight: 600; font-size: var(--fs-lg); margin-bottom: var(--spacing-2); }
         .report-card p { font-size: var(--fs-sm); color: var(--text-secondary); }
 
+        /* --- Reports Page Grid --- */
+        .report-generators-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--spacing-6);
+            margin-bottom: var(--spacing-6);
+        }
+        @media (max-width: 1024px) {
+            .report-generators-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .searchable-dropdown { position: relative; }
         .searchable-dropdown-results { position: absolute; top: 100%; left: 0; right: 0; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 2010; box-shadow: var(--shadow); }
         .searchable-dropdown-item { padding: var(--spacing-2) var(--spacing-4); cursor: pointer; line-height: 1.4; }
@@ -508,75 +521,77 @@
             document.getElementById('payments-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Recovered This Month</div><div id="payment-kpi-recovered-month" class="value">0</div></div><div class="kpi-card"><div class="title">Total Payments Recorded</div><div id="payment-kpi-total-count" class="value">0</div></div><div class="kpi-card"><div class="title">Pending Payments</div><div id="payment-kpi-pending" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Recent Payments</h3><div class="d-flex gap-2"><input type="search" id="payment-search" placeholder="Search customer..." class="form-control" style="width: auto;"><select id="payment-status-filter" class="form-control" style="width: auto;"><option value="all">All Status</option><option>Completed</option><option>Pending</option><option>Failed</option></select><select id="payment-method-filter" class="form-control" style="width: auto;"><option value="all">All Methods</option><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="d-flex gap-2"><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-payments-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-payments-pdf"><i class="fas fa-file-pdf"></i> PDF</button></div><button class="btn btn-success" id="record-payment-btn"><i class="fas fa-plus"></i> Record Payment</button></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="date">Date</th><th data-sort="customerId">Customer</th><th data-sort="consultantId">Consultant</th><th data-sort="amount">Amount</th><th data-sort="method">Method</th><th data-sort="status">Status</th><th>Actions</th></tr></thead><tbody id="payment-table-body"></tbody></table></div><div id="payments-pagination" class="pagination-controls"></div></div>`; 
             document.getElementById('analytics-page').innerHTML = `<div class="page-header"><h2>Analytics Dashboard</h2><p>Visual insights into recovery performance and activities.</p></div><div id="analytics-kpi-grid" class="kpi-card-grid"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div class="card"><div class="card-header"><h3 class="card-title">Recovery Performance by Consultant</h3></div><div class="chart-container"><canvas id="recovery-by-consultant-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Outstanding Debt by Emirate</h3></div><div class="chart-container"><canvas id="recovery-by-emirate-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Payment Methods</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="payment-methods-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="visit-outcome-chart"></canvas></div></div></div>`;
             document.getElementById('reports-page').innerHTML = `
-                <div class="card mb-4">
-                    <div class="card-header"><h3 class="card-title">Collection Details Report</h3></div>
-                    <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a detailed list of all collections within a specific date range.</p>
-                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-                        <div class="form-group">
-                            <label for="report-collection-start-date">Start Date</label>
-                            <input type="date" id="report-collection-start-date" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="report-collection-end-date">End Date</label>
-                            <input type="date" id="report-collection-end-date" class="form-control">
-                        </div>
-                    </div>
-                    <button id="generate-collection-report-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-                </div>
-                 <div class="card mb-4">
-                    <div class="card-header"><h3 class="card-title">Consultant Target Performance</h3></div>
-                     <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly target vs. actual collections for selected consultants.</p>
-                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-                        <div class="form-group">
-                            <label for="report-target-consultant-select">Consultant</label>
-                            <select id="report-target-consultant-select" class="form-control"></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="report-target-month">Month</label>
-                            <div class="input-with-icon">
-                                <input type="month" id="report-target-month" class="form-control">
-                                <label for="report-target-month" class="icon fas fa-calendar-alt"></label>
+                <div class="report-generators-grid">
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">Collection Details Report</h3></div>
+                        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a detailed list of all collections within a specific date range.</p>
+                        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                            <div class="form-group">
+                                <label for="report-collection-start-date">Start Date</label>
+                                <input type="date" id="report-collection-start-date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="report-collection-end-date">End Date</label>
+                                <input type="date" id="report-collection-end-date" class="form-control">
                             </div>
                         </div>
+                        <button id="generate-collection-report-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                     </div>
-                    <button id="generate-target-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-                </div>
-                 <div class="card mb-4">
-                    <div class="card-header"><h3 class="card-title">Consultant Forecast Performance</h3></div>
-                     <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly forecast vs. actual collections for selected consultants.</p>
-                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-                        <div class="form-group">
-                            <label for="report-forecast-consultant-select">Consultant</label>
-                            <select id="report-forecast-consultant-select" class="form-control"></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="report-forecast-month">Month</label>
-                            <div class="input-with-icon">
-                                <input type="month" id="report-forecast-month" class="form-control">
-                                <label for="report-forecast-month" class="icon fas fa-calendar-alt"></label>
+                     <div class="card">
+                        <div class="card-header"><h3 class="card-title">Consultant Target Performance</h3></div>
+                         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly target vs. actual collections for selected consultants.</p>
+                        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                            <div class="form-group">
+                                <label for="report-target-consultant-select">Consultant</label>
+                                <select id="report-target-consultant-select" class="form-control"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="report-target-month">Month</label>
+                                <div class="input-with-icon">
+                                    <input type="month" id="report-target-month" class="form-control">
+                                    <label for="report-target-month" class="icon fas fa-calendar-alt"></label>
+                                </div>
                             </div>
                         </div>
+                        <button id="generate-target-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                     </div>
-                    <button id="generate-forecast-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-                </div>
-                <div class="card mb-4">
-                    <div class="card-header"><h3 class="card-title">Consultant Visits Report</h3></div>
-                    <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a detailed visit history and performance report for a selected consultant and date range.</p>
-                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-                        <div class="form-group">
-                            <label for="report-visits-consultant-select">Consultant</label>
-                            <select id="report-visits-consultant-select" class="form-control"></select>
+                     <div class="card">
+                        <div class="card-header"><h3 class="card-title">Consultant Forecast Performance</h3></div>
+                         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly forecast vs. actual collections for selected consultants.</p>
+                        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                            <div class="form-group">
+                                <label for="report-forecast-consultant-select">Consultant</label>
+                                <select id="report-forecast-consultant-select" class="form-control"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="report-forecast-month">Month</label>
+                                <div class="input-with-icon">
+                                    <input type="month" id="report-forecast-month" class="form-control">
+                                    <label for="report-forecast-month" class="icon fas fa-calendar-alt"></label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="report-visits-start-date">Start Date</label>
-                            <input type="date" id="report-visits-start-date" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="report-visits-end-date">End Date</label>
-                            <input type="date" id="report-visits-end-date" class="form-control">
-                        </div>
+                        <button id="generate-forecast-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                     </div>
-                    <button id="generate-consultant-visits-btn-new" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">Consultant Visits Report</h3></div>
+                        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a detailed visit history and performance report for a selected consultant and date range.</p>
+                        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                            <div class="form-group">
+                                <label for="report-visits-consultant-select">Consultant</label>
+                                <select id="report-visits-consultant-select" class="form-control"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="report-visits-start-date">Start Date</label>
+                                <input type="date" id="report-visits-start-date" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="report-visits-end-date">End Date</label>
+                                <input type="date" id="report-visits-end-date" class="form-control">
+                            </div>
+                        </div>
+                        <button id="generate-consultant-visits-btn-new" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
+                    </div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);">
                     <div>
@@ -895,7 +910,7 @@
             }
         }
     });
-	    Object.assign(App.Dashboard, { 
+    Object.assign(App.Dashboard, { 
         charts: {}, 
         setupEventListeners() { 
             document.getElementById('dashboard-page').addEventListener('click', e => { 
@@ -1599,7 +1614,7 @@
         }
     },
     showCustomerDetail: function(accountNo) { App.state.activeCustomerId = accountNo; const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); if (!customer) return; document.getElementById('customer-detail-title').innerHTML = `Customer: ${customer.companyName} <span style="color:var(--text-secondary); font-weight:500;">(${customer.accountNo})</span>`; this.renderDetailOverview(customer, consultantMap); this.renderDetailVisitNotes(customer); this.switchDetailTab('overview'); App.UI.openModal('customer-detail-modal'); }, renderDetailOverview: function(customer, consultantMap) { const payments = App.DB.get('payments').filter(p => p.customerId === customer.accountNo); const visits = App.DB.get('visits').filter(v => v.customerId === customer.accountNo).sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime)); document.getElementById('overview-content').innerHTML = `<div class="detail-info-grid"><div class="detail-info-card"><div class="label">Account #</div><div class="value">${customer.accountNo}</div></div><div class="detail-info-card"><div class="label">Location</div><div class="value">${customer.area}, ${customer.emirate}</div></div><div class="detail-info-card"><div class="label">Account Status</div><div class="value"><span class="status-badge ${customer.status.toLowerCase()}">${customer.status}</span></div></div><div class="detail-info-card"><div class="label">Payment Status</div><div class="value"><span class="status-badge ${customer.paymentStatus.toLowerCase()}">${customer.paymentStatus}</span></div></div><div class="detail-info-card"><div class="label">Outstanding</div><div class="value">${App.Helpers.formatCurrency(customer.outstanding)}</div></div><div class="detail-info-card"><div class="label">Sales Consultant</div><div class="value">${consultantMap[customer.salesConsultantId] || 'N/A'}</div></div></div><h4 class="card-title mb-4">Payment History</h4>${payments.length > 0 ? `<div class="table-container"><table class="data-table"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead><tbody>${payments.map(p => `<tr><td>${App.Helpers.formatDate(p.date)}</td><td>${App.Helpers.formatCurrency(p.amount)}</td><td>${p.method}</td><td><span class="status-badge ${p.status.toLowerCase()}">${p.status}</span></td></tr>`).join('')}</tbody></table></div>` : '<p>No payments recorded.</p>'}<h4 class="card-title mt-4 mb-4">Visit Notes History</h4>${visits.length > 0 ? visits.map(v => `<div class="card mb-4" style="background:var(--bg-color);"><p><strong>${App.Helpers.formatDateTime(v.dateTime)}: ${v.contactMethod || v.purpose} ${v.outcome ? `(${v.outcome})` : ''}</strong></p>${v.notes || ''}</div>`).join('') : '<p>No visit notes recorded.</p>'}`; App.UI.animateTableRows(document.querySelector('#overview-content .data-table tbody')); }, renderDetailVisitNotes: function(customer) { document.getElementById('visit-notes-content').innerHTML = `<div class="form-grid"><div class="form-group"><label>CONTACT METHOD</label><select id="visit-contact-method" class="form-control"><option>Site Visit</option><option>Phone Call</option><option>Email</option></select></div><div class="form-group"><label>OUTCOME</label><select id="visit-outcome" class="form-control"><option>No Answer</option><option>Promise to Pay</option><option>Dispute</option><option>Paid in Full</option><option>Partial Payment</option></select></div></div><div class="form-group"><label>NOTES</label><div id="quill-editor" style="height:150px;"></div></div><div class="form-grid"><div class="form-group"><label>SCHEDULE NEXT VISIT (Optional)</label><input type="date" id="visit-next-date" class="form-control"></div><div class="form-group"><label>LOCATION</label><button type="button" class="btn btn-outline" id="tag-location-btn" style="width:100%;"><i class="fas fa-map-marker-alt"></i> <span id="location-tag-text">Tag Current Location</span></button></div></div><div class="d-flex" style="justify-content:flex-end;"><button type="button" class="btn btn-primary" id="save-visit-notes-btn">Save Notes</button></div>`; if (this.quill) { this.quill = null; } this.quill = new Quill('#quill-editor', { theme: 'snow', placeholder: 'Enter contact notes...' }); }, switchDetailTab: function(tabId) { document.querySelectorAll('.detail-tab-btn').forEach(btn => btn.classList.remove('active')); document.querySelector(`.detail-tab-btn[data-tab="${tabId}"]`)?.classList.add('active'); document.querySelectorAll('#customer-detail-content .tab-content').forEach(c => c.classList.add('hidden')); document.getElementById(`${tabId}-content`).classList.remove('hidden'); }, saveVisitNoteFromDetail: function() { const customerId = App.state.activeCustomerId; const contactMethod = document.getElementById('visit-contact-method').value; const outcome = document.getElementById('visit-outcome').value; const notes = this.quill.root.innerHTML; const nextVisitDate = document.getElementById('visit-next-date').value; let visits = App.DB.get('visits'); const customer = App.DB.get('customers').find(c => c.accountNo === customerId); const newNote = { id: `v${Date.now()}`, customerId, dateTime: new Date().toISOString(), purpose: `Follow-up: ${outcome}`, collectorId: customer.salesConsultantId, status: "Completed", contactMethod, outcome, notes, }; visits.push(newNote); if (nextVisitDate) { visits.push({ id: `v${Date.now() + 1}`, customerId, dateTime: `${nextVisitDate}`, purpose: 'Scheduled Follow-up', collectorId: newNote.collectorId, status: "Scheduled" }); } App.DB.set('visits', visits); App.Helpers.logChange('Added', 'Visit Note', `For ${customer.companyName}`); App.UI.toast('Visit note saved!'); App.UI.closeModal('customer-detail-modal'); }, deleteCustomer(accountNo) { const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); Swal.fire({ title: `Delete ${customer.companyName}?`, text: "This will permanently delete the customer and all their associated payments and visits. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let customers = App.DB.get('customers'); let visits = App.DB.get('visits'); let payments = App.DB.get('payments'); App.DB.set('customers', customers.filter(c => c.accountNo !== accountNo)); App.DB.set('visits', visits.filter(v => v.customerId !== accountNo)); App.DB.set('payments', payments.filter(p => p.customerId !== accountNo)); App.Helpers.logChange('Deleted', 'Customer', `${customer.companyName} (${accountNo})`, `Reason: ${result.value}`); App.UI.toast('Customer deleted permanently.', 'success'); this.render(); } }); } });
-	    Object.assign(App.Visits, { calendar: null, logNotesQuill: null, map: null, setupEventListeners: function() { document.getElementById('visit-notes-form').addEventListener('submit', e => this.saveCompletedVisit(e)); document.getElementById('visit-form').addEventListener('submit', (e) => this.saveScheduledVisit(e)); document.getElementById('export-visits-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); document.getElementById('export-visits-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); const page = document.getElementById('visits-page'); const debouncedRender = App.Helpers.debounce(() => {App.state.pagination.visits.currentPage = 1; this.renderListView()}, 300); page.addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; if (button.classList.contains('visit-view-tab')) this.switchView(button.dataset.view); if (button.classList.contains('visit-filter-btn')) this.setFilter(button.dataset.filter); if (button.id === 'visit-date-apply') this.applyDateFilter(); if (button.classList.contains('mark-done-btn')) this.showMarkDoneModal(button.dataset.id); if (button.classList.contains('view-visit-btn')) this.showVisitDetail(button.dataset.id); if (button.id === 'schedule-visit-btn') this.showScheduleModal(); if (button.classList.contains('delete-visit')) this.deleteVisit(button.dataset.id); if(button.id === 'set-visit-date-today') this.setQuickDate('today'); if(button.id === 'set-visit-date-tomorrow') this.setQuickDate('tomorrow'); }); 
+		    Object.assign(App.Visits, { calendar: null, logNotesQuill: null, map: null, setupEventListeners: function() { document.getElementById('visit-notes-form').addEventListener('submit', e => this.saveCompletedVisit(e)); document.getElementById('visit-form').addEventListener('submit', (e) => this.saveScheduledVisit(e)); document.getElementById('export-visits-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); document.getElementById('export-visits-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); const page = document.getElementById('visits-page'); const debouncedRender = App.Helpers.debounce(() => {App.state.pagination.visits.currentPage = 1; this.renderListView()}, 300); page.addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; if (button.classList.contains('visit-view-tab')) this.switchView(button.dataset.view); if (button.classList.contains('visit-filter-btn')) this.setFilter(button.dataset.filter); if (button.id === 'visit-date-apply') this.applyDateFilter(); if (button.classList.contains('mark-done-btn')) this.showMarkDoneModal(button.dataset.id); if (button.classList.contains('view-visit-btn')) this.showVisitDetail(button.dataset.id); if (button.id === 'schedule-visit-btn') this.showScheduleModal(); if (button.classList.contains('delete-visit')) this.deleteVisit(button.dataset.id); if(button.id === 'set-visit-date-today') this.setQuickDate('today'); if(button.id === 'set-visit-date-tomorrow') this.setQuickDate('tomorrow'); }); 
         document.getElementById('visit-search').addEventListener('input', (e) => { App.state.visits.search = e.target.value; debouncedRender(); });
         document.getElementById('visit-consultant-filter').addEventListener('change', (e) => { App.state.pagination.visits.currentPage = 1; App.state.visits.consultantFilter = e.target.value; this.renderListView(); });
         document.getElementById('map-consultant-filter').addEventListener('change', (e) => { App.state.visits.mapConsultant = e.target.value; this.renderMapView(); });
@@ -1983,7 +1998,7 @@
     }, 
     deleteVisit(visitId) { const visit = App.DB.get('visits').find(v => v.id === visitId); Swal.fire({ title: `Delete this visit?`, text: "This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let visits = App.DB.get('visits'); App.DB.set('visits', visits.filter(v => v.id !== visitId)); App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose} for customer ${visit.customerId}`, `Reason: ${result.value}`); App.UI.toast('Visit deleted.', 'success'); this.render(); } }); } 
     });
-		    Object.assign(App.Payments, { 
+	    Object.assign(App.Payments, { 
         getCurrentFilteredData: function() {
             let payments = App.Helpers.getScopedData('payments');
             const { search, statusFilter, methodFilter } = App.state.payments;
@@ -2863,7 +2878,7 @@
             });
         }
     });
-Object.assign(App.Users, { 
+	    Object.assign(App.Users, { 
         render: function() { 
             let users = App.DB.get('users'); 
             const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
