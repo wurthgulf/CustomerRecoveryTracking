@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Recovery App - v1.8</title>
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>Customer Recovery App - v1.9</title>
 
     <!-- Dependencies -->
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1546,7 +1546,34 @@
         }, 
         renderRecoveryProgress() { const customers = App.Helpers.getScopedData('customers'); const totalInitialDebt = customers.reduce((sum, c) => sum + c.initialDebt, 0); const totalOutstanding = customers.reduce((sum, c) => sum + c.outstanding, 0); const totalCollected = totalInitialDebt - totalOutstanding; const percentage = totalInitialDebt > 0 ? ((totalCollected / totalInitialDebt) * 100).toFixed(0) : 0; const container = document.getElementById('recovery-progress-card'); container.innerHTML = `<div class="d-flex align-items-center gap-2 mb-4"><i class="fas fa-bullseye" style="color: var(--primary);"></i><h3 class="card-title" style="margin:0;">Recovery Progress</h3></div><div><div class="mb-2" style="font-weight: 600; text-transform: uppercase; font-size: var(--fs-sm); color: var(--text-secondary);">Total Debt vs Collected</div><div class="progress-bar mb-2"><div class="progress-bar-inner" data-width="${percentage}"></div></div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${App.Helpers.formatCurrency(totalCollected)} collected of ${App.Helpers.formatCurrency(totalInitialDebt)} (${percentage}%)</div></div>`; App.UI.observeProgressBars(); } 
     });
-		    Object.assign(App.Customers, { quill: null, setupEventListeners: function() { document.getElementById('add-customer-btn').addEventListener('click', () => this.showCustomerForm()); document.getElementById('import-customer-btn').addEventListener('click', () => { document.getElementById('csv-filename').textContent = ''; App.UI.openModal('import-csv-modal'); }); document.getElementById('export-customers-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('export-customers-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Customers', this.getCurrentFilteredData, ['accountNo', 'companyName', 'outstanding', 'forecastAmount', 'salesConsultantId', 'paymentStatus'])); document.getElementById('customer-form').addEventListener('submit', (e) => this.saveCustomer(e)); document.getElementById('customer-forecast-form').addEventListener('submit', (e) => this.saveCustomerForecast(e)); document.querySelector('#customers-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('customers', th.dataset.sort); }); const debouncedSearch = App.Helpers.debounce(() => {App.state.pagination.customers.currentPage = 1; this.render()}, 300); document.getElementById('customer-search').addEventListener('input', debouncedSearch); document.getElementById('customer-account-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); document.getElementById('customer-table-body').addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; const id = button.dataset.id; if (button.classList.contains('view-customer')) this.showCustomerDetail(id); else if (button.classList.contains('edit-customer')) this.showCustomerForm(id); else if (button.classList.contains('delete-customer')) this.deleteCustomer(id); else if (button.classList.contains('set-forecast')) this.showCustomerForecastForm(id); }); 
+		    Object.assign(App.Customers, { quill: null, setupEventListeners: function() { 
+        document.getElementById('add-customer-btn').addEventListener('click', () => this.showCustomerForm()); 
+        document.getElementById('import-customer-btn').addEventListener('click', () => { document.getElementById('csv-filename').textContent = ''; App.UI.openModal('import-csv-modal'); }); 
+        
+        const exportCSVBtn = document.getElementById('export-customers-csv');
+        if (exportCSVBtn) {
+            exportCSVBtn.addEventListener('click', () => {
+                const visibleColumns = Object.keys(App.state.customerTableColumns).filter(key => App.state.customerTableColumns[key]);
+                App.Helpers.exportTableData('csv', 'Customers', this.getCurrentFilteredData, visibleColumns);
+            });
+        }
+
+        const exportPDFBtn = document.getElementById('export-customers-pdf');
+        if (exportPDFBtn) {
+            exportPDFBtn.addEventListener('click', () => {
+                const visibleColumns = Object.keys(App.state.customerTableColumns).filter(key => App.state.customerTableColumns[key]);
+                App.Helpers.exportTableData('pdf', 'Customers', this.getCurrentFilteredData, visibleColumns);
+            });
+        }
+        
+        document.getElementById('customer-form').addEventListener('submit', (e) => this.saveCustomer(e)); 
+        document.getElementById('customer-forecast-form').addEventListener('submit', (e) => this.saveCustomerForecast(e)); 
+        document.querySelector('#customers-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('customers', th.dataset.sort); }); 
+        const debouncedSearch = App.Helpers.debounce(() => {App.state.pagination.customers.currentPage = 1; this.render()}, 300); 
+        document.getElementById('customer-search').addEventListener('input', debouncedSearch); 
+        document.getElementById('customer-account-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); 
+        document.getElementById('customer-status-filter').addEventListener('change', () => {App.state.pagination.customers.currentPage = 1; this.render()}); 
+        document.getElementById('customer-table-body').addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; const id = button.dataset.id; if (button.classList.contains('view-customer')) this.showCustomerDetail(id); else if (button.classList.contains('edit-customer')) this.showCustomerForm(id); else if (button.classList.contains('delete-customer')) this.deleteCustomer(id); else if (button.classList.contains('set-forecast')) this.showCustomerForecastForm(id); }); 
         const detailModal = document.getElementById('customer-detail-modal');
         detailModal.addEventListener('click', (e) => { 
             const button = e.target.closest('button'); 
@@ -2862,7 +2889,7 @@
         exportStatementCSV: function() { if (!this.currentStatementData) return App.UI.toast('No statement data to export.', 'error'); const { customer, transactionsWithBalance } = this.currentStatementData; const title = `Statement_for_${customer.companyName.replace(/\s/g, '_')}`; let csvContent = "data:text/csv;charset=utf-8,"; csvContent += `Statement for:,"${customer.companyName} (${customer.accountNo})"\n`; csvContent += `Total Billed:,${App.Helpers.formatCurrency(customer.initialDebt)}\n`; csvContent += `Total Paid:,${App.Helpers.formatCurrency(customer.initialDebt - customer.outstanding)}\n`; csvContent += `Balance Due:,${App.Helpers.formatCurrency(customer.outstanding)}\n\n`; const headers = ['Date', 'Description', 'Debit (Billed)', 'Credit (Paid)', 'Balance']; csvContent += headers.join(',') + '\r\n'; transactionsWithBalance.forEach(t => { const row = [ t.date === 'Initial' ? 'N/A' : App.Helpers.formatDate(t.date), `"${t.description}"`, t.debit > 0 ? t.debit.toFixed(2) : '0.00', t.credit > 0 ? t.credit.toFixed(2) : '0.00', t.balance.toFixed(2) ]; csvContent += row.join(',') + '\r\n'; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `${title}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); },
         exportStatementPDF: function() { if (!this.currentStatementData) return App.UI.toast('No statement data to export.', 'error'); const { customer, transactionsWithBalance } = this.currentStatementData; const title = `Statement for ${customer.companyName} (${customer.accountNo})`; const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(18); doc.text(title, 14, 22); doc.setFontSize(11); doc.setTextColor(100); doc.text(`Total Billed: ${App.Helpers.formatCurrency(customer.initialDebt)}`, 14, 32); doc.text(`Total Paid: ${App.Helpers.formatCurrency(customer.initialDebt - customer.outstanding)}`, 70, 32); doc.text(`Balance Due: ${App.Helpers.formatCurrency(customer.outstanding)}`, 130, 32); const tableData = transactionsWithBalance.map(t => [ t.date === 'Initial' ? 'N/A' : App.Helpers.formatDate(t.date), t.description, t.debit > 0 ? App.Helpers.formatCurrency(t.debit) : '-', t.credit > 0 ? App.Helpers.formatCurrency(t.credit) : '-', App.Helpers.formatCurrency(t.balance) ]); doc.autoTable({ head: [['Date', 'Description', 'Debit (Billed)', 'Credit (Paid)', 'Balance']], body: tableData, startY: 40 }); doc.save(`Statement_${customer.companyName.replace(/\s/g, '_')}.pdf`); }
     });
-		    Object.assign(App.Analytics, {
+			    Object.assign(App.Analytics, {
         charts: {},
         render() {
             this.renderKpiCards();
@@ -3698,29 +3725,48 @@
         const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
         const customerMap = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c.companyName; return map; }, {});
 
-        const headers = displayColumns.map(key => {
-            if (key === 'accountNo') return 'Account #';
-            if (key === 'companyName') return 'Company Name';
-            if (key === 'salesConsultantId') return 'Consultant';
-            if (key === 'customerId') return 'Customer';
-            if (key === 'collectorId') return 'Consultant';
-            if (key === 'dateTime') return 'Date';
-            return key.charAt(0).toUpperCase() + key.slice(1);
-        });
+        const allColumnLabels = {
+            accountNo: 'Account #',
+            companyName: 'Company Name',
+            customerStatus: 'Customer Status',
+            agingCategory: 'Aging Category',
+            outstanding: 'Outstanding',
+            forecastAmount: 'Forecast',
+            salesConsultantId: 'Consultant',
+            paymentStatus: 'Payment Status',
+            dateTime: 'Date',
+            date: 'Date',
+            customerId: 'Customer',
+            purpose: 'Purpose',
+            collectorId: 'Consultant',
+            status: 'Status',
+            consultantId: 'Consultant',
+            amount: 'Amount',
+            method: 'Method'
+        };
+
+        const headers = displayColumns.map(key => allColumnLabels[key] || key);
 
         const data = allData.map(item => {
             return displayColumns.map(key => {
                 let value = item[key];
-                if (key === 'salesConsultantId' || key === 'collectorId') {
-                    return consultantMap[value] || 'N/A';
+                switch(key) {
+                    case 'salesConsultantId':
+                    case 'collectorId':
+                    case 'consultantId':
+                        return consultantMap[value] || 'N/A';
+                    case 'customerId':
+                        return customerMap[value] || 'N/A';
+                    case 'dateTime':
+                    case 'date':
+                        return App.Helpers.formatDate(value);
+                    case 'outstanding':
+                    case 'amount':
+                    case 'forecastAmount':
+                        return App.Helpers.formatCurrency(value || 0);
+                    default:
+                        return value || '';
                 }
-                if (key === 'customerId') {
-                    return customerMap[value] || 'N/A';
-                }
-                if (key === 'dateTime' || key === 'date') {
-                    return App.Helpers.formatDate(value);
-                }
-                return value || '';
             });
         });
 
