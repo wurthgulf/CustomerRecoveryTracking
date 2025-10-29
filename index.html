@@ -186,9 +186,13 @@
         .status-badge { padding: 4px 10px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 600; text-transform: uppercase; border: 1px solid; }
         .status-badge.admin { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; border-color: #dc3545; }
         .status-badge.user { background-color: rgba(226, 0, 15, 0.1); color: #e2000f; border-color: #e2000f; }
-        .status-badge.paid, .status-badge.active, .status-badge.cleared, .status-badge.complete, .status-badge.completed { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border-color: #10b981; }
+        .status-badge.paid, .status-badge.active, .status-badge.complete, .status-badge.completed { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border-color: #10b981; }
         .status-badge.pending { background-color: rgba(255, 193, 7, 0.1); color: #d9a007; border-color: #ffc107;}
         .status-badge.overdue { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; border-color: #dc3545; }
+        .status-badge.negotiation { background-color: rgba(255, 193, 7, 0.1); color: #d9a007; border-color: #ffc107;}
+        .status-badge.settlement { background-color: rgba(13, 110, 253, 0.1); color: #0d6efd; border-color: #0d6efd;}
+        .status-badge.legal { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; border-color: #dc3545; }
+        .status-badge.write-off { background-color: rgba(108, 117, 125, 0.1); color: #6c757d; border-color: #6c757d; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-4); }
         .form-grid .full-width { grid-column: 1 / -1; }
         .detail-info-grid, .kpi-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--spacing-4); margin-bottom: var(--spacing-6); }
@@ -406,7 +410,7 @@
 
     <!-- Sidebar Overlay for Mobile -->
     <div id="sidebar-overlay" class="hidden"></div>
-				<script>
+					<script>
     document.addEventListener('DOMContentLoaded', () => App.init());
     
     const App = {
@@ -433,12 +437,17 @@
             customerTableColumns: { // New state for column visibility
                 accountNo: true,
                 companyName: true,
-                customerStatus: true,
+                customerStatus: false,
                 agingCategory: true,
                 outstanding: true,
+                balance_2020_2025: true,
+                balance_2019_2020: true,
+                balance_lte_2018: true,
                 forecastAmount: false,
                 salesConsultantId: true,
                 paymentStatus: true,
+                email: false,
+                mobile: false,
             }
         },
         init() { this.UI.hydrate(); this.DB.initialize(); this.Auth.checkSession(); this.UI.setupEventListeners(); this.CommandPalette.init(); this.Notifications.init(); this.Import.init(); this.UI.applyTheme(); },
@@ -573,6 +582,53 @@
                 localStorage.setItem('dataModelVersion', '4');
                 console.log("Migration to v4 complete.");
             }
+            if (dataModelVersion < 5) {
+                console.log("Running data migration to v5 (Customer Contacts)...");
+                let customers = this.get('customers');
+                let updated = false;
+                customers.forEach(customer => {
+                    if (customer.email === undefined) {
+                        customer.email = '';
+                        updated = true;
+                    }
+                    if (customer.mobile === undefined) {
+                        customer.mobile = '';
+                        updated = true;
+                    }
+                });
+                if(updated) {
+                    this.set('customers', customers);
+                    console.log("Added 'email' and 'mobile' fields to all customers.");
+                }
+                localStorage.setItem('dataModelVersion', '5');
+                console.log("Migration to v5 complete.");
+            }
+            if (dataModelVersion < 6) {
+                console.log("Running data migration to v6 (Detailed Balances)...");
+                let customers = this.get('customers');
+                let updated = false;
+                customers.forEach(customer => {
+                    if (customer.balance_2020_2025 === undefined) {
+                        customer.balance_2020_2025 = 0;
+                        updated = true;
+                    }
+                    if (customer.balance_2019_2020 === undefined) {
+                        customer.balance_2019_2020 = 0;
+                        updated = true;
+                    }
+                    if (customer.balance_lte_2018 === undefined) {
+                        // To preserve data, if old outstanding exists, move it to the oldest category
+                        customer.balance_lte_2018 = customer.outstanding || 0;
+                        updated = true;
+                    }
+                });
+                if (updated) {
+                    this.set('customers', customers);
+                    console.log("Added detailed balance fields to all customers.");
+                }
+                localStorage.setItem('dataModelVersion', '6');
+                console.log("Migration to v6 complete.");
+            }
         },
         get: (key) => JSON.parse(localStorage.getItem(key) || '[]'), 
         set: (key, data) => localStorage.setItem(key, JSON.stringify(data)),
@@ -606,7 +662,7 @@
                     <div class="mt-4" style="color: var(--text-secondary); font-size: var(--fs-sm);"></div>
                 </div>`; 
             document.getElementById('app').innerHTML = `<aside class="sidebar"><div class="logo logo-text"><img src="https://i.ibb.co/pvvsMy1X/Wurth-Gulf-CMYK-PNG-01.png" alt="Wuerth Gulf Logo"></div><nav><div class="sidebar-heading">Main</div><ul style="list-style:none;"><li><a href="#dashboard" class="nav-link active" data-page="dashboard"><i class="fas fa-chart-pie"></i> <span class="nav-text">Dashboard</span></a></li><li><a href="#customers" class="nav-link" data-page="customers"><i class="fas fa-users"></i> <span class="nav-text">Customers</span></a></li><li><a href="#visits" class="nav-link" data-page="visits"><i class="fas fa-calendar-alt"></i> <span class="nav-text">Visits & Follow-ups</span></a></li><li><a href="#payments" class="nav-link" data-page="payments"><i class="fas fa-credit-card"></i> <span class="nav-text">Payments</span></a></li><li data-role="admin"><a href="#analytics" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> <span class="nav-text">Analytics</span></a></li><li data-role="admin"><a href="#reports" class="nav-link" data-page="reports"><i class="fas fa-file-alt"></i> <span class="nav-text">Reports</span></a></li></ul><div data-role="admin"><div class="sidebar-heading">Administration</div><ul style="list-style:none;"><li><a href="#performance" class="nav-link" data-page="performance"><i class="fas fa-tachometer-alt"></i> <span class="nav-text">Performance</span></a></li><li><a href="#consultants" class="nav-link" data-page="consultants"><i class="fas fa-user-tie"></i> <span class="nav-text">Consultants</span></a></li><li><a href="#users" class="nav-link" data-page="users"><i class="fas fa-users-cog"></i> <span class="nav-text">User Management</span></a></li><li><a href="#changelog" class="nav-link" data-page="changelog"><i class="fas fa-history"></i> <span class="nav-text">Change Log</span></a></li><li><a href="#settings" class="nav-link" data-page="settings"><i class="fas fa-cog"></i> <span class="nav-text">Settings</span></a></li></ul></div></nav></aside><header class="main-header"><button class="hamburger" id="hamburger-menu"><i class="fas fa-bars"></i></button><div id="page-title" style="font-weight: 600; font-size: var(--fs-lg);">Dashboard</div><div class="d-flex gap-4 align-items-center"><div id="notification-bell-wrapper" data-role="admin" style="position: relative;"><button id="notification-bell-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-bell"></i></button><span id="notification-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background-color: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: var(--fs-sm); display: flex; justify-content: center; align-items: center; font-weight: 600; border: 2px solid var(--card-bg);">0</span></div><button id="theme-toggle-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-moon"></i></button><div class="d-flex gap-2 align-items-center"><span id="username-display" style="font-weight: 500;"></span><button id="logout-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem;"><i class="fas fa-sign-out-alt"></i></button></div></div></header><main class="main-content"><section id="dashboard-page" class="page active"></section><section id="customers-page" class="page"></section><section id="visits-page" class="page"></section><section id="payments-page" class="page"></section><section id="analytics-page" class="page" data-role="admin"></section><section id="reports-page" class="page" data-role="admin"></section><section id="performance-page" class="page" data-role="admin"></section><section id="consultants-page" class="page" data-role="admin"></section><section id="users-page" class="page" data-role="admin"></section><section id="changelog-page" class="page" data-role="admin"></section><section id="settings-page" class="page" data-role="admin"></section></main>`; 
-            document.getElementById('customers-page').innerHTML = `<div class="kpi-card-grid" data-role="admin"><div class="kpi-card"><div class="title">Total Customers</div><div id="customer-kpi-total" class="value">0</div></div><div class="kpi-card"><div class="title">Total Outstanding</div><div id="customer-kpi-outstanding" class="value">0</div></div><div class="kpi-card"><div class="title">Active Accounts</div><div id="customer-kpi-active" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Manage Customers</h3><div class="d-flex gap-2 flex-wrap align-items-center"><div class="input-with-icon"><input type="search" id="customer-search" placeholder="Search customers..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear search"></i></div><div class="input-with-icon"><input type="search" id="customer-tag-filter" placeholder="Filter by tag..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear tag filter"></i></div><select id="customer-account-status-filter" class="form-control" style="width: auto;"><option value="all">All Account Status</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select><select id="customer-status-filter" class="form-control" style="width: auto;"><option value="all">All Statuses</option><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select><div style="position: relative;"><button class="btn btn-outline" id="toggle-columns-btn"><i class="fas fa-columns"></i> Columns</button><div id="column-toggle-dropdown" class="column-toggle-dropdown"></div></div><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-customers-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-customers-pdf"><i class="fas fa-file-pdf"></i> PDF</button><button class="btn btn-outline" id="import-customer-btn"><i class="fas fa-upload"></i> Import</button><button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button></div></div></div><div class="table-container"><table class="data-table"><thead></thead><tbody id="customer-table-body"></tbody></table></div><div id="customers-pagination" class="pagination-controls"></div></div>`; 
+            document.getElementById('customers-page').innerHTML = `<div class="kpi-card-grid" data-role="admin"><div class="kpi-card"><div class="title">Total Customers</div><div id="customer-kpi-total" class="value">0</div></div><div class="kpi-card"><div class="title">Total Outstanding</div><div id="customer-kpi-outstanding" class="value">0</div></div><div class="kpi-card"><div class="title">Active Accounts</div><div id="customer-kpi-active" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Manage Customers</h3><div class="d-flex gap-2 flex-wrap align-items-center"><div class="input-with-icon"><input type="search" id="customer-search" placeholder="Search customers..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear search"></i></div><div class="input-with-icon"><input type="search" id="customer-tag-filter" placeholder="Filter by tag..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear tag filter"></i></div><select id="customer-account-status-filter" class="form-control" style="width: auto;"><option value="all">All Account Status</option><option>Active</option><option>Inactive</option></select><select id="customer-status-filter" class="form-control" style="width: auto;"><option value="all">All Statuses</option><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select><div style="position: relative;"><button class="btn btn-outline" id="toggle-columns-btn"><i class="fas fa-columns"></i> Columns</button><div id="column-toggle-dropdown" class="column-toggle-dropdown"></div></div><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-customers-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-customers-pdf"><i class="fas fa-file-pdf"></i> PDF</button><button class="btn btn-outline" id="import-customer-btn"><i class="fas fa-upload"></i> Import</button><button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button></div></div></div><div class="table-container"><table class="data-table"><thead></thead><tbody id="customer-table-body"></tbody></table></div><div id="customers-pagination" class="pagination-controls"></div></div>`; 
             document.getElementById('users-page').innerHTML = `<div class="page-header"><h2 >User Management</h2><p >Home > Users</p></div><div class="card"><div class="card-header"><h3 class="card-title">User List</h3><button id="add-user-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add User</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="username">Username</th><th data-sort="fullName">Full Name</th><th data-sort="role">Role</th><th data-sort="assignedConsultantId">Assigned Consultant</th><th data-sort="department">Department</th><th data-sort="lastLogin">Last Login</th><th>Actions</th></tr></thead><tbody id="user-table-body"></tbody></table></div><div id="users-pagination" class="pagination-controls"></div></div>`; 
             document.getElementById('user-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="user-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">&times;</button></div><form id="user-form"><input type="hidden" id="user-id-hidden"><div class="form-grid"><div class="form-group"><label for="username">Username*</label><input type="text" id="username" class="form-control" required></div><div class="form-group"><label for="fullName">Full Name*</label><input type="text" id="fullName" class="form-control" required></div></div><div class="form-group"><label for="password">Password*</label><input type="password" id="password" class="form-control" required></div><div class="form-group"><label for="department">Department</label><input type="text" id="department" class="form-control" placeholder="e.g., Collections"></div><div class="form-group"><label for="role">Role</label><select id="role" class="form-control"><option value="user">User</option><option value="admin">Admin</option></select></div><div class="form-group" id="assigned-consultant-group"><label for="assignedConsultantId">Assigned Sales Consultant</label><select id="assignedConsultantId" class="form-control"></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save User</button></div></form></div>`;
             document.getElementById('dashboard-page').innerHTML = `<div id="admin-dashboard-wrapper" class="hidden"><div class="d-flex justify-content-between align-items-center mb-4 flex-wrap"><h2 class="page-header" style="margin-bottom: 0;">Admin Dashboard</h2><div id="consultant-dashboard-header" class="hidden"></div><button id="toggle-dashboard-view-btn" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Switch to Chart View</button></div><div id="admin-dashboard-content"></div></div><div id="chart-dashboard-wrapper"><div id="attendance-controls" class="mb-4"></div><div id="todays-agenda" class="mb-4"></div><div id="priority-actions" class="mb-4"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);"><div class="card"><div class="card-title">Total Customers</div><div id="stat-total-customers" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card"><div class="card-title">Total Outstanding</div><div id="stat-outstanding-debt" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card" id="user-dashboard-forecast-card"><div class="card-title">Total Forecast</div><div id="stat-total-forecast" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card"><div class="card-title">Recovered This Month</div><div id="stat-recovered-this-month" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div><div class="card"><div class="card-title">Upcoming Visits</div><div id="stat-upcoming-visits" style="font-size: var(--fs-3xl); font-weight: 700;">0</div></div></div><div id="recovery-progress-card" class="card mb-4"></div><div id="dashboard-bottom-content"></div></div>`; 
@@ -685,14 +741,18 @@
                         </div>
                         <button id="generate-consultant-visits-btn-new" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
                     </div>
+                    <div class="card">
+                        <div class="card-header"><h3 class="card-title">Aging Balance by Consultant</h3></div>
+                        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">View a breakdown of outstanding balances by aging category for each consultant.</p>
+                        <button id="generate-aging-balance-report-btn" class="btn btn-primary" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
+                    </div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);">
                     <div>
                         <div class="card mb-4" data-role="admin"><div class="card-header"><h3 class="card-title">Consultant Daily Activity</h3></div><div class="d-flex gap-4 flex-wrap align-items-center"><div class="d-flex gap-2 align-items-center"><select id="report-consultant-select" class="form-control" style="width:auto;"></select><input type="date" id="report-activity-start-date" class="form-control" style="width:auto;"> <span class="mx-2">to</span> <input type="date" id="report-activity-end-date" class="form-control" style="width:auto;"><button id="generate-activity-report-btn" class="btn btn-primary"><i class="fas fa-cogs"></i> Generate</button></div><div class="d-flex gap-2"><button id="activity-report-summary-btn" class="btn btn-outline filter-btn active"><i class="fas fa-chart-pie"></i> Summary</button><button id="activity-report-table-btn" class="btn btn-outline filter-btn"><i class="fas fa-table"></i> Table</button></div></div></div>
-                        <div class="card mb-4"><div class="card-header"><h3 class="card-title">Standard Reports</h3></div><div class="d-flex gap-2 flex-wrap"><button id="generate-customer-report-btn" class="btn btn-primary"><i class="fas fa-users"></i> Customer Report</button><button id="generate-consultant-report-btn" class="btn btn-primary"><i class="fas fa-user-tie"></i> Consultant Report</button><button id="generate-aging-report-btn" class="btn btn-info"><i class="fas fa-hourglass-half"></i> Aging Report</button><button id="generate-recovery-report-btn" class="btn btn-success"><i class="fas fa-chart-line"></i> Recovery Performance</button></div></div>
+                        <div class="card"><div class="card-header"><h3 class="card-title">Standard Reports</h3></div><div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: var(--spacing-4);"><div class="form-group"><label for="report-standard-start-date">Start Date</label><input type="date" id="report-standard-start-date" class="form-control"></div><div class="form-group"><label for="report-standard-end-date">End Date</label><input type="date" id="report-standard-end-date" class="form-control"></div></div><div class="d-flex gap-2 flex-wrap"><button id="generate-customer-report-btn" class="btn btn-primary"><i class="fas fa-users"></i> Customer Report</button><button id="generate-consultant-report-btn" class="btn btn-primary"><i class="fas fa-user-tie"></i> Consultant Report</button><button id="generate-aging-report-btn" class="btn btn-info"><i class="fas fa-hourglass-half"></i> Aging Report</button><button id="generate-recovery-report-btn" class="btn btn-success"><i class="fas fa-chart-line"></i> Recovery Performance</button></div></div>
                     </div>
                     <div>
-                        <div class="card mb-4"><div class="card-header"><h3 class="card-title">Customer Statement of Account</h3></div><div class="form-group"><label for="statement-customer-select">Select Customer</label><div id="statement-customer-select-container"></div></div><button id="generate-statement-btn" class="btn btn-primary"><i class="fas fa-file-invoice-dollar"></i> Generate Statement</button></div>
                         <div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis Report</h3></div><p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyzes the results of all completed visits.</p><button id="generate-outcome-analysis-btn" class="btn btn-primary"><i class="fas fa-poll"></i> Generate Analysis</button></div>
                     </div>
                 </div>
@@ -723,10 +783,10 @@
                     </div>
                     <button id="restore-data-btn" class="btn btn-warning" disabled><i class="fas fa-upload"></i> Restore Data</button>
                 </div>`;
-            document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group" data-admin-only="true"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="debtSince">Debt Since</label><input type="date" id="debtSince" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group" data-admin-only="true"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Pending</option><option>Paid</option><option>Cleared</option><option>Overdue</option></select></div><div class="form-group" data-admin-only="true"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="outstanding">Current Outstanding (AED)*</label><input type="number" id="outstanding" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="forecastAmount">Forecast Amount (AED)</label><input type="number" id="forecastAmount" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="customerStatus">Customer Status</label><select id="customerStatus" class="form-control"><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select></div><div class="form-group"><label for="agingCategory">Aging Category</label><select id="agingCategory" class="form-control" disabled><option>Auto-Calculated</option></select></div></div><div class="form-group full-width"><label for="customer-tags">Tags</label><input type="text" id="customer-tags" class="form-control" placeholder="e.g. High-Risk, VIP, Disputed"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
-            document.getElementById('payment-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Record a Payment</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-modal')">&times;</button></div><form id="payment-form"><div class="form-group"><label for="payment-customer-id">Customer*</label><div id="payment-customer-select-container"></div></div><div class="form-group"><label for="payment-amount">Amount*</label><input type="number" id="payment-amount" class="form-control" required></div><div class="form-group"><label for="payment-method">Payment Method*</label><select id="payment-method" class="form-control" required><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="form-group"><label for="payment-date">Date*</label><input type="date" id="payment-date" class="form-control" required></div><div class="form-group"><label for="payment-status">Status</label><select id="payment-status" class="form-control"><option>Completed</option><option>Pending</option><option>Failed</option></select></div><button type="submit" class="btn btn-primary">Record Payment</button></form></div>`; 
+            document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group" data-admin-only="true"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="email">Contact Email</label><input type="email" id="email" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="mobile">Contact Mobile</label><input type="tel" id="mobile" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="debtSince">Debt Since</label><input type="date" id="debtSince" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group" data-admin-only="true"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="form-group" data-admin-only="true"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group" data-user-only="true"><label for="forecastAmount">Forecast Amount (AED)</label><input type="number" id="forecastAmount" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="customerStatus">Customer Status</label><select id="customerStatus" class="form-control"><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select></div><div class="form-group"><label for="agingCategory">Aging Category</label><select id="agingCategory" class="form-control" disabled><option>Auto-Calculated</option></select></div><div class="form-group" data-admin-only="true"><label for="balance_2020_2025">Balance 2020-2025 (AED)</label><input type="number" step="any" id="balance_2020_2025" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_2019_2020">Balance 2019-2020 (AED)</label><input type="number" step="any" id="balance_2019_2020" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_lte_2018">Balance <=2018 (AED)</label><input type="number" step="any" id="balance_lte_2018" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="outstanding">Total Outstanding Balance (AED)*</label><input type="number" id="outstanding" class="form-control" required readonly style="background-color: var(--border-color);"></div></div><div class="form-group full-width"><label for="customer-tags">Tags</label><input type="text" id="customer-tags" class="form-control" placeholder="e.g. High-Risk, VIP, Disputed"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
+            document.getElementById('payment-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Record a Payment</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-modal')">&times;</button></div><form id="payment-form"><div class="form-group"><label for="payment-customer-id">Customer*</label><div id="payment-customer-select-container"></div></div><div id="payment-details-grid" class="form-grid"><div class="form-group"><label for="payment-amount-2025">For 2020-2025</label><input type="number" step="any" id="payment-amount-2025" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount-2020">For 2019-2020</label><input type="number" step="any" id="payment-amount-2020" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount-2018">For <=2018</label><input type="number" step="any" id="payment-amount-2018" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount">Total Amount*</label><input type="number" id="payment-amount" class="form-control" required readonly style="background-color: var(--border-color);"></div></div><div class="form-group"><label for="payment-method">Payment Method*</label><select id="payment-method" class="form-control" required><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="form-group"><label for="payment-date">Date*</label><input type="date" id="payment-date" class="form-control" required></div><div class="form-group"><label for="payment-status">Status</label><select id="payment-status" class="form-control"><option>Completed</option><option>Pending</option><option>Failed</option></select></div><button type="submit" class="btn btn-primary">Record Payment</button></form></div>`; 
             document.getElementById('visit-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Schedule Visit</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-modal')">&times;</button></div><form id="visit-form"><input type="hidden" id="visit-id"><div class="form-group"><label for="visit-customer-id">Customer*</label><div id="visit-customer-select-container"></div></div><div class="form-group"><label for="visit-purpose">Purpose*</label><input type="text" id="visit-purpose" class="form-control" required></div><div class="form-group"><label for="visit-date">Date & Time*</label><input type="datetime-local" id="visit-date" class="form-control" required></div><button type="submit" class="btn btn-primary">Save Visit</button></form></div>`; 
-            document.getElementById('import-csv-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Upload CSV File</h3><button class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">&times;</button></div><div class="file-upload-wrapper" id="csv-drop-zone"><i class="fas fa-upload" style="font-size: 1.5rem; color: var(--text-secondary);"></i><p>Click to browse or drag & drop file here</p><span id="csv-filename" style="font-weight: 600; color: var(--primary);"></span><input type="file" id="csv-file-input" class="hidden" accept=".csv"></div><div class="info-box"><p>Ensure headers match:</p><code>accountNumber,companyName,emirate,area,status,paymentStatus,initialDebt,outstandingAmount,salesConsultant,customerStatus,debtSince</code></div><a href="#" id="download-sample-csv-link"><i class="fas fa-download"></i> Download Sample Template</a><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">Close</button></div></div>`; 
+            document.getElementById('import-csv-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Upload CSV File</h3><button class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">&times;</button></div><div class="file-upload-wrapper" id="csv-drop-zone"><i class="fas fa-upload" style="font-size: 1.5rem; color: var(--text-secondary);"></i><p>Click to browse or drag & drop file here</p><span id="csv-filename" style="font-weight: 600; color: var(--primary);"></span><input type="file" id="csv-file-input" class="hidden" accept=".csv"></div><div class="info-box"><p>Ensure headers match:</p><code>accountNumber,companyName,email,mobile,emirate,area,status,paymentStatus,initialDebt,salesConsultant,customerStatus,debtSince,balance2020_2025,balance2019_2020,balancelte2018</code></div><a href="#" id="download-sample-csv-link"><i class="fas fa-download"></i> Download Sample Template</a><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">Close</button></div></div>`; 
             document.getElementById('customer-detail-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-detail-title" class="card-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-detail-modal')">&times;</button></div><div class="d-flex gap-2 mb-4"><button class="detail-tab-btn active" data-tab="overview"><i class="fas fa-info-circle"></i> Overview</button><button class="detail-tab-btn" data-tab="timeline"><i class="fas fa-history"></i> Activity Timeline</button><button class="detail-tab-btn" data-tab="comments"><i class="fas fa-comments"></i> Comments</button></div><div id="customer-detail-content"><div class="tab-content active" id="overview-content"></div><div class="tab-content hidden" id="timeline-content"></div><div class="tab-content hidden" id="comments-content"></div></div><div class="modal-footer" style="justify-content: space-between;"><div class="d-flex gap-2"><button class="btn btn-success" id="detail-record-payment-btn"><i class="fas fa-dollar-sign"></i> Record Payment</button><button class="btn btn-primary" id="detail-schedule-visit-btn"><i class="fas fa-calendar-plus"></i> Schedule Visit</button></div><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-detail-modal')">Close</button></div></div>`; 
             document.getElementById('visit-notes-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 class="card-title">Mark Visit as Done</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-notes-modal')">&times;</button></div><form id="visit-notes-form"><input type="hidden" id="mark-done-visit-id"><input type="hidden" id="log-location-hidden"><div class="form-grid"><div class="form-group"><label>CONTACT METHOD</label><select id="log-contact-method" class="form-control"><option>Site Visit</option><option>Phone Call</option><option>Email</option></select></div><div class="form-group"><label>OUTCOME</label><select id="log-outcome" class="form-control"><option>No Answer</option><option>Promise to Pay</option><option>Dispute</option><option>Paid in Full</option><option>Partial Payment</option></select></div></div><div id="promise-to-pay-fields" class="form-grid hidden"><div class="form-group"><label for="log-promise-amount">Promised Amount (AED)</label><input type="number" id="log-promise-amount" class="form-control"></div><div class="form-group"><label for="log-promise-date">Promised Date</label><input type="date" id="log-promise-date" class="form-control"></div></div><div class="form-group"><label>NOTES</label><div id="log-notes-editor" style="height:150px;"></div></div><div class="form-grid"><div class="form-group"><label>SCHEDULE NEXT VISIT (Optional)</label><input type="date" id="log-next-date" class="form-control"></div><div class="form-group"><label>LOCATION</label><button type="button" class="btn btn-outline" id="log-location-btn" style="width:100%;"><i class="fas fa-map-marker-alt"></i> <span id="log-location-text">Tag Current Location</span></button></div></div><div class="modal-footer" data-role="user"><button type="button" id="log-record-payment-btn" class="btn btn-success"><i class="fas fa-dollar-sign"></i> Record Payment</button><button type="submit" class="btn btn-primary">Save Notes</button></div></form></div>`; 
             document.getElementById('payment-detail-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Payment Details</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-detail-modal')">&times;</button></div><div id="payment-detail-content"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('payment-detail-modal')">Close</button></div></div>`; 
@@ -768,6 +828,29 @@
                 overlay.classList.add('hidden');
             });
             document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', (e) => { e.preventDefault(); this.navigateTo(link.dataset.page); })); 
+            
+            // Add listener for customer modal balance calculation
+            document.getElementById('customer-modal').addEventListener('input', e => {
+                if (e.target.classList.contains('balance-detail')) {
+                    const form = document.getElementById('customer-form');
+                    const bal1 = parseFloat(form.elements.balance_2020_2025.value) || 0;
+                    const bal2 = parseFloat(form.elements.balance_2019_2020.value) || 0;
+                    const bal3 = parseFloat(form.elements.balance_lte_2018.value) || 0;
+                    form.elements.outstanding.value = (bal1 + bal2 + bal3).toFixed(2);
+                }
+            });
+
+            // Add listener for payment modal balance calculation
+            document.getElementById('payment-modal').addEventListener('input', e => {
+                if (e.target.classList.contains('payment-detail-input')) {
+                    const form = document.getElementById('payment-form');
+                    const amt1 = parseFloat(form.elements['payment-amount-2025'].value) || 0;
+                    const amt2 = parseFloat(form.elements['payment-amount-2020'].value) || 0;
+                    const amt3 = parseFloat(form.elements['payment-amount-2018'].value) || 0;
+                    form.elements['payment-amount'].value = (amt1 + amt2 + amt3).toFixed(2);
+                }
+            });
+
             App.Dashboard.setupEventListeners(); App.Customers.setupEventListeners(); App.Payments.setupEventListeners(); App.Reports.setupEventListeners(); App.Visits.setupEventListeners(); App.Consultants.setupEventListeners(); App.Users.setupEventListeners(); App.ChangeLog.setupEventListeners(); App.Settings.setupEventListeners(); App.Analytics.setupEventListeners(); App.Performance.setupEventListeners();
             document.body.addEventListener('click', (e) => { if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && !hamburger.contains(e.target)) { sidebar.classList.remove('open'); overlay.classList.add('hidden'); } });
             
@@ -843,7 +926,7 @@
                 pageRenderers[pageId].render();
             }
         },
-		        handleTableSort(pageKey, column) {
+		handleTableSort(pageKey, column) {
             const sortState = App.state.tableSorts[pageKey];
             if (sortState.column === column) {
                 sortState.order = sortState.order === 'asc' ? 'desc' : 'asc';
@@ -1101,7 +1184,7 @@
             }
         }
     });
-    Object.assign(App.Dashboard, { 
+	    Object.assign(App.Dashboard, { 
         charts: {}, 
         setupEventListeners() { 
             document.getElementById('dashboard-page').addEventListener('click', e => { 
@@ -1574,8 +1657,8 @@
                                 <span style="font-weight: 600;">${consultant.name}</span>
                                 <span style="font-size: var(--fs-sm); color: var(--text-secondary);">${percentage}%</span>
                             </div>
-                            <div class="progress-bar"><div class="progress-bar-inner" data-width="${percentage}" style="background-color: var(--warning);"></div></div>
-                            <div style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedThisMonth)} of ${App.Helpers.formatCurrency(totalForecast)}</div>
+							                            <div class="progress-bar"><div class="progress-bar-inner" data-width="${percentage}" style="background-color: var(--warning);"></div></div>
+                             <div style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedThisMonth)} of ${App.Helpers.formatCurrency(totalForecast)}</div>
                         </div>`;
             }).join('');
             
@@ -1791,7 +1874,7 @@
             App.Reports.displayReport(reportTitle, headers, data, '', ['csv', 'pdf']);
         }
     });
-    Object.assign(App.Customers, { 
+	    Object.assign(App.Customers, { 
         quill: null, 
         setupEventListeners: function() { 
             document.getElementById('add-customer-btn').addEventListener('click', () => this.showCustomerForm()); 
@@ -1943,9 +2026,14 @@
                     if (App.state.customerTableColumns.customerStatus) rowHTML += `<td>${c.customerStatus || 'N/A'}</td>`;
                     if (App.state.customerTableColumns.agingCategory) rowHTML += `<td>${c.agingCategory || 'N/A'}</td>`;
                     if (App.state.customerTableColumns.outstanding) rowHTML += `<td>${App.Helpers.formatCurrency(c.outstanding)}</td>`;
+                    if (App.state.customerTableColumns.balance_2020_2025) rowHTML += `<td>${App.Helpers.formatCurrency(c.balance_2020_2025 || 0)}</td>`;
+                    if (App.state.customerTableColumns.balance_2019_2020) rowHTML += `<td>${App.Helpers.formatCurrency(c.balance_2019_2020 || 0)}</td>`;
+                    if (App.state.customerTableColumns.balance_lte_2018) rowHTML += `<td>${App.Helpers.formatCurrency(c.balance_lte_2018 || 0)}</td>`;
                     if (App.state.customerTableColumns.forecastAmount) rowHTML += `<td>${App.Helpers.formatCurrency(c.forecastAmount || 0)}</td>`;
                     if (App.state.customerTableColumns.salesConsultantId) rowHTML += `<td>${consultantMap[c.salesConsultantId] || 'N/A'}</td>`;
-                    if (App.state.customerTableColumns.paymentStatus) rowHTML += `<td><span class="status-badge ${c.paymentStatus.toLowerCase()}">${c.paymentStatus}</span></td>`;
+                    if (App.state.customerTableColumns.paymentStatus) rowHTML += `<td><span class="status-badge ${c.paymentStatus.toLowerCase().replace(' ', '-')}">${c.paymentStatus}</span></td>`;
+                    if (App.state.customerTableColumns.email) rowHTML += `<td>${c.email || 'N/A'}</td>`;
+                    if (App.state.customerTableColumns.mobile) rowHTML += `<td>${c.mobile || 'N/A'}</td>`;
                     rowHTML += `<td class="d-flex gap-2">
                             <button class="btn btn-outline view-customer" data-id="${c.accountNo}" title="View"><i class="fas fa-eye"></i></button>
                             ${editButton}
@@ -1968,10 +2056,15 @@
                 companyName: 'Company Name',
                 customerStatus: 'Customer Status',
                 agingCategory: 'Aging Category',
-                outstanding: 'Outstanding',
+                outstanding: 'Balance',
+                balance_2020_2025: '2020-2025',
+                balance_2019_2020: '2019-2020',
+                balance_lte_2018: '<=2018',
                 forecastAmount: 'Forecast',
                 salesConsultantId: 'Consultant',
-                paymentStatus: 'Payment Status'
+                paymentStatus: 'Payment Status',
+                email: 'Email',
+                mobile: 'Mobile',
             };
 
             const dropdown = document.getElementById('column-toggle-dropdown');
@@ -2010,17 +2103,16 @@
             const consultantSelect = form.elements['salesConsultantId']; 
             consultantSelect.innerHTML = App.DB.get('consultants').map(c => `<option value="${c.id}">${c.name}</option>`).join(''); 
             let originalCustomer = null; 
-            const isAdmin = App.state.currentUser.role === 'admin';
 
-            form.querySelectorAll('.form-group').forEach(el => {
-                const isAdminOnly = el.getAttribute('data-admin-only') === 'true';
-                el.style.display = !isAdmin && isAdminOnly ? 'none' : '';
-            });
+            // Handle visibility based on role
+            form.querySelectorAll('[data-admin-only="true"]').forEach(el => el.style.display = App.state.currentUser.role === 'admin' ? '' : 'none');
+            form.querySelectorAll('[data-user-only="true"]').forEach(el => el.style.display = App.state.currentUser.role === 'user' ? '' : 'none');
+
 
             if (accountNo) { 
                 const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); 
                 originalCustomer = {...customer}; 
-                document.getElementById('customer-modal-title').textContent = isAdmin ? 'Edit Customer' : `Update Status for ${customer.companyName}`;
+                document.getElementById('customer-modal-title').textContent = 'Edit Customer';
                 document.getElementById('customer-id-hidden').value = customer.accountNo; 
                 Object.keys(customer).forEach(key => { if (form.elements[key]) form.elements[key].value = customer[key]; }); 
                 form.elements['customer-tags'].value = customer.tags ? customer.tags.join(', ') : '';
@@ -2044,41 +2136,49 @@
             const isAdmin = App.state.currentUser.role === 'admin';
             const tags = form.elements['customer-tags'].value.split(',').map(tag => tag.trim()).filter(Boolean);
             
-            let customerData;
+            let customerData = {
+                paymentStatus: form.elements.paymentStatus.value,
+                customerStatus: form.elements.customerStatus.value,
+                tags: tags
+            };
+
             if (isAdmin) {
-                customerData = { 
-                    companyName: form.elements.companyName.value, 
+                const bal_2020_2025 = parseFloat(form.elements.balance_2020_2025.value) || 0;
+                const bal_2019_2020 = parseFloat(form.elements.balance_2019_2020.value) || 0;
+                const bal_lte_2018 = parseFloat(form.elements.balance_lte_2018.value) || 0;
+                
+                Object.assign(customerData, { 
+                    companyName: form.elements.companyName.value,
+                    email: form.elements.email.value,
+                    mobile: form.elements.mobile.value, 
                     emirate: form.elements.emirate.value, 
                     area: form.elements.area.value, 
                     initialDebt: parseFloat(form.elements.initialDebt.value), 
-                    outstanding: parseFloat(form.elements.outstanding.value), 
+                    outstanding: bal_2020_2025 + bal_2019_2020 + bal_lte_2018,
+                    balance_2020_2025: bal_2020_2025,
+                    balance_2019_2020: bal_2019_2020,
+                    balance_lte_2018: bal_lte_2018,
                     salesConsultantId: parseInt(form.elements.salesConsultantId.value), 
                     status: form.elements.status.value, 
-                    paymentStatus: form.elements.paymentStatus.value, 
-                    forecastAmount: parseFloat(form.elements.forecastAmount.value) || 0,
-                    customerStatus: form.elements.customerStatus.value,
                     debtSince: form.elements.debtSince.value,
-                    agingCategory: App.Helpers.calculateAgingCategory(form.elements.debtSince.value),
-                    tags: tags
-                }; 
-            } else {
-                customerData = {
-                    paymentStatus: form.elements.paymentStatus.value,
-                    customerStatus: form.elements.customerStatus.value,
-                    tags: tags
-                };
+                    agingCategory: App.Helpers.calculateAgingCategory(form.elements.debtSince.value)
+                });
+            } else { // User role
+                Object.assign(customerData, {
+                    forecastAmount: parseFloat(form.elements.forecastAmount.value) || 0
+                });
             }
             
             if (id) { 
                 const index = customers.findIndex(c => c.accountNo === id); 
                 const original = form.originalData; 
                 if (isAdmin) {
-                    customers[index].agingCategory = App.Helpers.calculateAgingCategory(form.elements.debtSince.value);
+                    customerData.agingCategory = App.Helpers.calculateAgingCategory(form.elements.debtSince.value);
                 }
                 const changes = App.Helpers.getObjectChanges(original, {...original, ...customerData}); 
                 customers[index] = { ...customers[index], ...customerData }; 
                 App.Helpers.logChange('Updated', 'Customer', `${customers[index].companyName} (${id})`, changes); 
-            } else {
+            } else { // New customer, only possible by admin
                 const newAccountNo = form.elements.accountNo.value.trim(); 
                 if (!newAccountNo) { App.UI.toast('Account Number is required.', 'error'); return; } 
                 const accountExists = customers.some(c => c.accountNo.toLowerCase() === newAccountNo.toLowerCase()); 
@@ -2136,9 +2236,11 @@
                     <div class="detail-info-card"><div class="label">Account #</div><div class="value">${customer.accountNo}</div></div>
                     <div class="detail-info-card"><div class="label">Location</div><div class="value">${customer.area}, ${customer.emirate}</div></div>
                     <div class="detail-info-card"><div class="label">Account Status</div><div class="value"><span class="status-badge ${customer.status.toLowerCase()}">${customer.status}</span></div></div>
-                    <div class="detail-info-card"><div class="label">Payment Status</div><div class="value"><span class="status-badge ${customer.paymentStatus.toLowerCase()}">${customer.paymentStatus}</span></div></div>
+                    <div class="detail-info-card"><div class="label">Payment Status</div><div class="value"><span class="status-badge ${customer.paymentStatus.toLowerCase().replace(' ', '-')}">${customer.paymentStatus}</span></div></div>
                     <div class="detail-info-card"><div class="label">Outstanding</div><div class="value">${App.Helpers.formatCurrency(customer.outstanding)}</div></div>
                     <div class="detail-info-card"><div class="label">Sales Consultant</div><div class="value">${consultantMap[customer.salesConsultantId] || 'N/A'}</div></div>
+                    <div class="detail-info-card"><div class="label">Email</div><div class="value">${customer.email || 'N/A'}</div></div>
+                    <div class="detail-info-card"><div class="label">Mobile</div><div class="value">${customer.mobile || 'N/A'}</div></div>
                     ${tagsHTML}
                 </div>
             `;
@@ -2241,7 +2343,7 @@
         switchDetailTab: function(tabId) { document.querySelectorAll('.detail-tab-btn').forEach(btn => btn.classList.remove('active')); document.querySelector(`.detail-tab-btn[data-tab="${tabId}"]`)?.classList.add('active'); document.querySelectorAll('#customer-detail-content .tab-content').forEach(c => c.classList.add('hidden')); document.getElementById(`${tabId}-content`).classList.remove('hidden'); }, 
         deleteCustomer(accountNo) { const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); Swal.fire({ title: `Delete ${customer.companyName}?`, text: "This will permanently delete the customer and all their associated payments and visits. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let customers = App.DB.get('customers'); let visits = App.DB.get('visits'); let payments = App.DB.get('payments'); let comments = App.DB.get('customerComments'); App.DB.set('customers', customers.filter(c => c.accountNo !== accountNo)); App.DB.set('visits', visits.filter(v => v.customerId !== accountNo)); App.DB.set('payments', payments.filter(p => p.customerId !== accountNo)); App.DB.set('customerComments', comments.filter(c => c.accountNo !== accountNo)); App.Helpers.logChange('Deleted', 'Customer', `${customer.companyName} (${accountNo})`, `Reason: ${result.value}`); App.UI.toast('Customer deleted permanently.', 'success'); this.render(); } }); } 
     });
-    Object.assign(App.Visits, { calendar: null, logNotesQuill: null, map: null, setupEventListeners: function() { document.getElementById('visit-notes-form').addEventListener('submit', e => this.saveCompletedVisit(e)); document.getElementById('visit-form').addEventListener('submit', (e) => this.saveScheduledVisit(e)); document.getElementById('export-visits-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); document.getElementById('export-visits-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); const page = document.getElementById('visits-page'); const debouncedRender = App.Helpers.debounce(() => {App.state.pagination.visits.currentPage = 1; this.renderListView()}, 300); page.addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; if (button.classList.contains('visit-view-tab')) this.switchView(button.dataset.view); if (button.classList.contains('visit-filter-btn')) this.setFilter(button.dataset.filter); if (button.id === 'visit-date-apply') this.applyDateFilter(); if (button.classList.contains('mark-done-btn')) this.showMarkDoneModal(button.dataset.id); if (button.classList.contains('view-visit-btn')) this.showVisitDetail(button.dataset.id); if (button.id === 'schedule-visit-btn') this.showScheduleModal(); if (button.classList.contains('delete-visit')) this.deleteVisit(button.dataset.id); if(button.id === 'set-visit-date-today') this.setQuickDate('today'); if(button.id === 'set-visit-date-tomorrow') this.setQuickDate('tomorrow'); }); 
+	    Object.assign(App.Visits, { calendar: null, logNotesQuill: null, map: null, setupEventListeners: function() { document.getElementById('visit-notes-form').addEventListener('submit', e => this.saveCompletedVisit(e)); document.getElementById('visit-form').addEventListener('submit', (e) => this.saveScheduledVisit(e)); document.getElementById('export-visits-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); document.getElementById('export-visits-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); const page = document.getElementById('visits-page'); const debouncedRender = App.Helpers.debounce(() => {App.state.pagination.visits.currentPage = 1; this.renderListView()}, 300); page.addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; if (button.classList.contains('visit-view-tab')) this.switchView(button.dataset.view); if (button.classList.contains('visit-filter-btn')) this.setFilter(button.dataset.filter); if (button.id === 'visit-date-apply') this.applyDateFilter(); if (button.classList.contains('mark-done-btn')) this.showMarkDoneModal(button.dataset.id); if (button.classList.contains('view-visit-btn')) this.showVisitDetail(button.dataset.id); if (button.id === 'schedule-visit-btn') this.showScheduleModal(); if (button.classList.contains('delete-visit')) this.deleteVisit(button.dataset.id); if(button.id === 'set-visit-date-today') this.setQuickDate('today'); if(button.id === 'set-visit-date-tomorrow') this.setQuickDate('tomorrow'); }); 
         document.getElementById('visit-search').addEventListener('input', (e) => { App.state.visits.search = e.target.value; debouncedRender(); });
         document.getElementById('visit-consultant-filter').addEventListener('change', (e) => { App.state.pagination.visits.currentPage = 1; App.state.visits.consultantFilter = e.target.value; this.renderListView(); });
         document.getElementById('map-consultant-filter').addEventListener('change', (e) => { App.state.visits.mapConsultant = e.target.value; this.renderMapView(); });
@@ -2473,7 +2575,7 @@
             });
 
             if (latLngs.length > 1) {
-                L.polyline(latLngs, { color: 'var(--primary)', weight: 3, opacity: 0.7 }).addTo(this.map);
+                L.polyline(latLngs, { color: '#e2000f', weight: 3, opacity: 0.7 }).addTo(this.map);
             }
             
             if (markers.length > 0) {
@@ -2625,7 +2727,7 @@
     }, 
     deleteVisit(visitId) { const visit = App.DB.get('visits').find(v => v.id === visitId); Swal.fire({ title: `Delete this visit?`, text: "This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let visits = App.DB.get('visits'); App.DB.set('visits', visits.filter(v => v.id !== visitId)); App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose} for customer ${visit.customerId}`, `Reason: ${result.value}`); App.UI.toast('Visit deleted.', 'success'); this.render(); } }); } 
     });
-    Object.assign(App.Payments, { 
+Object.assign(App.Payments, { 
         getCurrentFilteredData: function() {
             let payments = App.Helpers.getScopedData('payments');
             const { search, statusFilter, methodFilter } = App.state.payments;
@@ -2667,7 +2769,12 @@
         },
         render: function() { 
             const payments = App.DB.get('payments');
-            const recoveredThisMonth = payments.filter(p => new Date(p.date).getMonth() === new Date().getMonth() && p.status === 'Completed').reduce((sum, p) => sum + p.amount, 0);
+            const now = new Date();
+            const recoveredThisMonth = payments.filter(p => {
+                const paymentDate = new Date(p.date);
+                return paymentDate.getMonth() === now.getMonth() && paymentDate.getFullYear() === now.getFullYear() && p.status === 'Completed';
+            }).reduce((sum, p) => sum + p.amount, 0);
+            
             App.Dashboard.animateCounter('payment-kpi-recovered-month', recoveredThisMonth, true);
             App.Dashboard.animateCounter('payment-kpi-total-count', payments.length);
             App.Dashboard.animateCounter('payment-kpi-pending', payments.filter(p => p.status === 'Pending').length);
@@ -2737,14 +2844,16 @@
                 return App.UI.toast('Please enter a valid, positive payment amount.', 'error');
             }
 
+            const amt2025 = parseFloat(f.elements['payment-amount-2025'].value) || 0;
+            const amt2020 = parseFloat(f.elements['payment-amount-2020'].value) || 0;
+            const amt2018 = parseFloat(f.elements['payment-amount-2018'].value) || 0;
+
             const pd = { id: `p${Date.now()}`, customerId: cid, amount: a, method: f.elements['payment-method'].value, date: f.elements['payment-date'].value, status: f.elements['payment-status'].value }; 
             
-            // If payment is completed, check if it fulfills a promise
             if (pd.status === 'Completed') {
                 let visits = App.DB.get('visits');
                 const promiseVisitIndex = visits.findIndex(v => v.customerId === cid && v.outcome === 'Promise to Pay' && v.promiseDate);
                 if(promiseVisitIndex > -1) {
-                    // Mark the promise as fulfilled by removing the date and amount
                     visits[promiseVisitIndex].promiseAmount = null;
                     visits[promiseVisitIndex].promiseDate = null;
                     App.DB.set('visits', visits);
@@ -2753,15 +2862,24 @@
 
             App.DB.set('payments', [...App.DB.get('payments'), pd]); 
             if (pd.status === 'Completed') { 
-                let c = App.DB.get('customers'); 
-                const ci = c.findIndex(cu => cu.accountNo === cid); 
-                if (ci !== -1) { 
-                    c[ci].outstanding -= a;
-                    if (c[ci].forecastAmount) {
-                        c[ci].forecastAmount = Math.max(0, c[ci].forecastAmount - a);
+                let customers = App.DB.get('customers'); 
+                const customerIndex = customers.findIndex(c => c.accountNo === cid); 
+                if (customerIndex !== -1) { 
+                    customers[customerIndex].outstanding -= a;
+                    customers[customerIndex].balance_2020_2025 -= amt2025;
+                    customers[customerIndex].balance_2019_2020 -= amt2020;
+                    customers[customerIndex].balance_lte_2018 -= amt2018;
+
+                    if (customers[customerIndex].forecastAmount) {
+                        customers[customerIndex].forecastAmount = Math.max(0, customers[customerIndex].forecastAmount - a);
                     }
-                    if (c[ci].outstanding <= 0) { c[ci].outstanding = 0; c[ci].paymentStatus = 'Cleared'; } else { c[ci].paymentStatus = 'Pending';} 
-                    App.DB.set('customers', c); 
+                    if (customers[customerIndex].outstanding <= 0) { 
+                        customers[customerIndex].outstanding = 0; 
+                        customers[customerIndex].paymentStatus = 'Settlement'; 
+                    } else { 
+                        customers[customerIndex].paymentStatus = 'Negotiation';
+                    } 
+                    App.DB.set('customers', customers); 
                 } 
                 App.Helpers.logActivity('recorded a payment', `(Method: ${pd.method})`, pd.customerId, pd.amount); 
                 App.Helpers.logChange('Recorded', 'Payment', `${App.Helpers.formatCurrency(pd.amount)} for ${cid}`);
@@ -2779,7 +2897,7 @@
                 if (App.state.activePage === 'customers') App.Customers.render();
             }
         }, 
-        showPaymentDetail: function(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); if (!payment) return; const customer = App.DB.get('customers').find(c => c.accountNo === payment.customerId); const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); const contentEl = document.getElementById('payment-detail-content'); contentEl.innerHTML = `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr; gap: var(--spacing-6);"><div class="detail-info-card"><div class="label">TRANSACTION ID</div><div class="value">${payment.id}</div></div><div class="detail-info-card"><div class="label">AMOUNT</div><div class="value" style="color: var(--success);">${App.Helpers.formatCurrency(payment.amount)}</div></div><div class="detail-info-card"><div class="label">PAYMENT DATE</div><div class="value">${App.Helpers.formatDate(payment.date)}</div></div><div class="detail-info-card"><div class="label">PAYMENT METHOD</div><div class="value">${payment.method}</div></div><div class="detail-info-card"><div class="label">STATUS</div><div class="value"><span class="status-badge ${payment.status.toLowerCase()}">${payment.status}</span></div></div></div><hr style="border: none; border-top: 1px solid var(--border-color); margin: var(--spacing-6) 0;"><h4 class="card-title mb-4">Customer Information</h4>${customer ? `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr;"><div class="detail-info-card"><div class="label">COMPANY NAME</div><div class="value">${customer.companyName}</div></div><div class="detail-info-card"><div class="label">ACCOUNT #</div><div class="value">${customer.accountNo}</div></div><div class="detail-info-card"><div class="label">SALES CONSULTANT</div><div class="value">${consultantMap[customer.salesConsultantId] || 'N/A'}</div></div><div class="detail-info-card"><div class="label">CURRENT OUTSTANDING</div><div class="value">${App.Helpers.formatCurrency(customer.outstanding)}</div></div></div>` : '<p>No customer associated with this payment.</p>'}`; App.UI.openModal('payment-detail-modal'); }, deletePayment(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); Swal.fire({ title: `Delete this payment?`, text: "This will add the amount back to the customer's outstanding balance. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let payments = App.DB.get('payments'); let customers = App.DB.get('customers'); const customerIndex = customers.findIndex(c => c.accountNo === payment.customerId); if (customerIndex !== -1) { customers[customerIndex].outstanding += payment.amount; if (customers[customerIndex].outstanding > 0) { customers[customerIndex].paymentStatus = 'Pending'; } App.DB.set('customers', customers); } App.DB.set('payments', payments.filter(p => p.id !== paymentId)); App.Helpers.logChange('Deleted', 'Payment', `${App.Helpers.formatCurrency(payment.amount)} for customer ${payment.customerId}`, `Reason: ${result.value}`); App.UI.toast('Payment deleted and balance adjusted.', 'success'); this.render(); if(App.state.activePage === 'dashboard') App.Dashboard.render(); if(App.state.activePage === 'customers') App.Customers.render(); } }); } 
+        showPaymentDetail: function(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); if (!payment) return; const customer = App.DB.get('customers').find(c => c.accountNo === payment.customerId); const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); const contentEl = document.getElementById('payment-detail-content'); contentEl.innerHTML = `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr; gap: var(--spacing-6);"><div class="detail-info-card"><div class="label">TRANSACTION ID</div><div class="value">${payment.id}</div></div><div class="detail-info-card"><div class="label">AMOUNT</div><div class="value" style="color: var(--success);">${App.Helpers.formatCurrency(payment.amount)}</div></div><div class="detail-info-card"><div class="label">PAYMENT DATE</div><div class="value">${App.Helpers.formatDate(payment.date)}</div></div><div class="detail-info-card"><div class="label">PAYMENT METHOD</div><div class="value">${payment.method}</div></div><div class="detail-info-card"><div class="label">STATUS</div><div class="value"><span class="status-badge ${payment.status.toLowerCase()}">${payment.status}</span></div></div></div><hr style="border: none; border-top: 1px solid var(--border-color); margin: var(--spacing-6) 0;"><h4 class="card-title mb-4">Customer Information</h4>${customer ? `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr;"><div class="detail-info-card"><div class="label">COMPANY NAME</div><div class="value">${customer.companyName}</div></div><div class="detail-info-card"><div class="label">ACCOUNT #</div><div class="value">${customer.accountNo}</div></div><div class="detail-info-card"><div class="label">SALES CONSULTANT</div><div class="value">${consultantMap[customer.salesConsultantId] || 'N/A'}</div></div><div class="detail-info-card"><div class="label">CURRENT OUTSTANDING</div><div class="value">${App.Helpers.formatCurrency(customer.outstanding)}</div></div></div>` : '<p>No customer associated with this payment.</p>'}`; App.UI.openModal('payment-detail-modal'); }, deletePayment(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); Swal.fire({ title: `Delete this payment?`, text: "This will add the amount back to the customer's outstanding balance. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let payments = App.DB.get('payments'); let customers = App.DB.get('customers'); const customerIndex = customers.findIndex(c => c.accountNo === payment.customerId); if (customerIndex !== -1) { customers[customerIndex].outstanding += payment.amount; if (customers[customerIndex].outstanding > 0) { customers[customerIndex].paymentStatus = 'Negotiation'; } App.DB.set('customers', customers); } App.DB.set('payments', payments.filter(p => p.id !== paymentId)); App.Helpers.logChange('Deleted', 'Payment', `${App.Helpers.formatCurrency(payment.amount)} for customer ${payment.customerId}`, `Reason: ${result.value}`); App.UI.toast('Payment deleted and balance adjusted.', 'success'); this.render(); if(App.state.activePage === 'dashboard') App.Dashboard.render(); if(App.state.activePage === 'customers') App.Customers.render(); } }); } 
     });
     Object.assign(App.Reports, { charts: {}, currentReportData: null, currentStatementData: null, currentConsultantVisitsData: null,  render: function() { 
         const consultantSelect = document.getElementById('report-consultant-select'); 
@@ -2812,20 +2930,11 @@
         App.Helpers.populateMonthYearDropdowns('report-target-month-select', 'report-target-year-select', today.getMonth(), today.getFullYear());
         App.Helpers.populateMonthYearDropdowns('report-forecast-month-select', 'report-forecast-year-select', today.getMonth(), today.getFullYear());
         
-        const container = document.getElementById('statement-customer-select-container');
-        if(container) {
-            const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
-            const customers = App.DB.get('customers').map(c => ({
-                id: c.accountNo,
-                mainText: `${c.companyName}`,
-                secondaryText: `${c.accountNo}  |  ${consultantMap[c.salesConsultantId] || 'Unassigned'}`
-            }));
-            App.UI.createSearchableDropdown(container, customers, null, 'Search by Name, Account #, or Consultant...');
-        }
-        
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         document.getElementById('report-collection-start-date').value = firstDayOfMonth.toISOString().slice(0, 10);
         document.getElementById('report-collection-end-date').valueAsDate = today;
+        document.getElementById('report-standard-start-date').value = firstDayOfMonth.toISOString().slice(0, 10);
+        document.getElementById('report-standard-end-date').valueAsDate = today;
 
         document.getElementById('report-output').innerHTML = ''; 
     }, 
@@ -2840,7 +2949,6 @@
                     'generate-consultant-report-btn': () => this.generateConsultantReport(),
                     'generate-overdue-report-btn': () => this.generateOverdueReport(),
                     'generate-recovery-report-btn': () => this.generateRecoveryPerformanceReport(),
-                    'generate-statement-btn': () => this.generateCustomerStatement(),
                     'generate-outcome-analysis-btn': () => this.generateVisitOutcomeReport(),
                     'generate-activity-report-btn': () => this.generateActivityReport(),
                     'activity-report-summary-btn': () => { App.state.reports.activityView = 'summary'; this.updateActivityReportView(); },
@@ -2852,6 +2960,7 @@
                     'generate-consultant-visits-btn-new': () => this.generateConsultantVisitsReport(),
                     'generate-target-perf-btn': () => this.generateTargetPerformanceReport(),
                     'generate-forecast-perf-btn': () => this.generateForecastPerformanceReport(),
+                    'generate-aging-balance-report-btn': () => this.generateAgingBalanceByConsultantReport(),
                 };
 
                 if (reportActions[target.id]) {
@@ -3003,6 +3112,26 @@
             });
             this.displayReport('Customer Aging Report', headers, data);
         },
+		        generateAgingBalanceByConsultantReport: function() {
+            const consultants = App.DB.get('consultants');
+            const customers = App.DB.get('customers');
+            const headers = ['Consultant', 'Balance <=2018', 'Balance 2019-2020', 'Balance 2020-2025', 'Total Outstanding'];
+            const data = consultants.map(consultant => {
+                const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id);
+                const balance_lte_2018 = assignedCustomers.reduce((sum, c) => sum + (c.balance_lte_2018 || 0), 0);
+                const balance_2019_2020 = assignedCustomers.reduce((sum, c) => sum + (c.balance_2019_2020 || 0), 0);
+                const balance_2020_2025 = assignedCustomers.reduce((sum, c) => sum + (c.balance_2020_2025 || 0), 0);
+                const totalOutstanding = balance_lte_2018 + balance_2019_2020 + balance_2020_2025;
+                return [
+                    consultant.name,
+                    App.Helpers.formatCurrency(balance_lte_2018),
+                    App.Helpers.formatCurrency(balance_2019_2020),
+                    App.Helpers.formatCurrency(balance_2020_2025),
+                    App.Helpers.formatCurrency(totalOutstanding)
+                ];
+            });
+            this.displayReport('Aging Balance by Consultant', headers, data);
+        },
         generateCollectorPerformanceReport: function() {
             const consultants = App.DB.get('consultants');
             const customers = App.DB.get('customers');
@@ -3033,10 +3162,9 @@
             this.displayReport('Customer Risk Analysis Report', headers, data);
         },
         generateCustomerReport: function() { const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); const c = App.Helpers.getScopedData('customers'), h = ['Account #', 'Company Name', 'Emirate', 'Outstanding', 'Consultant', 'Status'], d = c.map(i => [i.accountNo, i.companyName, i.emirate, App.Helpers.formatCurrency(i.outstanding), consultantMap[i.salesConsultantId], i.status]); this.displayReport('Customer List Report', h, d); },
-        generateConsultantReport: function() { const c = App.Helpers.getScopedData('customers'), v = App.DB.get('visits'); const consultantMap = App.DB.get('consultants').reduce((map, con) => { map[con.id] = { name: con.name, customers: 0, totalDebt: 0, visits: 0 }; return map; }, {}); c.forEach(i => { if (consultantMap[i.salesConsultantId]) { consultantMap[i.salesConsultantId].customers++; consultantMap[i.salesConsultantId].totalDebt += i.outstanding; } }); v.forEach(i => { if (consultantMap[i.collectorId]) consultantMap[i.collectorId].visits++; }); const h = ['Consultant', 'Assigned Customers', 'Total Outstanding', 'Total Visits'], d = Object.values(consultantMap).map(s => [s.name, s.customers, App.Helpers.formatCurrency(s.totalDebt), s.visits]); this.displayReport('Consultant Activity Report', h, d); },
+        generateConsultantReport: function() { const c = App.Helpers.getScopedData('customers'); const startDate = document.getElementById('report-standard-start-date').value; const endDate = document.getElementById('report-standard-end-date').value; let v = App.DB.get('visits'); if(startDate && endDate) { v = v.filter(visit => visit.dateTime >= startDate && visit.dateTime <= endDate); } const consultantMap = App.DB.get('consultants').reduce((map, con) => { map[con.id] = { name: con.name, customers: 0, totalDebt: 0, visits: 0 }; return map; }, {}); c.forEach(i => { if (consultantMap[i.salesConsultantId]) { consultantMap[i.salesConsultantId].customers++; consultantMap[i.salesConsultantId].totalDebt += i.outstanding; } }); v.forEach(i => { if (consultantMap[i.collectorId]) consultantMap[i.collectorId].visits++; }); const h = ['Consultant', 'Assigned Customers', 'Total Outstanding', 'Total Visits'], d = Object.values(consultantMap).map(s => [s.name, s.customers, App.Helpers.formatCurrency(s.totalDebt), s.visits]); this.displayReport('Consultant Activity Report', h, d); },
         generateOverdueReport: function() { const customers = App.Helpers.getScopedData('customers').filter(c => c.paymentStatus === 'Overdue'); const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); const headers = ['Account #', 'Company Name', 'Outstanding', 'Consultant', 'Emirate']; const data = customers.map(c => [c.accountNo, c.companyName, App.Helpers.formatCurrency(c.outstanding), consultantMap[c.salesConsultantId], c.emirate]); this.displayReport('Overdue Accounts Report', headers, data); },
         generateRecoveryPerformanceReport: function() { const consultants = App.DB.get('consultants'); const customers = App.Helpers.getScopedData('customers'); const headers = ['Consultant', 'Total Initial Debt', 'Total Outstanding', 'Total Recovered', 'Recovery Rate']; const data = consultants.map(consultant => { const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id); const initialDebt = assignedCustomers.reduce((sum, c) => sum + c.initialDebt, 0); const outstandingDebt = assignedCustomers.reduce((sum, c) => sum + c.outstanding, 0); const recovered = initialDebt - outstandingDebt; const recoveryRate = initialDebt > 0 ? ((recovered / initialDebt) * 100).toFixed(2) + '%' : 'N/A'; return [consultant.name, App.Helpers.formatCurrency(initialDebt), App.Helpers.formatCurrency(outstandingDebt), App.Helpers.formatCurrency(recovered), recoveryRate]; }); this.displayReport('Debt Recovery Performance Report', headers, data); },
-        generateCustomerStatement: function() { const customerId = document.querySelector('#statement-customer-select-container input[type="hidden"]').value; if (!customerId) { App.UI.toast('Please select a customer.', 'warning'); return; } const customer = App.DB.get('customers').find(c => c.accountNo === customerId); const payments = App.DB.get('payments').filter(p => p.customerId === customerId && p.status === 'Completed').sort((a,b) => new Date(a.date) - new Date(b.date)); let transactions = []; transactions.push({ date: customer.debtSince || 'Initial', description: 'Initial Debt Amount', debit: customer.initialDebt, credit: 0 }); payments.forEach(p => { transactions.push({ date: p.date, description: `Payment Received (${p.method})`, debit: 0, credit: p.amount }); }); let balance = 0; const transactionsWithBalance = transactions.map(t => { balance += t.debit - t.credit; return {...t, balance}; }); const body = transactionsWithBalance.map(t => { return `<tr><td>${App.Helpers.formatDate(t.date)}</td><td>${t.description}</td><td>${t.debit > 0 ? App.Helpers.formatCurrency(t.debit) : '-'}</td><td>${t.credit > 0 ? App.Helpers.formatCurrency(t.credit) : '-'}</td><td>${App.Helpers.formatCurrency(t.balance)}</td></tr>` }).join(''); const reportTitle = `Statement for ${customer.companyName} (${customer.accountNo})`; this.currentStatementData = { customer, transactionsWithBalance }; const content = `<div class="detail-info-grid" style="grid-template-columns: repeat(3, 1fr);"><div class="detail-info-card"><div class="label">Total Billed</div><div class="value">${App.Helpers.formatCurrency(customer.initialDebt)}</div></div><div class="detail-info-card"><div class="label">Total Paid</div><div class="value">${App.Helpers.formatCurrency(customer.initialDebt - customer.outstanding)}</div></div><div class="detail-info-card"><div class="label">Balance Due</div><div class="value" style="color:var(--danger);">${App.Helpers.formatCurrency(customer.outstanding)}</div></div></div><div class="table-container mt-4"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Debit (Billed)</th><th>Credit (Paid)</th><th>Balance</th></tr></thead><tbody>${body}</tbody></table></div>`; this.displayReport(reportTitle, [], [], content, ['csv', 'pdf']);},
         generateVisitOutcomeReport: function() { const visits = App.DB.get('visits').filter(v => v.status === 'Completed' && v.outcome); const outcomeCounts = visits.reduce((acc, visit) => { acc[visit.outcome] = (acc[visit.outcome] || 0) + 1; return acc; }, {}); const labels = Object.keys(outcomeCounts); const data = Object.values(outcomeCounts); const content = `<div class="chart-container" style="height: 400px;"><canvas id="outcome-chart"></canvas></div>`; this.displayReport('Visit Outcome Analysis', [], [], content); if(this.charts && this.charts.outcome) this.charts.outcome.destroy(); this.charts.outcome = new Chart(document.getElementById('outcome-chart'), { type: 'pie', data: { labels: labels, datasets: [{ label: 'Visit Outcomes', data: data, backgroundColor: ['#e2000f', '#10b981', '#ffc107', '#dc3545', '#0d6efd', '#84cc16'], }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: 'var(--text-primary)' } } } } }); },
         generateConsultantVisitsReport: function() {
             const consultantFilter = document.getElementById('report-visits-consultant-select').value;
@@ -3134,7 +3262,7 @@
                     .filter(p => p.status === 'Completed' && customerAccountNos.includes(p.customerId) && p.date.startsWith(monthFilter))
                     .reduce((sum, p) => sum + p.amount, 0);
 
-                const performance = forecastedAmount > 0 ? ((collectedAmount / collectedAmount) * 100).toFixed(2) + '%' : 'N/A';
+                const performance = forecastedAmount > 0 ? ((collectedAmount / forecastedAmount) * 100).toFixed(2) + '%' : 'N/A';
 
                 return [
                     consultant.name,
@@ -3158,7 +3286,7 @@
             csvContent += "Consultant,Date,Customer,Account #,Purpose,Status,Outcome,Contact Method,Notes\n";
             this.currentConsultantVisitsData.details.forEach(consultant => {
                 consultant.visitDetails.forEach(visit => {
-                    const row = [consultant.name, visit.date, visit.customer, visit.accountNo, visit.purpose, visit.status, visit.outcome, visit.contactMethod, `"${visit.notes.replace(/"/g, '""')}"`];
+                    const row = [consultant.name, visit.date, visit.customer, visit.accountNo, visit.purpose, visit.status, visit.outcome, visit.contactMethod, `"${(visit.notes || '').replace(/"/g, '""')}"`];
                     csvContent += row.join(",") + "\n";
                 });
             });
@@ -3218,8 +3346,6 @@
         },
         exportCSV: function() { if (!this.currentReportData) return App.UI.toast('No report data to export.', 'error'); const { title: t, headers: h, data: d } = this.currentReportData; App.Helpers.exportToCSV(`${t.replace(/\s/g, '_')}.csv`, h, d); },
         exportPDF: function() { if (!this.currentReportData) return App.UI.toast('No report data to export.', 'error'); const { title: t, headers: h, data: d } = this.currentReportData; App.Helpers.exportToPDF(`${t.replace(/\s/g, '_')}.pdf`, t, h, d); },
-        exportStatementCSV: function() { if (!this.currentStatementData) return App.UI.toast('No statement data to export.', 'error'); const { customer, transactionsWithBalance } = this.currentStatementData; const title = `Statement_for_${customer.companyName.replace(/\s/g, '_')}`; let csvContent = "data:text/csv;charset=utf-8,"; csvContent += `Statement for:,"${customer.companyName} (${customer.accountNo})"\n`; csvContent += `Total Billed:,${App.Helpers.formatCurrency(customer.initialDebt)}\n`; csvContent += `Total Paid:,${App.Helpers.formatCurrency(customer.initialDebt - customer.outstanding)}\n`; csvContent += `Balance Due:,${App.Helpers.formatCurrency(customer.outstanding)}\n\n`; const headers = ['Date', 'Description', 'Debit (Billed)', 'Credit (Paid)', 'Balance']; csvContent += headers.join(',') + '\r\n'; transactionsWithBalance.forEach(t => { const row = [ t.date === 'Initial' ? 'N/A' : App.Helpers.formatDate(t.date), `"${t.description}"`, t.debit > 0 ? t.debit.toFixed(2) : '0.00', t.credit > 0 ? t.credit.toFixed(2) : '0.00', t.balance.toFixed(2) ]; csvContent += row.join(',') + '\r\n'; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `${title}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); },
-        exportStatementPDF: function() { if (!this.currentStatementData) return App.UI.toast('No statement data to export.', 'error'); const { customer, transactionsWithBalance } = this.currentStatementData; const title = `Statement for ${customer.companyName} (${customer.accountNo})`; const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(18); doc.text(title, 14, 22); doc.setFontSize(11); doc.setTextColor(100); doc.text(`Total Billed: ${App.Helpers.formatCurrency(customer.initialDebt)}`, 14, 32); doc.text(`Total Paid: ${App.Helpers.formatCurrency(customer.initialDebt - customer.outstanding)}`, 70, 32); doc.text(`Balance Due: ${App.Helpers.formatCurrency(customer.outstanding)}`, 130, 32); const tableData = transactionsWithBalance.map(t => [ t.date === 'Initial' ? 'N/A' : App.Helpers.formatDate(t.date), t.description, t.debit > 0 ? App.Helpers.formatCurrency(t.debit) : '-', t.credit > 0 ? App.Helpers.formatCurrency(t.credit) : '-', App.Helpers.formatCurrency(t.balance) ]); doc.autoTable({ head: [['Date', 'Description', 'Debit (Billed)', 'Credit (Paid)', 'Balance']], body: tableData, startY: 40 }); doc.save(`Statement_${customer.companyName.replace(/\s/g, '_')}.pdf`); }
     });
     Object.assign(App.Analytics, {
         charts: {},
@@ -3609,7 +3735,7 @@
             form.elements['forecast-amount'].focus();
         }
     });
-    Object.assign(App.Users, { 
+Object.assign(App.Users, { 
         render: function() { 
             let users = App.DB.get('users'); 
             const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
@@ -3652,7 +3778,9 @@
                 form.elements['username'].value = user.username; 
                 form.elements['username'].readOnly = true; 
                 form.elements['fullName'].value = user.fullName; 
-                passwordInput.value = atob(user.password); // Decode for viewing/editing
+                passwordInput.value = '';
+                passwordInput.placeholder = 'Leave blank to keep current password';
+                passwordInput.required = false;
                 form.elements['department'].value = user.department || '';
                 form.elements['role'].value = user.role; 
                 form.elements['assignedConsultantId'].value = user.assignedConsultantId || ''; 
@@ -3661,6 +3789,8 @@
                 document.getElementById('user-modal-title').textContent = 'Add New User'; 
                 form.elements['user-id-hidden'].value = ''; 
                 form.elements['username'].readOnly = false; 
+                passwordInput.placeholder = 'Enter password';
+                passwordInput.required = true;
                 form.originalData = null;
             } 
             document.getElementById('assigned-consultant-group').style.display = form.elements['role'].value === 'user' ? 'block' : 'none'; 
@@ -3671,23 +3801,28 @@
             const form = e.target; 
             const id = form.elements['user-id-hidden'].value; 
             let users = App.DB.get('users'); 
+            const newPassword = form.elements['password'].value;
             const userData = { 
                 username: form.elements['username'].value.trim(), 
                 fullName: form.elements['fullName'].value.trim(), 
-                password: btoa(form.elements['password'].value), // Encode password on save
                 role: form.elements['role'].value, 
                 department: form.elements['department'].value.trim(),
                 assignedConsultantId: form.elements['role'].value === 'user' ? parseInt(form.elements['assignedConsultantId'].value) || null : null 
             }; 
-            if (!userData.username || !userData.fullName || !form.elements['password'].value) return App.UI.toast('All fields are required.', 'error'); 
+            if (!id && !newPassword) return App.UI.toast('Password is required for new users.', 'error');
+            if (!userData.username || !userData.fullName) return App.UI.toast('Username and Full Name are required.', 'error'); 
             if (id) { 
                 const index = users.findIndex(u => u.id == id);
+                if (newPassword) {
+                    userData.password = btoa(newPassword);
+                }
                 const original = form.originalData;
                 const changes = App.Helpers.getObjectChanges(original, {...original, ...userData});
                 users[index] = { ...users[index], ...userData };
                 App.Helpers.logChange('Updated', 'User', `'${userData.username}'`, changes);
             } else { 
                 if (users.some(u => u.username === userData.username)) { return App.UI.toast('Username already exists.', 'error'); } 
+                userData.password = btoa(newPassword);
                 users.push({ id: Date.now(), ...userData, lastLogin: null }); 
                 App.Helpers.logChange('Created', 'User', `'${userData.username}'`);
             } 
@@ -3699,7 +3834,7 @@
         deleteUser: function(id) { if (id == App.state.currentUser.id) { return App.UI.toast('You cannot delete your own account.', 'error'); } App.UI.confirm('Are you sure?', "This will delete the user account.", () => { let users = App.DB.get('users'); const user = users.find(u => u.id == id); users = users.filter(u => u.id != id); App.DB.set('users', users); App.Helpers.logChange('Deleted', 'User', `'${user.username}'`); App.UI.toast('User deleted.', 'success'); this.render(); }); } 
     });
     Object.assign(App.Notifications, { init() { document.getElementById('notification-bell-btn').addEventListener('click', (e) => { e.stopPropagation(); this.toggleDropdown(); }); document.body.addEventListener('click', (e) => { const bellBtn = document.getElementById('notification-bell-btn'); const dropdown = document.getElementById('notification-dropdown'); if (dropdown && !dropdown.classList.contains('hidden') && !bellBtn.contains(e.target) && !dropdown.contains(e.target)) { dropdown.classList.add('hidden'); } }); }, create(message) { let notifications = App.DB.get('notifications'); const newNotification = { id: `notif_${Date.now()}`, timestamp: Date.now(), message: message, isRead: false }; notifications.unshift(newNotification); App.DB.set('notifications', notifications); if(App.state.currentUser && App.state.currentUser.role === 'admin') this.render(); }, render() { const notifications = App.DB.get('notifications').sort((a, b) => b.timestamp - a.timestamp); const unreadCount = notifications.filter(n => !n.isRead).length; const badge = document.getElementById('notification-badge'); if (unreadCount > 0) { badge.textContent = unreadCount; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); } const list = document.getElementById('notification-list'); list.innerHTML = notifications.length > 0 ? notifications.slice(0, 15).map(n => `<li style="padding: var(--spacing-2) 0; border-bottom: 1px solid var(--border-color); ${!n.isRead ? 'font-weight: 600;' : ''}">${n.message}<div style="font-size: var(--fs-sm); color: var(--text-secondary); font-weight: 400; margin-top: 4px;"><i class="fas fa-clock"></i> ${App.Helpers.timeAgo(n.timestamp)}</div></li>`).join('') : '<li>No new notifications.</li>'; }, toggleDropdown() { const dropdown = document.getElementById('notification-dropdown'); const bellBtn = document.getElementById('notification-bell-btn'); const rect = bellBtn.getBoundingClientRect(); dropdown.style.top = `${rect.bottom + 10}px`; dropdown.style.right = `${window.innerWidth - rect.right}px`; dropdown.classList.toggle('hidden'); if(!dropdown.classList.contains('hidden')) { this.markAllAsRead(); } }, markAllAsRead() { let notifications = App.DB.get('notifications'); if (notifications.some(n => !n.isRead)) { setTimeout(() => { const updatedNotifications = notifications.map(n => ({ ...n, isRead: true })); App.DB.set('notifications', updatedNotifications); this.render(); }, 1500); } } });
-    Object.assign(App.CommandPalette, { init() { window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'k') { e.preventDefault(); this.open(); } }); document.getElementById('command-palette-input').addEventListener('input', App.Helpers.debounce(e => this.search(e.target.value), 200)); document.getElementById('command-palette-modal').addEventListener('click', (e) => { if (e.target.id === 'command-palette-modal') this.close(); }); }, open() { App.UI.openModal('command-palette-modal'); document.getElementById('command-palette-input').focus(); }, close() { document.getElementById('command-palette-input').value = ''; document.getElementById('command-palette-results').innerHTML = ''; App.UI.closeModal('command-palette-modal'); }, search(query) { const resultsContainer = document.getElementById('command-palette-results'); if (!query || query.length < 2) { resultsContainer.innerHTML = ''; return; } const q = query.toLowerCase(); let results = []; App.DB.get('customers').forEach(c => { if (c.companyName.toLowerCase().includes(q) || c.accountNo.toLowerCase().includes(q)) { results.push({ type: 'Customer', title: c.companyName, description: `Account: ${c.accountNo} | Consultant: ${c.salesConsultant}`, action: () => { App.Customers.showCustomerDetail(c.accountNo); } }); } }); App.DB.get('payments').forEach(p => { if (p.id.toLowerCase().includes(q)) { const customer = App.DB.get('customers').find(c => c.accountNo === p.customerId); results.push({ type: 'Payment', title: `Payment: ${App.Helpers.formatCurrency(p.amount)}`, description: `ID: ${p.id} | For: ${customer ? customer.companyName : 'N/A'}`, action: () => { App.Payments.showPaymentDetail(p.id); } }); } }); this.renderResults(results); }, renderResults(results) { const container = document.getElementById('command-palette-results'); if (results.length === 0) { container.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-secondary);">No results found.</div>'; return; } container.innerHTML = results.map(r => `<div class="command-result-item" role="button" tabindex="0"><div style="font-size: var(--fs-sm); color: var(--primary); font-weight: 600;">${r.type}</div><div style="font-weight: 500;">${r.title}</div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${r.description}</div></div>`).join(''); document.querySelectorAll('.command-result-item').forEach((item, index) => { item.addEventListener('click', () => { results[index].action(); this.close(); }); }); if (!document.getElementById('command-palette-styles')) { const style = document.createElement('style'); style.id = 'command-palette-styles'; style.innerHTML = `.command-result-item { padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; margin-bottom: 0.25rem; } .command-result-item:hover, .command-result-item:focus { background-color: var(--bg-color); outline: none; }`; document.head.appendChild(style); } } });
+    Object.assign(App.CommandPalette, { init() { window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'k') { e.preventDefault(); this.open(); } }); document.getElementById('command-palette-input').addEventListener('input', App.Helpers.debounce(e => this.search(e.target.value), 200)); document.getElementById('command-palette-modal').addEventListener('click', (e) => { if (e.target.id === 'command-palette-modal') this.close(); }); }, open() { App.UI.openModal('command-palette-modal'); document.getElementById('command-palette-input').focus(); }, close() { document.getElementById('command-palette-input').value = ''; document.getElementById('command-palette-results').innerHTML = ''; App.UI.closeModal('command-palette-modal'); }, search(query) { const resultsContainer = document.getElementById('command-palette-results'); if (!query || query.length < 2) { resultsContainer.innerHTML = ''; return; } const q = query.toLowerCase(); let results = []; const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); App.DB.get('customers').forEach(c => { if (c.companyName.toLowerCase().includes(q) || c.accountNo.toLowerCase().includes(q)) { const consultantName = consultantMap[c.salesConsultantId] || 'N/A'; results.push({ type: 'Customer', title: c.companyName, description: `Account: ${c.accountNo} | Consultant: ${consultantName}`, action: () => { App.Customers.showCustomerDetail(c.accountNo); } }); } }); App.DB.get('payments').forEach(p => { if (p.id.toLowerCase().includes(q)) { const customer = App.DB.get('customers').find(c => c.accountNo === p.customerId); results.push({ type: 'Payment', title: `Payment: ${App.Helpers.formatCurrency(p.amount)}`, description: `ID: ${p.id} | For: ${customer ? customer.companyName : 'N/A'}`, action: () => { App.Payments.showPaymentDetail(p.id); } }); } }); this.renderResults(results); }, renderResults(results) { const container = document.getElementById('command-palette-results'); if (results.length === 0) { container.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-secondary);">No results found.</div>'; return; } container.innerHTML = results.map(r => `<div class="command-result-item" role="button" tabindex="0"><div style="font-size: var(--fs-sm); color: var(--primary); font-weight: 600;">${r.type}</div><div style="font-weight: 500;">${r.title}</div><div style="font-size: var(--fs-sm); color: var(--text-secondary);">${r.description}</div></div>`).join(''); document.querySelectorAll('.command-result-item').forEach((item, index) => { item.addEventListener('click', () => { results[index].action(); this.close(); }); }); if (!document.getElementById('command-palette-styles')) { const style = document.createElement('style'); style.id = 'command-palette-styles'; style.innerHTML = `.command-result-item { padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; margin-bottom: 0.25rem; } .command-result-item:hover, .command-result-item:focus { background-color: var(--bg-color); outline: none; }`; document.head.appendChild(style); } } });
     Object.assign(App.ChangeLog, { render() { let log = App.DB.get('changeLog'); const search = document.getElementById('changelog-search').value.toLowerCase(); if (search) { log = log.filter(entry => entry.user.toLowerCase().includes(search) || entry.action.toLowerCase().includes(search) || (entry.details && entry.details.toLowerCase().includes(search)) || (entry.entityName && entry.entityName.toLowerCase().includes(search))); } const { column, order } = App.state.tableSorts.changelog; log.sort((a,b) => { let valA = a[column]; let valB = b[column]; if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); } if (valA < valB) return order === 'asc' ? -1 : 1; if (valA > valB) return order === 'asc' ? 1 : -1; return 0; }); const { currentPage, rowsPerPage } = App.state.pagination.changelog; const startIndex = (currentPage - 1) * rowsPerPage; const paginatedLog = log.slice(startIndex, startIndex + rowsPerPage); const tbody = document.getElementById('changelog-table-body'); if(paginatedLog.length > 0) { tbody.innerHTML = paginatedLog.map(entry => `<tr><td>${new Date(entry.timestamp).toLocaleString()}</td><td>${entry.user}</td><td>${entry.action}</td><td>${entry.entityType}: ${entry.entityName}</td><td>${entry.details || 'N/A'}</td></tr>`).join(''); } else { tbody.innerHTML = App.UI.getEmptyStateHTML('fa-history', 'No Log Entries Found', 'Changes to data will be recorded here.'); } App.UI.animateTableRows(tbody); App.UI.renderPaginationControls('changelog', log.length); App.UI.updateSortIndicators('changelog'); }, setupEventListeners() { const debouncedSearch = App.Helpers.debounce(() => {App.state.pagination.changelog.currentPage = 1; this.render()}, 300); document.getElementById('changelog-search').addEventListener('input', debouncedSearch); document.querySelector('#changelog-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('changelog', th.dataset.sort); }); } });
     Object.assign(App.Import, { init: function() { const dropZone = document.getElementById('csv-drop-zone'); const fileInput = document.getElementById('csv-file-input'); const sampleLink = document.getElementById('download-sample-csv-link'); dropZone.addEventListener('click', () => fileInput.click()); fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0])); dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }); dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover')); dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) { this.handleFileSelect(e.dataTransfer.files[0]); } }); sampleLink.addEventListener('click', (e) => { e.preventDefault(); this.downloadSampleCSV(); }); }, 
     handleFileSelect: function(file) {
@@ -3722,13 +3857,13 @@
         let headerRow = rows.shift().replace(/^\uFEFF/, '');
         const delimiter = headerRow.includes(';') ? ';' : ',';
         const originalHeaders = headerRow.split(delimiter);
-        const cleanedHeaders = originalHeaders.map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+        const cleanedHeaders = originalHeaders.map(h => h.trim().replace(/^"|"$/g, '').toLowerCase().replace(/[^a-z0-9]/gi, ''));
 
         if (cleanedHeaders.length < 2) {
             return App.UI.toast('Invalid CSV format. Please ensure it is properly comma-separated.', 'error');
         }
 
-        const expectedHeaders = ['accountnumber', 'companyname', 'emirate', 'area', 'status', 'paymentstatus', 'initialdebt', 'outstandingamount', 'salesconsultant', 'customerstatus', 'debtsince', 'agingcategory'];
+        const expectedHeaders = ['accountnumber', 'companyname', 'email', 'mobile', 'emirate', 'area', 'status', 'paymentstatus', 'initialdebt', 'outstandingamount', 'salesconsultant', 'customerstatus', 'debtsince', 'balance20202025', 'balance20192020', 'balancelte2018'];
         const headerMap = {};
         
         expectedHeaders.forEach(eh => {
@@ -3792,15 +3927,26 @@
             const consultant = consultants.find(c => c.name.toLowerCase() === item.consultantName.toLowerCase());
             const rawDebtSince = getCellValue('debtsince');
             const debtSince = App.Helpers.parseCSVDate(rawDebtSince);
+            
+            const bal1 = parseFloat(getCellValue('balance20202025')) || 0;
+            const bal2 = parseFloat(getCellValue('balance20192020')) || 0;
+            const bal3 = parseFloat(getCellValue('balancelte2018')) || 0;
+            const outstanding = bal1 + bal2 + bal3;
+
             return {
                 accountNo: getCellValue('accountnumber'), 
                 companyName: getCellValue('companyname') || 'N/A', 
+                email: getCellValue('email') || '',
+                mobile: getCellValue('mobile') || '',
                 emirate: getCellValue('emirate') || 'Dubai', 
                 area: getCellValue('area') || 'N/A', 
                 status: getCellValue('status') || 'Active', 
-                paymentStatus: getCellValue('paymentstatus') || 'Pending', 
-                initialDebt: parseFloat(getCellValue('initialdebt')) || 0, 
-                outstanding: parseFloat(getCellValue('outstandingamount')) || 0, 
+                paymentStatus: getCellValue('paymentstatus') || 'Negotiation', 
+                initialDebt: parseFloat(getCellValue('initialdebt')) || outstanding, 
+                outstanding: outstanding, 
+                balance_2020_2025: bal1,
+                balance_2019_2020: bal2,
+                balance_lte_2018: bal3,
                 salesConsultantId: consultant ? consultant.id : null,
                 customerStatus: getCellValue('customerstatus') || 'Collectors',
                 agingCategory: App.Helpers.calculateAgingCategory(debtSince),
@@ -3824,8 +3970,8 @@
         if(App.state.activePage === 'consultants') App.Consultants.render();
     }, 
     downloadSampleCSV: function() { 
-        const headers = "accountNumber,companyName,emirate,area,status,paymentStatus,initialDebt,outstandingAmount,salesConsultant,customerStatus,debtSince"; 
-        const exampleRow = "DXB-123,Sample Trading LLC,Dubai,Al Quoz,Active,Overdue,50000,12500,John Doe,Sales (Above 3 Months),15/01/2023"; 
+        const headers = "accountNumber,companyName,email,mobile,emirate,area,status,paymentStatus,initialDebt,salesConsultant,customerStatus,debtSince,balance2020_2025,balance2019_2020,balance_lte_2018"; 
+        const exampleRow = "DXB-123,Sample Trading LLC,contact@sample.com,+971501234567,Dubai,Al Quoz,Active,Negotiation,84093,John Doe,Sales (Above 3 Months),15/01/2023,12500,50000,21593"; 
         const csvContent = headers + "\n" + exampleRow; 
         const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); 
         const link = document.createElement("a"); const url = URL.createObjectURL(blob); 
@@ -3938,6 +4084,10 @@
 
             const forecastAmount = customers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
             const forecastPercentage = forecastAmount > 0 ? ((collectedAmount / forecastAmount) * 100).toFixed(0) : 0;
+
+            const balance_lte_2018 = customers.reduce((sum, c) => sum + (c.balance_lte_2018 || 0), 0);
+            const balance_2019_2020 = customers.reduce((sum, c) => sum + (c.balance_2019_2020 || 0), 0);
+            const balance_2020_2025 = customers.reduce((sum, c) => sum + (c.balance_2020_2025 || 0), 0);
             
             return `
                 <div class="card">
@@ -3961,6 +4111,14 @@
                             <div class="progress-bar"><div class="progress-bar-inner" data-width="${forecastPercentage}" style="background-color: var(--warning);"></div></div>
                              <div class="text-right" style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedAmount)} of ${App.Helpers.formatCurrency(forecastAmount)}</div>
                         </div>
+                        <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
+                        <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Outstanding Balance Breakdown</h4>
+                        <div class="detail-info-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                            <div class="detail-info-card"><div class="label"><=2018</div><div class="value">${App.Helpers.formatCurrency(balance_lte_2018)}</div></div>
+                            <div class="detail-info-card"><div class="label">2019-2020</div><div class="value">${App.Helpers.formatCurrency(balance_2019_2020)}</div></div>
+                            <div class="detail-info-card"><div class="label">2020-2025</div><div class="value">${App.Helpers.formatCurrency(balance_2020_2025)}</div></div>
+                        </div>
+                         <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
                         <div class="detail-info-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="detail-info-card"><div class="label">Visits This Month</div><div class="value">${visits.length}</div></div>
                             <div class="detail-info-card"><div class="label">Payments This Month</div><div class="value">${payments.length}</div></div>
@@ -3970,7 +4128,7 @@
             `;
         }
     });
-    Object.assign(App.Helpers, { 
+	    Object.assign(App.Helpers, { 
         tagColors: {},
         formatCurrency: (a) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a), formatAbbreviatedCurrency: (num) => { if (num >= 1000000) return 'AED ' + (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (num >= 1000) return 'AED ' + (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED' }).format(num); }, debounce: (f, d) => { let t; return function(...a) { clearTimeout(t); t = setTimeout(() => f.apply(this, a), d); }; }, 
         formatDate: (dateString) => {
@@ -4098,6 +4256,7 @@
             return changes.join('; ');
         },
         stripHtml(html) {
+            if (!html) return "";
             const doc = new DOMParser().parseFromString(html, 'text/html');
             return doc.body.textContent || "";
         },
@@ -4203,10 +4362,15 @@
                 companyName: 'Company Name',
                 customerStatus: 'Customer Status',
                 agingCategory: 'Aging Category',
-                outstanding: 'Outstanding',
+                outstanding: 'Balance',
+                balance_2020_2025: '2020-2025',
+                balance_2019_2020: '2019-2020',
+                balance_lte_2018: '<=2018',
                 forecastAmount: 'Forecast',
                 salesConsultantId: 'Consultant',
                 paymentStatus: 'Payment Status',
+                email: 'Email',
+                mobile: 'Mobile',
                 dateTime: 'Date',
                 date: 'Date',
                 customerId: 'Customer',
@@ -4236,7 +4400,10 @@
                         case 'outstanding':
                         case 'amount':
                         case 'forecastAmount':
-                            return App.Helpers.formatCurrency(value || 0);
+                        case 'balance_2020_2025':
+                        case 'balance_2019_2020':
+                        case 'balance_lte_2018':
+                            return value ? value.toFixed(2) : '0.00'; // Return as raw number for CSV
                         default:
                             return value || '';
                     }
@@ -4247,7 +4414,33 @@
             if (format === 'csv') {
                 App.Helpers.exportToCSV(filename + '.csv', headers, data);
             } else {
-                App.Helpers.exportToPDF(filename + '.pdf', `${entityName} List`, headers, data);
+                // For PDF, format currency values
+                const pdfData = allData.map(item => {
+                    return displayColumns.map(key => {
+                        let value = item[key];
+                        switch(key) {
+                            case 'salesConsultantId':
+                            case 'collectorId':
+                            case 'consultantId':
+                                return consultantMap[value] || 'N/A';
+                            case 'customerId':
+                                return customerMap[value] || 'N/A';
+                            case 'dateTime':
+                            case 'date':
+                                return App.Helpers.formatDate(value);
+                            case 'outstanding':
+                            case 'amount':
+                            case 'forecastAmount':
+                            case 'balance_2020_2025':
+                            case 'balance_2019_2020':
+                            case 'balance_lte_2018':
+                                return App.Helpers.formatCurrency(value || 0);
+                            default:
+                                return value || '';
+                        }
+                    });
+                });
+                App.Helpers.exportToPDF(filename + '.pdf', `${entityName} List`, headers, pdfData);
             }
         }
     });
