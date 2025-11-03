@@ -11,6 +11,14 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+<!-- Phase 2 Dependencies -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+
 <style>
     :root {
         /* Wuerth Group Inspired Color Palette */
@@ -55,6 +63,7 @@
     body[data-theme="dark"] .searchable-dropdown-item:hover { background-color: var(--bg-color); }
     body[data-theme="dark"] .detail-tab-btn:hover, body[data-theme="dark"] .detail-tab-btn.active { background-color: var(--dark); color: black; border-color: var(--dark); }
     body[data-theme="dark"] .leaflet-tile { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7); }
+    body[data-theme="dark"] .leaflet-routing-container { background-color: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); }
 
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -282,6 +291,34 @@
         border: 2px solid white;
         box-shadow: 0 2px 5px rgba(0,0,0,0.4);
     }
+    
+    /* --- Phase 1: Status Markers --- */
+    .leaflet-div-icon {
+        border: none;
+        background: none;
+    }
+    .status-marker {
+        position: relative;
+        font-size: 28px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .status-marker.good { color: var(--success); }
+    .status-marker.warning { color: var(--warning); }
+    .status-marker.critical { color: var(--danger); }
+    .status-marker.completed { color: #6c757d; } /* Grey for completed */
+    .status-marker::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 8px;
+        height: 8px;
+        background: black;
+        border-radius: 50%;
+        opacity: 0.2;
+        filter: blur(3px);
+    }
 
     /* --- New styles for v1.1 & v2.2 enhancements --- */
     .customer-tag {
@@ -326,6 +363,7 @@
         justify-content: space-between;
         align-items: baseline;
         gap: var(--spacing-2);
+        flex-wrap: wrap;
     }
     .breakdown-item .value {
         font-size: var(--fs-lg);
@@ -357,6 +395,49 @@
     .dynamic-filter-row:hover {
         background-color: var(--card-bg);
     }
+    
+    /* --- My Day Page Styles --- */
+    .myday-task-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--spacing-2) 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+     .myday-task-item:last-child {
+        border-bottom: none;
+    }
+    .myday-task-item.clickable {
+        cursor: pointer;
+    }
+     .myday-task-item.clickable:hover {
+        background-color: var(--bg-color);
+     }
+    .myday-task-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .myday-task-info .customer-name {
+        font-weight: 600;
+    }
+     .myday-task-info .task-details {
+        font-size: var(--fs-sm);
+        color: var(--text-secondary);
+    }
+
+    /* Health Score Indicator */
+    .health-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+    .health-dot.good { background-color: var(--success); }
+    .health-dot.warning { background-color: var(--warning); }
+    .health-dot.critical { background-color: var(--danger); }
+
 
     /* --- Accessibility --- */
     *:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
@@ -413,6 +494,8 @@
 <div id="report-modal" class="modal"></div>
 <div id="bulk-update-customers-modal" class="modal"></div>
 <div id="changelog-detail-modal" class="modal"></div>
+<div id="route-planner-modal" class="modal"></div>
+
 
 <!-- Notification Dropdown -->
 <div id="notification-dropdown" class="card hidden" style="position: absolute; width: 350px; z-index: 1001; max-height: 400px; overflow-y: auto; padding: var(--spacing-4);">
@@ -447,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => App.init());
 
 const App = {
     state: { currentUser: null, reports: { activityView: 'summary', customReportFilters: [] }, activePage: 'dashboard', activeCustomerId: null, activeConsultantId: null,
-        visits: { activeView: 'list', filter: 'Upcoming', startDate: '', endDate: '', search: '', consultantFilter: 'all', mapDate: new Date().toISOString().slice(0, 10), mapConsultant: 'all' },
+        visits: { activeView: 'list', filter: 'Upcoming', startDate: '', endDate: '', search: '', consultantFilter: 'all', mapDate: new Date().toISOString().slice(0, 10), mapConsultant: 'all', plannedRoute: null },
         payments: { search: '', statusFilter: 'all', methodFilter: 'all'},
         adminDashboardView: 'overview', dayTimerInterval: null, dashboardInterval: null, paymentFlowOrigin: null, breakStartTime: null, totalBreakTime: 0,
         dashboardTimeFrame: null, // New state for dashboard filter
@@ -458,6 +541,7 @@ const App = {
             visits: { column: 'dateTime', order: 'desc' },
             payments: { column: 'date', order: 'desc' },
             changelog: { column: 'timestamp', order: 'desc' },
+            myday: { column: 'dateTime', order: 'asc' },
         },
         pagination: {
             customers: { currentPage: 1, rowsPerPage: 10 },
@@ -466,6 +550,7 @@ const App = {
             visits: { currentPage: 1, rowsPerPage: 10 },
             payments: { currentPage: 1, rowsPerPage: 10 },
             changelog: { currentPage: 1, rowsPerPage: 25 },
+            myday: { currentPage: 1, rowsPerPage: 100 },
         },
         customerTableColumns: { // New state for column visibility
             accountNo: true,
@@ -499,9 +584,10 @@ const App = {
         this.CommandPalette.init(); 
         this.Notifications.init(); 
         this.Import.init(); 
+        this.Offline.init();
         this.UI.applyTheme(); 
     },
-    Auth: {}, DB: {}, UI: {}, Dashboard: {}, Customers: {}, Visits: {}, Payments: {}, Reports: {}, Analytics: {}, Consultants: {}, Users: {}, Notifications: {}, CommandPalette: {}, Helpers: {}, ChangeLog: {}, Import: {}, Settings: {}, Performance: {}
+    Auth: {}, DB: {}, UI: {}, Dashboard: {}, Customers: {}, Visits: {}, Payments: {}, Reports: {}, Analytics: {}, Consultants: {}, Users: {}, Notifications: {}, CommandPalette: {}, Helpers: {}, ChangeLog: {}, Import: {}, Settings: {}, Performance: {}, MyDay: {}, Geo: {}, Offline: {}
 };
 Object.assign(App.Auth, { 
     login(u, p) { 
@@ -535,6 +621,8 @@ Object.assign(App.DB, {
         if (!localStorage.getItem('changeLog')) localStorage.setItem('changeLog', JSON.stringify([]));
         if (!localStorage.getItem('forecasts')) localStorage.setItem('forecasts', JSON.stringify([]));
         if (!localStorage.getItem('customerComments')) localStorage.setItem('customerComments', JSON.stringify([]));
+        if (!localStorage.getItem('customerForecasts')) localStorage.setItem('customerForecasts', JSON.stringify([]));
+
         // Initialize customer table column settings
         if (!localStorage.getItem('customerTableColumns')) localStorage.setItem('customerTableColumns', JSON.stringify(App.state.customerTableColumns));
         else App.state.customerTableColumns = JSON.parse(localStorage.getItem('customerTableColumns'));
@@ -703,6 +791,56 @@ Object.assign(App.DB, {
             localStorage.setItem('dataModelVersion', '7');
             console.log("Migration to v7 complete.");
         }
+         if (dataModelVersion < 8) {
+            console.log("Running data migration to v8 (Customer Monthly Forecasts)...");
+            let customers = this.get('customers');
+            let customerForecasts = this.get('customerForecasts');
+            let updated = false;
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+            customers.forEach(customer => {
+                if (customer.forecastAmount && customer.forecastAmount > 0) {
+                    const existingForecast = customerForecasts.find(f => f.accountNo === customer.accountNo && f.month === currentMonth);
+                    if (!existingForecast) {
+                        customerForecasts.push({
+                            id: `cf-${Date.now()}-${customer.accountNo}`,
+                            accountNo: customer.accountNo,
+                            month: currentMonth,
+                            amount: customer.forecastAmount
+                        });
+                        updated = true;
+                    }
+                }
+            });
+
+            if (updated) {
+                this.set('customerForecasts', customerForecasts);
+                console.log("Migrated legacy customer forecasts to new monthly structure.");
+            }
+            localStorage.setItem('dataModelVersion', '8');
+            console.log("Migration to v8 complete.");
+        }
+        if (dataModelVersion < 9) {
+            console.log("Running data migration to v9 (Geocoding)...");
+            let customers = this.get('customers');
+            let updated = false;
+            customers.forEach(customer => {
+                if (customer.latitude === undefined || customer.longitude === undefined) {
+                    // Simulate geocoding for existing customers
+                    const coords = App.Geo.getMockCoordinates(customer.accountNo);
+                    customer.latitude = coords.lat;
+                    customer.longitude = coords.lng;
+                    updated = true;
+                }
+            });
+             if (updated) {
+                this.set('customers', customers);
+                console.log("Added latitude and longitude to all customers.");
+            }
+            localStorage.setItem('dataModelVersion', '9');
+            console.log("Migration to v9 complete.");
+        }
     },
     get: (key) => JSON.parse(localStorage.getItem(key) || '[]'), 
     set: (key, data) => localStorage.setItem(key, JSON.stringify(data)),
@@ -735,12 +873,13 @@ Object.assign(App.UI, {
                 </form>
                 <div class="mt-4" style="color: var(--text-secondary); font-size: var(--fs-sm);"></div>
             </div>`; 
-        document.getElementById('app').innerHTML = `<aside class="sidebar"><div class="logo logo-text"><img src="https://i.ibb.co/pvvsMy1X/Wurth-Gulf-CMYK-PNG-01.png" alt="Wuerth Gulf Logo"></div><nav><div class="sidebar-heading">Main</div><ul style="list-style:none;"><li><a href="#dashboard" class="nav-link active" data-page="dashboard"><i class="fas fa-chart-pie"></i> <span class="nav-text">Dashboard</span></a></li><li><a href="#customers" class="nav-link" data-page="customers"><i class="fas fa-users"></i> <span class="nav-text">Customers</span></a></li><li><a href="#visits" class="nav-link" data-page="visits"><i class="fas fa-calendar-alt"></i> <span class="nav-text">Visits & Follow-ups</span></a></li><li><a href="#payments" class="nav-link" data-page="payments"><i class="fas fa-credit-card"></i> <span class="nav-text">Payments</span></a></li><li data-role="admin"><a href="#analytics" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> <span class="nav-text">Analytics</span></a></li><li data-role="admin"><a href="#reports" class="nav-link" data-page="reports"><i class="fas fa-file-alt"></i> <span class="nav-text">Reports</span></a></li></ul><div data-role="admin"><div class="sidebar-heading">Administration</div><ul style="list-style:none;"><li><a href="#performance" class="nav-link" data-page="performance"><i class="fas fa-tachometer-alt"></i> <span class="nav-text">Performance</span></a></li><li><a href="#consultants" class="nav-link" data-page="consultants"><i class="fas fa-user-tie"></i> <span class="nav-text">Consultants</span></a></li><li><a href="#users" class="nav-link" data-page="users"><i class="fas fa-users-cog"></i> <span class="nav-text">User Management</span></a></li><li><a href="#changelog" class="nav-link" data-page="changelog"><i class="fas fa-history"></i> <span class="nav-text">Change Log</span></a></li><li><a href="#settings" class="nav-link" data-page="settings"><i class="fas fa-cog"></i> <span class="nav-text">Settings</span></a></li></ul></div></nav></aside><header class="main-header"><button class="hamburger" id="hamburger-menu"><i class="fas fa-bars"></i></button><div id="page-title" style="font-weight: 600; font-size: var(--fs-lg);">Dashboard</div><div class="d-flex gap-4 align-items-center"><div id="notification-bell-wrapper" data-role="admin" style="position: relative;"><button id="notification-bell-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-bell"></i></button><span id="notification-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background-color: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: var(--fs-sm); display: flex; justify-content: center; align-items: center; font-weight: 600; border: 2px solid var(--card-bg);">0</span></div><button id="theme-toggle-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-moon"></i></button><div class="d-flex gap-2 align-items-center"><span id="username-display" style="font-weight: 500;"></span><button id="logout-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem;"><i class="fas fa-sign-out-alt"></i></button></div></div></header><main class="main-content"><section id="dashboard-page" class="page active"></section><section id="customers-page" class="page"></section><section id="visits-page" class="page"></section><section id="payments-page" class="page"></section><section id="analytics-page" class="page" data-role="admin"></section><section id="reports-page" class="page" data-role="admin"></section><section id="performance-page" class="page" data-role="admin"></section><section id="consultants-page" class="page" data-role="admin"></section><section id="users-page" class="page" data-role="admin"></section><section id="changelog-page" class="page" data-role="admin"></section><section id="settings-page" class="page" data-role="admin"></section></main>`; 
+        document.getElementById('app').innerHTML = `<aside class="sidebar"><div class="logo logo-text"><img src="https://i.ibb.co/pvvsMy1X/Wurth-Gulf-CMYK-PNG-01.png" alt="Wuerth Gulf Logo"></div><nav><div class="sidebar-heading">Main</div><ul style="list-style:none;"><li><a href="#dashboard" class="nav-link active" data-page="dashboard"><i class="fas fa-chart-pie"></i> <span class="nav-text">Dashboard</span></a></li><li data-role="user"><a href="#myday" class="nav-link" data-page="myday"><i class="fas fa-clipboard-list"></i> <span class="nav-text">My Day</span></a></li><li><a href="#customers" class="nav-link" data-page="customers"><i class="fas fa-users"></i> <span class="nav-text">Customers</span></a></li><li><a href="#visits" class="nav-link" data-page="visits"><i class="fas fa-calendar-alt"></i> <span class="nav-text">Visits & Follow-ups</span></a></li><li><a href="#payments" class="nav-link" data-page="payments"><i class="fas fa-credit-card"></i> <span class="nav-text">Payments</span></a></li><li data-role="admin"><a href="#analytics" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> <span class="nav-text">Analytics</span></a></li><li data-role="admin"><a href="#reports" class="nav-link" data-page="reports"><i class="fas fa-file-alt"></i> <span class="nav-text">Reports</span></a></li></ul><div data-role="admin"><div class="sidebar-heading">Administration</div><ul style="list-style:none;"><li><a href="#performance" class="nav-link" data-page="performance"><i class="fas fa-tachometer-alt"></i> <span class="nav-text">Performance</span></a></li><li><a href="#consultants" class="nav-link" data-page="consultants"><i class="fas fa-user-tie"></i> <span class="nav-text">Consultants</span></a></li><li><a href="#users" class="nav-link" data-page="users"><i class="fas fa-users-cog"></i> <span class="nav-text">User Management</span></a></li><li><a href="#changelog" class="nav-link" data-page="changelog"><i class="fas fa-history"></i> <span class="nav-text">Change Log</span></a></li><li><a href="#settings" class="nav-link" data-page="settings"><i class="fas fa-cog"></i> <span class="nav-text">Settings</span></a></li></ul></div></nav></aside><header class="main-header"><button class="hamburger" id="hamburger-menu"><i class="fas fa-bars"></i></button><div id="page-title" style="font-weight: 600; font-size: var(--fs-lg);">Dashboard</div><div class="d-flex gap-4 align-items-center"><div id="notification-bell-wrapper" data-role="admin" style="position: relative;"><button id="notification-bell-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-bell"></i></button><span id="notification-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background-color: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: var(--fs-sm); display: flex; justify-content: center; align-items: center; font-weight: 600; border: 2px solid var(--card-bg);">0</span></div><button id="theme-toggle-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-moon"></i></button><div class="d-flex gap-2 align-items-center"><span id="username-display" style="font-weight: 500;"></span><button id="logout-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem;"><i class="fas fa-sign-out-alt"></i></button></div></div></header><main class="main-content"><section id="dashboard-page" class="page active"></section><section id="myday-page" class="page" data-role="user"></section><section id="customers-page" class="page"></section><section id="visits-page" class="page"></section><section id="payments-page" class="page"></section><section id="analytics-page" class="page" data-role="admin"></section><section id="reports-page" class="page" data-role="admin"></section><section id="performance-page" class="page" data-role="admin"></section><section id="consultants-page" class="page" data-role="admin"></section><section id="users-page" class="page" data-role="admin"></section><section id="changelog-page" class="page" data-role="admin"></section><section id="settings-page" class="page" data-role="admin"></section></main>`; 
         document.getElementById('customers-page').innerHTML = `<div class="kpi-card-grid" data-role="admin"><div class="kpi-card"><div class="title">Total Customers</div><div id="customer-kpi-total" class="value">0</div></div><div class="kpi-card"><div class="title">Total Outstanding</div><div id="customer-kpi-outstanding" class="value">0</div></div><div class="kpi-card"><div class="title">Active Accounts</div><div id="customer-kpi-active" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Manage Customers</h3><div class="d-flex gap-2 flex-wrap align-items-center"><div class="input-with-icon"><input type="search" id="customer-search" placeholder="Search customers..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear search"></i></div><div class="input-with-icon"><input type="search" id="customer-tag-filter" placeholder="Filter by tag..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear tag filter"></i></div><select id="customer-account-status-filter" class="form-control" style="width: auto;"><option value="all">All Account Status</option><option>Active</option><option>Inactive</option></select><select id="customer-status-filter" class="form-control" style="width: auto;"><option value="all">All Statuses</option><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select><div style="position: relative;"><button class="btn btn-outline" id="toggle-columns-btn"><i class="fas fa-columns"></i> Columns</button><div id="column-toggle-dropdown" class="column-toggle-dropdown"></div></div><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-customers-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-customers-pdf"><i class="fas fa-file-pdf"></i> PDF</button><button class="btn btn-outline" id="import-customer-btn"><i class="fas fa-upload"></i> Import</button><button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button><button class="btn btn-warning" id="bulk-update-btn"><i class="fas fa-edit"></i> Bulk Update</button></div></div></div><div class="table-container"><table class="data-table"><thead></thead><tbody id="customer-table-body"></tbody></table></div><div id="customers-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('users-page').innerHTML = `<div class="page-header"><h2 >User Management</h2><p >Home > Users</p></div><div class="card"><div class="card-header"><h3 class="card-title">User List</h3><button id="add-user-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add User</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="username">Username</th><th data-sort="fullName">Full Name</th><th data-sort="role">Role</th><th data-sort="assignedConsultantId">Assigned Consultant</th><th data-sort="department">Department</th><th data-sort="lastLogin">Last Login</th><th>Actions</th></tr></thead><tbody id="user-table-body"></tbody></table></div><div id="users-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('user-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="user-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">&times;</button></div><form id="user-form"><input type="hidden" id="user-id-hidden"><div class="form-grid"><div class="form-group"><label for="username">Username*</label><input type="text" id="username" class="form-control" required></div><div class="form-group"><label for="fullName">Full Name*</label><input type="text" id="fullName" class="form-control" required></div></div><div class="form-group"><label for="password">Password*</label><input type="password" id="password" class="form-control" required></div><div class="form-group"><label for="department">Department</label><input type="text" id="department" class="form-control" placeholder="e.g., Collections"></div><div class="form-group"><label for="role">Role</label><select id="role" class="form-control"><option value="user">User</option><option value="admin">Admin</option></select></div><div class="form-group" id="assigned-consultant-group"><label for="assignedConsultantId">Assigned Sales Consultant</label><select id="assignedConsultantId" class="form-control"></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save User</button></div></form></div>`;
         document.getElementById('dashboard-page').innerHTML = `<div id="admin-dashboard-wrapper" class="hidden"><div class="d-flex justify-content-between align-items-center mb-4 flex-wrap"><h2 class="page-header" style="margin-bottom: 0;">Admin Dashboard</h2><div class="d-flex gap-2 align-items-center"><label for="dashboard-month-select" style="margin-bottom:0;">Data for:</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="dashboard-month-select" class="form-control" style="width: auto;"></select><select id="dashboard-year-select" class="form-control" style="width: auto;"></select></div></div><div id="consultant-dashboard-header" class="hidden"></div><button id="toggle-dashboard-view-btn" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Switch to Chart View</button></div><div id="admin-dashboard-content"></div></div><div id="chart-dashboard-wrapper"><div id="attendance-controls" class="mb-4"></div><div id="todays-agenda" class="mb-4"></div><div id="priority-actions" class="mb-4"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);"><div class="card"><div class="card-title">Total Customers</div><div id="stat-total-customers" class="value">0</div></div><div class="card"><div class="card-title">Total Outstanding</div><div id="stat-outstanding-debt" class="value">0</div></div><div class="card" id="user-dashboard-forecast-card"><div class="card-title">Total Forecast</div><div id="stat-total-forecast" class="value">0</div></div><div class="card"><div class="card-title">Recovered This Month</div><div id="stat-recovered-this-month" class="value">0</div></div><div class="card"><div class="card-title">Upcoming Visits</div><div id="stat-upcoming-visits" class="value">0</div></div></div><div id="recovery-progress-card" class="card mb-4"></div><div id="dashboard-bottom-content"></div></div>`; 
-        document.getElementById('visits-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Upcoming Visits</div><div id="visit-kpi-upcoming" class="value">0</div></div><div class="kpi-card"><div class="title">Overdue Visits</div><div id="visit-kpi-overdue" class="value">0</div></div><div class="kpi-card"><div class="title">Completed Today</div><div id="visit-kpi-completed-today" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><div class="d-flex gap-2"><button class="btn btn-outline visit-view-tab active" data-view="list"><i class="fas fa-list"></i> List View</button><button class="btn btn-outline visit-view-tab" data-view="calendar"><i class="fas fa-calendar"></i> Calendar View</button><button class="btn btn-outline visit-view-tab" data-view="map"><i class="fas fa-map-marked-alt"></i> Map View</button></div><div class="d-flex gap-2"><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-visits-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-visits-pdf"><i class="fas fa-file-pdf"></i> PDF</button></div><button class="btn btn-primary" id="schedule-visit-btn"><i class="fas fa-plus"></i> Schedule a Visit</button></div></div><div id="list-view-controls" class="d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap"><div class="d-flex gap-2" data-role="admin"><div class="input-with-icon"><input type="search" id="visit-search" placeholder="Search customer or purpose..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="visit-consultant-filter" class="form-control" style="width: auto;"><option value="all">All Consultants</option></select></div><button class="btn filter-btn visit-filter-btn active" data-filter="Upcoming">Upcoming</button><button class="btn filter-btn visit-filter-btn" data-filter="Today">Today</button><button class="btn filter-btn visit-filter-btn" data-filter="Overdue">Overdue</button><button class="btn filter-btn visit-filter-btn" data-filter="All">All Visits</button></div><div class="d-flex gap-2 align-items-center flex-wrap"><input type="date" id="visit-start-date" class="form-control" style="width:auto;"><div class="d-flex gap-1"><button class="btn btn-outline" id="set-visit-date-today">Today</button><button class="btn btn-outline" id="set-visit-date-tomorrow">Tomorrow</button></div><span>to</span><input type="date" id="visit-end-date" class="form-control" style="width:auto;"><button class="btn btn-primary" id="visit-date-apply">Apply</button></div></div><div id="map-view-controls" class="hidden d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap align-items-center"><div data-role="admin" class="form-group mb-0"><label for="map-consultant-filter">Consultant</label><select id="map-consultant-filter" class="form-control"></select></div><div class="form-group mb-0"><label for="map-date-filter">Date</label><input type="date" id="map-date-filter" class="form-control"></div></div></div><div id="list-view-content" class="visit-view-content"><div class="table-container"><table class="data-table"><thead></thead><tbody id="visit-table-body"></tbody></table></div><div id="visits-pagination" class="pagination-controls"></div></div><div id="calendar-view-content" class="visit-view-content hidden"><div id="calendar-view" style="min-height: 600px;"></div></div><div id="map-view-content" class="visit-view-content hidden"><div id="map-view" style="height: 600px; border-radius: 8px;"></div></div></div>`; 
+        document.getElementById('myday-page').innerHTML = `<div class="page-header"><h2 id="myday-title">My Day</h2><p id="myday-date"></p></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-tasks" style="margin-right: 8px;"></i>Today's Visits</h3></div><div id="myday-visits-list"></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-map-route" style="margin-right: 8px;"></i>Today's Map Route</h3></div><div id="myday-map-view" style="height: 400px; border-radius: 8px;"></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-hand-holding-usd" style="margin-right: 8px;"></i>Follow-ups Due Today</h3></div><div id="myday-promises-list"></div></div><div class="card" style="border-color: var(--danger);"><div class="card-header"><h3 class="card-title" style="color: var(--danger);"><i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>Overdue Tasks</h3></div><div id="myday-overdue-list"></div></div></div>`;
+        document.getElementById('visits-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Upcoming Visits</div><div id="visit-kpi-upcoming" class="value">0</div></div><div class="kpi-card"><div class="title">Overdue Visits</div><div id="visit-kpi-overdue" class="value">0</div></div><div class="kpi-card"><div class="title">Completed Today</div><div id="visit-kpi-completed-today" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><div class="d-flex gap-2"><button class="btn btn-outline visit-view-tab active" data-view="list"><i class="fas fa-list"></i> List View</button><button class="btn btn-outline visit-view-tab" data-view="calendar"><i class="fas fa-calendar"></i> Calendar View</button><button class="btn btn-outline visit-view-tab" data-view="map"><i class="fas fa-map-marked-alt"></i> Map View</button></div><div id="visits-header-actions" class="d-flex gap-2"></div></div><div id="list-view-controls" class="d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap"><div class="d-flex gap-2" data-role="admin"><div class="input-with-icon"><input type="search" id="visit-search" placeholder="Search customer or purpose..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="visit-consultant-filter" class="form-control" style="width: auto;"><option value="all">All Consultants</option></select></div><button class="btn filter-btn visit-filter-btn active" data-filter="Upcoming">Upcoming</button><button class="btn filter-btn visit-filter-btn" data-filter="Today">Today</button><button class="btn filter-btn visit-filter-btn" data-filter="Overdue">Overdue</button><button class="btn filter-btn visit-filter-btn" data-filter="All">All Visits</button></div><div class="d-flex gap-2 align-items-center flex-wrap"><input type="date" id="visit-start-date" class="form-control" style="width:auto;"><div class="d-flex gap-1"><button class="btn btn-outline" id="set-visit-date-today">Today</button><button class="btn btn-outline" id="set-visit-date-tomorrow">Tomorrow</button></div><span>to</span><input type="date" id="visit-end-date" class="form-control" style="width:auto;"><button class="btn btn-primary" id="visit-date-apply">Apply</button></div></div><div id="map-view-controls" class="hidden d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap align-items-center"><div data-role="admin" class="form-group mb-0"><label for="map-consultant-filter">Consultant</label><select id="map-consultant-filter" class="form-control"></select></div><div class="form-group mb-0"><label for="map-date-filter">Date</label><input type="date" id="map-date-filter" class="form-control"></div></div><button id="clear-route-btn" class="btn btn-outline hidden"><i class="fas fa-times"></i> Clear Route</button></div><div id="list-view-content" class="visit-view-content"><div class="table-container"><table class="data-table"><thead></thead><tbody id="visit-table-body"></tbody></table></div><div id="visits-pagination" class="pagination-controls"></div></div><div id="calendar-view-content" class="visit-view-content hidden"><div id="calendar-view" style="min-height: 600px;"></div></div><div id="map-view-content" class="visit-view-content hidden"><div id="map-view" style="height: 600px; border-radius: 8px;"></div></div></div>`; 
         document.getElementById('payments-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Recovered This Month</div><div id="payment-kpi-recovered-month" class="value">0</div></div><div class="kpi-card"><div class="title">Total Payments Recorded</div><div id="payment-kpi-total-count" class="value">0</div></div><div class="kpi-card"><div class="title">Pending Payments</div><div id="payment-kpi-pending" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Recent Payments</h3><div class="d-flex gap-2"><div class="input-with-icon"><input type="search" id="payment-search" placeholder="Search customer..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="payment-status-filter" class="form-control" style="width: auto;"><option value="all">All Status</option><option>Completed</option><option>Pending</option><option>Failed</option></select><select id="payment-method-filter" class="form-control" style="width: auto;"><option value="all">All Methods</option><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="d-flex gap-2"><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-payments-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-payments-pdf"><i class="fas fa-file-pdf"></i> PDF</button></div><button class="btn btn-success" id="record-payment-btn"><i class="fas fa-plus"></i> Record Payment</button></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="date">Date</th><th data-sort="customerId">Customer</th><th data-sort="consultantId">Consultant</th><th data-sort="amount">Amount</th><th data-sort="method">Method</th><th data-sort="status">Status</th><th>Actions</th></tr></thead><tbody id="payment-table-body"></tbody></table></div><div id="payments-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('analytics-page').innerHTML = `<div class="page-header"><h2>Analytics Dashboard</h2><p>Visual insights into recovery performance and activities.</p></div><div id="analytics-kpi-grid" class="kpi-card-grid"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div class="card"><div class="card-header"><h3 class="card-title">Recovery Performance by Consultant</h3></div><div class="chart-container"><canvas id="recovery-by-consultant-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Outstanding Debt by Emirate</h3></div><div class="chart-container"><canvas id="recovery-by-emirate-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Payment Methods</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="payment-methods-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="visit-outcome-chart"></canvas></div></div></div>`;
         document.getElementById('reports-page').innerHTML = `
@@ -1010,8 +1149,14 @@ Object.assign(App.UI, {
                     <input type="file" id="restore-file-input" class="form-control" accept=".json,.csv">
                 </div>
                 <button id="restore-data-btn" class="btn btn-warning" disabled><i class="fas fa-upload"></i> Restore Data</button>
-            </div>`;
-        document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group" data-admin-only="true"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="email">Contact Email</label><input type="email" id="email" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="mobile">Contact Mobile</label><input type="tel" id="mobile" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="debtSince">Debt Since</label><input type="date" id="debtSince" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group" data-admin-only="true"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="form-group" data-admin-only="true"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group" data-user-only="true"><label for="forecastAmount">Forecast Amount (AED)</label><input type="number" id="forecastAmount" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="customerStatus">Customer Status</label><select id="customerStatus" class="form-control"><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select></div><div class="form-group"><label for="agingCategory">Aging Category</label><select id="agingCategory" class="form-control" disabled><option>Auto-Calculated</option></select></div><div class="form-group" data-admin-only="true"><label for="balance_2020_2025">Balance 2020-2025 (AED)</label><input type="number" step="any" id="balance_2020_2025" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_2019_2020">Balance 2019-2020 (AED)</label><input type="number" step="any" id="balance_2019_2020" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_lte_2018">Balance <=2018 (AED)</label><input type="number" step="any" id="balance_lte_2018" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="outstanding">Total Outstanding Balance (AED)*</label><input type="number" id="outstanding" class="form-control" required readonly style="background-color: var(--border-color);"></div></div><div class="form-group full-width"><label for="customer-tags">Tags</label><input type="text" id="customer-tags" class="form-control" placeholder="e.g. High-Risk, VIP, Disputed"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
+            </div>
+             <div class="card mt-4">
+                <div class="card-header"><h3 class="card-title">Offline Capability</h3></div>
+                <p class="text-secondary mb-4">Enable offline access for map tiles. This will download and store map data in your browser for use in areas with no internet connection. (Requires initial download)</p>
+                <button id="enable-offline-mode-btn" class="btn btn-primary"><i class="fas fa-wifi"></i> Enable Offline Maps</button>
+            </div>
+            `;
+        document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">&times;</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group" data-admin-only="true"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="email">Contact Email</label><input type="email" id="email" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="mobile">Contact Mobile</label><input type="tel" id="mobile" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="debtSince">Debt Since</label><input type="date" id="debtSince" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group" data-admin-only="true"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="form-group" data-admin-only="true"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="customerStatus">Customer Status</label><select id="customerStatus" class="form-control"><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select></div><div class="form-group"><label for="agingCategory">Aging Category</label><select id="agingCategory" class="form-control" disabled><option>Auto-Calculated</option></select></div><div class="form-group" data-admin-only="true"><label for="balance_2020_2025">Balance 2020-2025 (AED)</label><input type="number" step="any" id="balance_2020_2025" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_2019_2020">Balance 2019-2020 (AED)</label><input type="number" step="any" id="balance_2019_2020" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_lte_2018">Balance <=2018 (AED)</label><input type="number" step="any" id="balance_lte_2018" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="outstanding">Total Outstanding Balance (AED)*</label><input type="number" id="outstanding" class="form-control" required readonly style="background-color: var(--border-color);"></div></div><div class="form-group full-width"><label for="customer-tags">Tags</label><input type="text" id="customer-tags" class="form-control" placeholder="e.g. High-Risk, VIP, Disputed"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`; 
         document.getElementById('payment-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Record a Payment</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-modal')">&times;</button></div><form id="payment-form"><div class="form-group"><label for="payment-customer-id">Customer*</label><div id="payment-customer-select-container"></div></div><div id="payment-details-grid" class="form-grid"><div class="form-group"><label for="payment-amount-2025">For 2020-2025</label><input type="number" step="any" id="payment-amount-2025" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount-2020">For 2019-2020</label><input type="number" step="any" id="payment-amount-2020" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount-2018">For <=2018</label><input type="number" step="any" id="payment-amount-2018" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount">Total Amount*</label><input type="number" id="payment-amount" class="form-control" required readonly style="background-color: var(--border-color);"></div></div><div class="form-group"><label for="payment-method">Payment Method*</label><select id="payment-method" class="form-control" required><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="form-group"><label for="payment-date">Date*</label><input type="date" id="payment-date" class="form-control" required></div><div class="form-group"><label for="payment-status">Status</label><select id="payment-status" class="form-control"><option>Completed</option><option>Pending</option><option>Failed</option></select></div><button type="submit" class="btn btn-primary">Record Payment</button></form></div>`; 
         document.getElementById('visit-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Schedule Visit</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-modal')">&times;</button></div><form id="visit-form"><input type="hidden" id="visit-id"><div class="form-group"><label for="visit-customer-id">Customer*</label><div id="visit-customer-select-container"></div></div><div class="form-group"><label for="visit-purpose">Purpose*</label><input type="text" id="visit-purpose" class="form-control" required></div><div class="form-group"><label for="visit-date">Date*</label><input type="date" id="visit-date" class="form-control" required></div><button type="submit" class="btn btn-primary">Save Visit</button></form></div>`; 
         document.getElementById('import-csv-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Upload CSV File</h3><button class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">&times;</button></div><div class="file-upload-wrapper" id="csv-drop-zone"><i class="fas fa-upload" style="font-size: 1.5rem; color: var(--text-secondary);"></i><p>Click to browse or drag & drop file here</p><span id="csv-filename" style="font-weight: 600; color: var(--primary);"></span><input type="file" id="csv-file-input" class="hidden" accept=".csv"></div><div class="info-box"><p>Ensure headers match:</p><code>accountNumber,companyName,email,mobile,emirate,area,status,paymentStatus,initialDebt,salesConsultant,customerStatus,debtSince,balance2020_2025,balance2019_2020,balancelte2018</code></div><a href="#" id="download-sample-csv-link"><i class="fas fa-download"></i> Download Sample Template</a><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">Close</button></div></div>`; 
@@ -1024,10 +1169,11 @@ Object.assign(App.UI, {
         document.getElementById('reassign-customers-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 id="reassign-customers-title">Reassign Customers</h3><button class="btn btn-outline" onclick="App.UI.closeModal('reassign-customers-modal')">&times;</button></div><form id="reassign-customers-form"><input type="hidden" id="from-consultant-hidden"><div class="form-group"><label>Customers assigned to <strong id="from-consultant-name"></strong></label><div id="reassign-customer-list" style="height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: var(--spacing-2); border-radius: 8px;"></div></div><div class="form-group"><label for="reassign-to-consultant">Reassign selected to</label><select id="reassign-to-consultant" class="form-control" required></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('reassign-customers-modal')">Cancel</button><button type="submit" class="btn btn-primary">Reassign</button></div></form></div>`;
         document.getElementById('reassign-and-delete-consultant-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 id="reassign-delete-title">Delete Consultant</h3><button class="btn btn-outline" onclick="App.UI.closeModal('reassign-and-delete-consultant-modal')">&times;</button></div><form id="reassign-and-delete-form"><input type="hidden" id="delete-consultant-id-hidden"><p id="reassign-delete-message"></p><div class="form-group mt-4"><label for="reassign-delete-to-consultant">Reassign all customers to</label><select id="reassign-delete-to-consultant" class="form-control" required></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('reassign-and-delete-consultant-modal')">Cancel</button><button type="submit" class="btn btn-danger">Reassign & Delete</button></div></form></div>`;
         document.getElementById('forecast-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('forecast-modal')">&times;</button></div><form id="forecast-form"><input type="hidden" id="forecast-consultant-id"><input type="hidden" id="forecast-id-hidden"><div class="form-grid"><div class="form-group"><label for="forecast-month-select">Month</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="forecast-month-select" class="form-control" required></select><select id="forecast-year-select" class="form-control" required></select></div></div><div class="form-group"><label for="forecast-amount">Target Amount (AED)</label><input type="number" id="forecast-amount" class="form-control" required></div></div><button type="submit" class="btn btn-primary">Save Target</button></form><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title mb-4">Target History</h4><div class="table-container"><table class="data-table"><thead><tr><th>Month</th><th>Target Amount</th><th>Actions</th></tr></thead><tbody id="existing-forecasts-body"></tbody></table></div></div>`;
-        document.getElementById('customer-forecast-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="customer-forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-forecast-modal')">&times;</button></div><form id="customer-forecast-form"><input type="hidden" id="customer-forecast-accountNo"><div class="form-group"><label for="customer-forecast-amount">Forecast Amount (AED)</label><input type="number" id="customer-forecast-amount" class="form-control" required></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-forecast-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Forecast</button></div></form></div>`;
+        document.getElementById('customer-forecast-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-forecast-modal')">&times;</button></div><form id="customer-forecast-form"><input type="hidden" id="customer-forecast-accountNo"><input type="hidden" id="customer-forecast-id-hidden"><div class="form-grid"><div class="form-group"><label for="customer-forecast-month-select">Month</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="customer-forecast-month-select" class="form-control" required></select><select id="customer-forecast-year-select" class="form-control" required></select></div></div><div class="form-group"><label for="customer-forecast-amount">Forecast Amount (AED)</label><input type="number" id="customer-forecast-amount" class="form-control" required></div></div><button type="submit" class="btn btn-primary">Save Forecast</button></form><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title mb-4">Forecast History</h4><div class="table-container"><table class="data-table"><thead><tr><th>Month</th><th>Forecast Amount</th><th>Actions</th></tr></thead><tbody id="existing-customer-forecasts-body"></tbody></table></div></div>`;
         document.getElementById('report-modal').innerHTML = `<div class="modal-content" style="max-width: 90%; width: 1200px;"><div class="modal-header"><h3 id="report-modal-title" style="flex-grow: 1;"></h3><div id="report-modal-actions" class="d-flex gap-2"></div><button class="btn btn-outline" onclick="App.UI.closeModal('report-modal')" style="margin-left: 1rem;">&times;</button></div><div id="report-modal-body" style="margin-top: var(--spacing-4);"></div></div>`;
         document.getElementById('bulk-update-customers-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Bulk Customer Update</h3><button class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">&times;</button></div><p id="bulk-update-count-msg" class="text-secondary"></p><form id="bulk-update-form"><div class="form-group"><label for="bulk-update-consultant">Assign to Consultant (Optional)</label><select id="bulk-update-consultant" class="form-control"><option value="">-- Do Not Change --</option></select></div><div class="form-group"><label for="bulk-update-status">Set Account Status (Optional)</label><select id="bulk-update-status" class="form-control"><option value="">-- Do Not Change --</option><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="bulk-update-payment-status">Set Payment Status (Optional)</label><select id="bulk-update-payment-status" class="form-control"><option value="">-- Do Not Change --</option><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">Cancel</button><button type="submit" class="btn btn-warning">Apply Bulk Update</button></div></form></div>`;
         document.getElementById('changelog-detail-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Change Log Detail</h3><button class="btn btn-outline" onclick="App.UI.closeModal('changelog-detail-modal')">&times;</button></div><div id="changelog-detail-content"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('changelog-detail-modal')">Close</button></div></div>`;
+        document.getElementById('route-planner-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Plan Daily Route</h3><button class="btn btn-outline" onclick="App.UI.closeModal('route-planner-modal')">&times;</button></div><form id="route-planner-form"><div class="form-group"><label for="route-date">Select Date for Route</label><input type="date" id="route-date" class="form-control"></div><div class="form-group"><label>Select Customers to Visit</label><div id="route-customer-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); padding: var(--spacing-4); border-radius: 8px;"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('route-planner-modal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-route"></i> Generate Route</button></div></form></div>`;
     }, 
     setupEventListeners() { 
         const sidebar = document.querySelector('.sidebar');
@@ -1081,7 +1227,7 @@ Object.assign(App.UI, {
             }
         });
 
-        App.Dashboard.setupEventListeners(); App.Customers.setupEventListeners(); App.Payments.setupEventListeners(); App.Reports.setupEventListeners(); App.Visits.setupEventListeners(); App.Consultants.setupEventListeners(); App.Users.setupEventListeners(); App.ChangeLog.setupEventListeners(); App.Settings.setupEventListeners(); App.Analytics.setupEventListeners(); App.Performance.setupEventListeners();
+        App.Dashboard.setupEventListeners(); App.Customers.setupEventListeners(); App.Payments.setupEventListeners(); App.Reports.setupEventListeners(); App.Visits.setupEventListeners(); App.Consultants.setupEventListeners(); App.Users.setupEventListeners(); App.ChangeLog.setupEventListeners(); App.Settings.setupEventListeners(); App.Analytics.setupEventListeners(); App.Performance.setupEventListeners(); App.MyDay.setupEventListeners();
         document.body.addEventListener('click', (e) => { if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && !hamburger.contains(e.target)) { sidebar.classList.remove('open'); overlay.classList.add('hidden'); } });
         
         // Setup clearable input listeners globally
@@ -1117,7 +1263,8 @@ Object.assign(App.UI, {
             App.state.activeConsultantId = null;
             this.navigateTo('dashboard');
         } else {
-            this.navigateTo('dashboard');
+            const initialPage = App.state.currentUser.role === 'user' ? 'myday' : 'dashboard';
+            this.navigateTo(initialPage);
         }
     }, 
     showLogin() { document.getElementById('login-page').style.display = 'flex'; document.getElementById('app').classList.add('hidden'); }, 
@@ -1154,6 +1301,7 @@ Object.assign(App.UI, {
 
         const pageRenderers = {
             dashboard: App.Dashboard,
+            myday: App.MyDay,
             customers: App.Customers,
             visits: App.Visits,
             payments: App.Payments,
@@ -1354,16 +1502,12 @@ Object.assign(App.UI, {
     },
     getEmptyStateHTML(iconClass, title, message, buttonHTML = '') {
         return `
-            <tr>
-                <td colspan="100%" style="padding: 0;">
-                    <div class="empty-state">
-                        <i class="fas ${iconClass}"></i>
-                        <h4>${title}</h4>
-                        <p>${message}</p>
-                        ${buttonHTML}
-                    </div>
-                </td>
-            </tr>
+            <div class="empty-state" style="padding: var(--spacing-4);">
+                <i class="fas ${iconClass}"></i>
+                <h4>${title}</h4>
+                <p>${message}</p>
+                ${buttonHTML}
+            </div>
         `;
     },
     renderPaginationControls(pageKey, totalRows) {
@@ -1520,6 +1664,7 @@ Object.assign(App.Dashboard, {
         const customers = App.DB.get('customers');
         const payments = App.DB.get('payments');
         const forecasts = App.DB.get('forecasts');
+        const customerForecasts = App.DB.get('customerForecasts');
         const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${App.state.dashboardTimeFrame.month}`;
         const recoveredThisMonth = payments.filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr));
 
@@ -1553,10 +1698,16 @@ Object.assign(App.Dashboard, {
         // Chart 2: Forecast vs Collected
         const forecastData = consultants.map(consultant => {
             const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id);
-            const totalForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+            const assignedCustomerIds = assignedCustomers.map(c => c.accountNo);
+
+            const totalForecast = customerForecasts
+                .filter(f => f.month === currentMonthStr && assignedCustomerIds.includes(f.accountNo))
+                .reduce((sum, f) => sum + f.amount, 0);
+
             const collected = recoveredThisMonth
-                .filter(p => assignedCustomers.some(c => c.accountNo === p.customerId))
+                .filter(p => assignedCustomerIds.includes(p.customerId))
                 .reduce((sum, p) => sum + p.amount, 0);
+
             return { forecast: totalForecast, collected };
         });
 
@@ -1580,6 +1731,7 @@ Object.assign(App.Dashboard, {
         const activityLog = App.DB.get('activityLog'); 
         const consultants = App.DB.get('consultants');
         const payments = App.DB.get('payments');
+        const customerForecasts = App.DB.get('customerForecasts');
 
         const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${App.state.dashboardTimeFrame.month}`;
         const recoveredThisMonth = payments.filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr)).reduce((sum, p) => sum + p.amount, 0);
@@ -1588,7 +1740,9 @@ Object.assign(App.Dashboard, {
             .filter(f => f.month === currentMonthStr)
             .reduce((sum, f) => sum + f.amount, 0);
         
-        const totalForecastedAmount = customers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+        const totalForecastedAmount = customerForecasts
+            .filter(f => f.month === currentMonthStr)
+            .reduce((sum, f) => sum + f.amount, 0);
 
         const forecastPercentage = totalForecastTarget > 0 ? ((recoveredThisMonth / totalForecastTarget) * 100).toFixed(0) : 0;
         
@@ -1652,13 +1806,17 @@ Object.assign(App.Dashboard, {
         const scopedCustomers = App.Helpers.getScopedData('customers', consultantId);
         const scopedPayments = App.Helpers.getScopedData('payments', consultantId);
         const scopedVisits = App.Helpers.getScopedData('visits', consultantId);
+        const customerForecasts = App.DB.get('customerForecasts');
 
         this.renderRecoveryProgress(scopedCustomers); 
         
         const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${App.state.dashboardTimeFrame.month}`;
         const recoveredThisMonth = scopedPayments.filter(i => i.date.startsWith(currentMonthStr) && i.status === 'Completed').reduce((s, i) => s + i.amount, 0);
         
-        let totalForecast = scopedCustomers.reduce((s, i) => s + (i.forecastAmount || 0), 0);
+        const scopedCustomerIds = scopedCustomers.map(c => c.accountNo);
+        let totalForecast = customerForecasts
+            .filter(f => f.month === currentMonthStr && scopedCustomerIds.includes(f.accountNo))
+            .reduce((s, f) => s + f.amount, 0);
         
         const forecastPercentage = totalForecast > 0 ? ((recoveredThisMonth / totalForecast) * 100).toFixed(0) : 0;
         const forecastCard = document.getElementById('user-dashboard-forecast-card');
@@ -1897,12 +2055,15 @@ Object.assign(App.Dashboard, {
     renderConsultantForecastProgress(container, consultants, allCustomers, allPayments) {
         const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${App.state.dashboardTimeFrame.month}`;
         const recoveredThisMonth = allPayments.filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr));
+        const customerForecasts = App.DB.get('customerForecasts');
 
         const progressHTML = consultants.map(consultant => {
             const assignedCustomers = allCustomers.filter(c => c.salesConsultantId === consultant.id);
-            const totalForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
-            
             const assignedCustomerIds = new Set(assignedCustomers.map(c => c.accountNo));
+            const totalForecast = customerForecasts
+                .filter(f => f.month === currentMonthStr && assignedCustomerIds.has(f.accountNo))
+                .reduce((sum, f) => sum + f.amount, 0);
+            
             const collectedThisMonth = recoveredThisMonth.filter(p => assignedCustomerIds.has(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
 
             const percentage = totalForecast > 0 ? ((collectedThisMonth / totalForecast) * 100).toFixed(0) : 0;
@@ -2136,6 +2297,176 @@ Object.assign(App.Dashboard, {
         App.Reports.displayReport(reportTitle, headers, data, '', ['csv', 'pdf']);
     }
 });
+Object.assign(App.MyDay, {
+    map: null,
+    routingControl: null,
+    setupEventListeners() {
+        const page = document.getElementById('myday-page');
+        page.addEventListener('click', e => {
+            const visitBtn = e.target.closest('.mark-done-btn');
+            if (visitBtn) {
+                App.Visits.showMarkDoneModal(visitBtn.dataset.id);
+            }
+            const taskItem = e.target.closest('.clickable');
+            if (taskItem && taskItem.dataset.customerId) {
+                App.Customers.showCustomerDetail(taskItem.dataset.customerId);
+            }
+        });
+    },
+    render() {
+        document.getElementById('myday-date').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const consultantId = App.state.currentUser.assignedConsultantId;
+        const allVisits = App.Helpers.getScopedData('visits', consultantId);
+        const customerMap = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c; return map; }, {});
+        const today = new Date().toISOString().slice(0, 10);
+        const todayStart = new Date();
+        todayStart.setHours(0,0,0,0);
+
+        // Render Today's Visits
+        const todaysVisits = allVisits.filter(v => v.dateTime.startsWith(today) && v.status === 'Scheduled');
+        const visitsListContainer = document.getElementById('myday-visits-list');
+        if (todaysVisits.length > 0) {
+            visitsListContainer.innerHTML = todaysVisits.map(v => `
+                <div class="myday-task-item">
+                    <div class="myday-task-info">
+                        <span class="customer-name">${customerMap[v.customerId]?.companyName || 'N/A'}</span>
+                        <span class="task-details">${v.purpose}</span>
+                    </div>
+                    <button class="btn btn-success mark-done-btn" data-id="${v.id}"><i class="fas fa-check"></i> Done</button>
+                </div>
+            `).join('');
+        } else {
+            visitsListContainer.innerHTML = App.UI.getEmptyStateHTML('fa-check-circle', 'All Clear!', 'No visits scheduled for today.');
+        }
+
+        // Render Promises Due
+        const promisesDue = allVisits.filter(v => v.outcome === 'Promise to Pay' && v.promiseDate === today);
+        const promisesListContainer = document.getElementById('myday-promises-list');
+         if (promisesDue.length > 0) {
+            promisesListContainer.innerHTML = promisesDue.map(p => `
+                <div class="myday-task-item clickable" data-customer-id="${p.customerId}">
+                    <div class="myday-task-info">
+                        <span class="customer-name">${customerMap[p.customerId]?.companyName || 'N/A'}</span>
+                        <span class="task-details">Promised: ${App.Helpers.formatCurrency(p.promiseAmount)}</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </div>
+            `).join('');
+        } else {
+            promisesListContainer.innerHTML = App.UI.getEmptyStateHTML('fa-calendar-check', 'No Follow-ups', 'No payment promises are due today.');
+        }
+        
+        // Render Overdue Tasks
+        const overdueVisits = allVisits.filter(v => v.status === 'Overdue');
+        const overduePromises = allVisits.filter(v => v.outcome === 'Promise to Pay' && v.promiseDate && new Date(v.promiseDate) < todayStart);
+        const overdueListContainer = document.getElementById('myday-overdue-list');
+        let overdueHTML = '';
+        if (overdueVisits.length > 0) {
+            overdueHTML += overdueVisits.map(v => `
+                <div class="myday-task-item clickable" data-customer-id="${v.customerId}">
+                    <div class="myday-task-info">
+                        <span class="customer-name">${customerMap[v.customerId]?.companyName || 'N/A'}</span>
+                        <span class="task-details">Overdue Visit from ${App.Helpers.formatDate(v.dateTime)}</span>
+                    </div>
+                     <i class="fas fa-chevron-right"></i>
+                </div>
+            `).join('');
+        }
+         if (overduePromises.length > 0) {
+            overdueHTML += overduePromises.map(p => `
+                 <div class="myday-task-item clickable" data-customer-id="${p.customerId}">
+                    <div class="myday-task-info">
+                        <span class="customer-name">${customerMap[p.customerId]?.companyName || 'N/A'}</span>
+                        <span class="task-details">Missed Promise from ${App.Helpers.formatDate(p.promiseDate)}</span>
+                    </div>
+                     <i class="fas fa-chevron-right"></i>
+                </div>
+            `).join('');
+        }
+        if (overdueHTML === '') {
+            overdueListContainer.innerHTML = App.UI.getEmptyStateHTML('fa-thumbs-up', 'Nothing Overdue', 'Great job staying on top of your tasks!');
+        } else {
+             overdueListContainer.innerHTML = overdueHTML;
+        }
+
+        this.renderMyDayMap(todaysVisits, customerMap);
+    },
+    renderMyDayMap(visits, customerMap) {
+        const mapContainer = document.getElementById('myday-map-view');
+        if (!mapContainer) return;
+        if (this.map) { 
+            if (this.routingControl) {
+                this.map.removeControl(this.routingControl);
+                this.routingControl = null;
+            }
+            this.map.remove(); 
+            this.map = null; 
+        }
+
+        this.map = L.map('myday-map-view').setView([25.2048, 55.2708], 10);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }).addTo(this.map);
+
+        if (visits.length === 0) {
+            mapContainer.innerHTML = App.UI.getEmptyStateHTML('fa-map-signs', 'No Visits on Map', 'Schedule visits for today to see them here.');
+            return;
+        }
+        
+        const validVisits = visits.filter(v => {
+            const c = customerMap[v.customerId];
+            return c && c.latitude && c.longitude;
+        });
+        
+        if(validVisits.length < 2) { // Not enough points for a route, just show markers
+             validVisits.forEach(visit => {
+                const customer = customerMap[visit.customerId];
+                const icon = App.Helpers.getCustomerMarkerIcon(customer);
+                L.marker([customer.latitude, customer.longitude], { icon })
+                    .addTo(this.map)
+                    .bindPopup(`<b>${customer.companyName}</b><br>${visit.purpose}`);
+            });
+            if(validVisits.length === 1) {
+                const c = customerMap[validVisits[0].customerId];
+                this.map.setView([c.latitude, c.longitude], 13);
+            }
+            return;
+        }
+
+        const waypoints = App.Helpers.optimizeRoute(validVisits.map(v => v.customerId))
+            .map(id => {
+                const c = customerMap[id];
+                return L.latLng(c.latitude, c.longitude);
+            });
+
+        this.routingControl = L.Routing.control({
+            waypoints: waypoints,
+            routeWhileDragging: false,
+            addWaypoints: false,
+            show: false, // Hide the turn-by-turn instructions
+            lineOptions: {
+                styles: [{ color: 'var(--primary)', opacity: 0.8, weight: 6 }]
+            },
+             createMarker: (i, waypoint, n) => {
+                const customerId = validVisits.find(v => {
+                    const c = customerMap[v.customerId];
+                    return c && c.latitude === waypoint.latLng.lat && c.longitude === waypoint.latLng.lng;
+                })?.customerId;
+                
+                const customer = customerMap[customerId];
+                if (!customer) return null;
+
+                const icon = L.divIcon({
+                    className: 'numbered-marker',
+                    html: `<div>${i + 1}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+                return L.marker(waypoint.latLng, { icon }).bindPopup(`<b>${i+1}. ${customer.companyName}</b>`);
+            }
+        }).addTo(this.map);
+    }
+});
 Object.assign(App.Customers, { 
     quill: null, 
     setupEventListeners: function() { 
@@ -2210,6 +2541,12 @@ Object.assign(App.Customers, {
                 toggleDropdown.style.display = 'none';
             }
         });
+         document.getElementById('existing-customer-forecasts-body').addEventListener('click', e => { 
+            const deleteBtn = e.target.closest('.delete-customer-forecast'); 
+            const editBtn = e.target.closest('.edit-customer-forecast'); 
+            if(deleteBtn) this.deleteCustomerForecast(deleteBtn.dataset.id); 
+            if(editBtn) this.editCustomerForecast(editBtn.dataset.id); 
+        }); 
     }, 
     getCurrentFilteredData: function() {
         const { value: search } = document.getElementById('customer-search'); 
@@ -2273,9 +2610,17 @@ Object.assign(App.Customers, {
         };
 
         const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
+        const customerForecasts = App.DB.get('customerForecasts');
+        const currentMonthStr = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
+        const allPayments = App.DB.get('payments');
+        const allVisits = App.DB.get('visits');
+
         const tbody = document.getElementById('customer-table-body'); 
         if (paginatedCustomers.length > 0) {
             tbody.innerHTML = paginatedCustomers.map(c => {
+                const health = App.Helpers.calculateCustomerHealth(c, allPayments, allVisits);
+                const healthDot = `<span class="health-dot ${health.status}" title="${health.title}"></span>`;
+                const currentForecast = customerForecasts.find(f => f.accountNo === c.accountNo && f.month === currentMonthStr)?.amount || 0;
                 const editButton = `<button class="btn btn-outline edit-customer" data-id="${c.accountNo}" title="Edit"><i class="fas fa-edit"></i></button>`;
                 const deleteButton = App.state.currentUser.role === 'admin' ? `<button class="btn btn-danger delete-customer" data-id="${c.accountNo}" title="Delete"><i class="fas fa-trash"></i></button>` : '';
                 const userButtons = App.state.currentUser.role === 'user' ? `<button class="btn btn-outline set-forecast" data-id="${c.accountNo}" title="Set Forecast"><i class="fas fa-bullseye"></i></button>` : '';
@@ -2286,14 +2631,14 @@ Object.assign(App.Customers, {
 
                 let rowHTML = '<tr>';
                 if (App.state.customerTableColumns.accountNo) rowHTML += `<td>${c.accountNo}</td>`;
-                if (App.state.customerTableColumns.companyName) rowHTML += `<td><div class="company-info"><div class="name">${c.companyName}${promiseIcon}</div><div class="location" style="color: var(--text-secondary); font-size: var(--fs-sm);">${tagsHTML}</div></div></td>`;
+                if (App.state.customerTableColumns.companyName) rowHTML += `<td><div class="company-info d-flex align-items-center"><div class="name">${healthDot}${c.companyName}${promiseIcon}</div><div class="location" style="color: var(--text-secondary); font-size: var(--fs-sm);">${tagsHTML}</div></div></td>`;
                 if (App.state.customerTableColumns.customerStatus) rowHTML += `<td>${c.customerStatus || 'N/A'}</td>`;
                 if (App.state.customerTableColumns.agingCategory) rowHTML += `<td>${c.agingCategory || 'N/A'}</td>`;
                 if (App.state.customerTableColumns.outstanding) rowHTML += `<td>${App.Helpers.formatCurrency(c.outstanding)}</td>`;
                 if (App.state.customerTableColumns.balance_2020_2025) rowHTML += `<td>${App.Helpers.formatCurrency(c.balance_2020_2025 || 0)}</td>`;
                 if (App.state.customerTableColumns.balance_2019_2020) rowHTML += `<td>${App.Helpers.formatCurrency(c.balance_2019_2020 || 0)}</td>`;
                 if (App.state.customerTableColumns.balance_lte_2018) rowHTML += `<td>${App.Helpers.formatCurrency(c.balance_lte_2018 || 0)}</td>`;
-                if (App.state.customerTableColumns.forecastAmount) rowHTML += `<td>${App.Helpers.formatCurrency(c.forecastAmount || 0)}</td>`;
+                if (App.state.customerTableColumns.forecastAmount) rowHTML += `<td>${App.Helpers.formatCurrency(currentForecast)}</td>`;
                 if (App.state.customerTableColumns.salesConsultantId) rowHTML += `<td>${consultantMap[c.salesConsultantId] || 'N/A'}</td>`;
                 if (App.state.customerTableColumns.paymentStatus) rowHTML += `<td><span class="status-badge ${c.paymentStatus.toLowerCase().replace(' ', '-')}">${c.paymentStatus}</span></td>`;
                 if (App.state.customerTableColumns.email) rowHTML += `<td>${c.email || 'N/A'}</td>`;
@@ -2308,7 +2653,7 @@ Object.assign(App.Customers, {
             }).join('');
         } else {
             const buttonHTML = App.state.currentUser.role === 'admin' ? `<button class="btn btn-primary" onclick="App.Customers.showCustomerForm()"><i class="fas fa-plus"></i> Add First Customer</button>` : '';
-            tbody.innerHTML = App.UI.getEmptyStateHTML('fa-users-slash', 'No Customers Found', 'Try adjusting your filters or add a new customer.', buttonHTML);
+            tbody.innerHTML = `<tr><td colspan="100%">${App.UI.getEmptyStateHTML('fa-users-slash', 'No Customers Found', 'Try adjusting your filters or add a new customer.', buttonHTML)}</td></tr>`;
         }
         App.UI.animateTableRows(tbody);
         App.UI.renderPaginationControls('customers', filteredCustomers.length);
@@ -2370,7 +2715,7 @@ Object.assign(App.Customers, {
 
         // Handle visibility based on role
         form.querySelectorAll('[data-admin-only="true"]').forEach(el => el.style.display = App.state.currentUser.role === 'admin' ? '' : 'none');
-        form.querySelectorAll('[data-user-only="true"]').forEach(el => el.style.display = App.state.currentUser.role === 'user' ? '' : 'none');
+        form.querySelectorAll('[data-user-only="true"]').forEach(el => el.style.display = App.state.currentUser.role === 'user' ? 'none' : 'none');
 
 
         if (accountNo) { 
@@ -2392,7 +2737,7 @@ Object.assign(App.Customers, {
         App.UI.openModal('customer-modal'); 
         form.originalData = originalCustomer; 
     }, 
-    saveCustomer: function(e) { 
+    saveCustomer: async function(e) { 
         e.preventDefault(); 
         const form = e.target; 
         const id = form.elements['customer-id-hidden'].value; 
@@ -2411,12 +2756,17 @@ Object.assign(App.Customers, {
             const bal_2019_2020 = parseFloat(form.elements.balance_2019_2020.value) || 0;
             const bal_lte_2018 = parseFloat(form.elements.balance_lte_2018.value) || 0;
             
+            const addressString = `${form.elements.area.value}, ${form.elements.emirate.value}`;
+            const coords = await App.Geo.geocodeAddress(addressString, form.elements.accountNo.value);
+
             Object.assign(customerData, { 
                 companyName: form.elements.companyName.value,
                 email: form.elements.email.value,
                 mobile: form.elements.mobile.value, 
                 emirate: form.elements.emirate.value, 
                 area: form.elements.area.value, 
+                latitude: coords.lat,
+                longitude: coords.lng,
                 initialDebt: parseFloat(form.elements.initialDebt.value), 
                 outstanding: bal_2020_2025 + bal_2019_2020 + bal_lte_2018,
                 balance_2020_2025: bal_2020_2025,
@@ -2426,10 +2776,6 @@ Object.assign(App.Customers, {
                 status: form.elements.status.value, 
                 debtSince: form.elements.debtSince.value,
                 agingCategory: App.Helpers.calculateAgingCategory(form.elements.debtSince.value)
-            });
-        } else { // User role
-            Object.assign(customerData, {
-                forecastAmount: parseFloat(form.elements.forecastAmount.value) || 0
             });
         }
         
@@ -2461,36 +2807,115 @@ Object.assign(App.Customers, {
         const customer = App.DB.get('customers').find(c => c.accountNo === accountNo);
         if (!customer) return App.UI.toast('Customer not found.', 'error');
 
-        document.getElementById('customer-forecast-modal-title').textContent = `Set Forecast for ${customer.companyName}`;
+        document.getElementById('customer-forecast-modal-title').textContent = `Monthly Forecasts for ${customer.companyName}`;
         const form = document.getElementById('customer-forecast-form');
+        form.reset();
         form.elements['customer-forecast-accountNo'].value = customer.accountNo;
-        form.elements['customer-forecast-amount'].value = customer.forecastAmount || '';
+        form.elements['customer-forecast-id-hidden'].value = '';
+
+        const now = new Date();
+        App.Helpers.populateMonthYearDropdowns('customer-forecast-month-select', 'customer-forecast-year-select', now.getMonth(), now.getFullYear());
+        
+        form.elements['customer-forecast-month-select'].disabled = false;
+        form.elements['customer-forecast-year-select'].disabled = false;
+
+        this.renderForecastsForCustomer(accountNo);
         App.UI.openModal('customer-forecast-modal');
+    },
+     renderForecastsForCustomer(accountNo) {
+        const customerForecasts = App.DB.get('customerForecasts')
+            .filter(f => f.accountNo === accountNo)
+            .sort((a, b) => b.month.localeCompare(a.month));
+        
+        const tbody = document.getElementById('existing-customer-forecasts-body');
+        tbody.innerHTML = customerForecasts.length > 0
+            ? customerForecasts.map(f => `<tr><td>${f.month}</td><td>${App.Helpers.formatCurrency(f.amount)}</td><td><div class="d-flex gap-2"><button class="btn btn-outline edit-customer-forecast" data-id="${f.id}"><i class="fas fa-edit"></i></button><button class="btn btn-danger delete-customer-forecast" data-id="${f.id}"><i class="fas fa-trash"></i></button></div></td></tr>`).join('')
+            : '<tr><td colspan="3">No forecasts found.</td></tr>';
+        App.UI.animateTableRows(tbody);
+    },
+     editCustomerForecast(forecastId) {
+        const forecast = App.DB.get('customerForecasts').find(f => f.id === forecastId);
+        if (!forecast) return;
+        const form = document.getElementById('customer-forecast-form');
+        form.elements['customer-forecast-id-hidden'].value = forecast.id;
+        
+        const [year, month] = forecast.month.split('-');
+        App.Helpers.populateMonthYearDropdowns('customer-forecast-month-select', 'customer-forecast-year-select', parseInt(month, 10) - 1, parseInt(year, 10));
+
+        form.elements['customer-forecast-month-select'].disabled = true;
+        form.elements['customer-forecast-year-select'].disabled = true;
+        
+        form.elements['customer-forecast-amount'].value = forecast.amount;
+        form.elements['customer-forecast-amount'].focus();
+    },
+    deleteCustomerForecast(forecastId) {
+        const forecasts = App.DB.get('customerForecasts');
+        const forecast = forecasts.find(f => f.id === forecastId);
+        if (!forecast) return;
+        
+        App.UI.confirm(
+            'Delete this forecast?', 
+            `Are you sure you want to delete the forecast for ${forecast.month}?`, 
+            () => {
+                const updatedForecasts = forecasts.filter(f => f.id !== forecastId);
+                App.DB.set('customerForecasts', updatedForecasts);
+                App.Helpers.logChange('Deleted', 'Customer Forecast', `for ${forecast.accountNo} on ${forecast.month}`);
+                App.UI.toast('Forecast deleted.', 'success');
+                this.renderForecastsForCustomer(forecast.accountNo);
+                if (App.state.activePage === 'performance') App.Performance.render();
+            },
+            '#customer-forecast-modal'
+        );
     },
     saveCustomerForecast(e) {
         e.preventDefault();
         const form = e.target;
         const accountNo = form.elements['customer-forecast-accountNo'].value;
+        const monthVal = form.elements['customer-forecast-month-select'].value;
+        const yearVal = form.elements['customer-forecast-year-select'].value;
         const amount = parseFloat(form.elements['customer-forecast-amount'].value);
+        const forecastId = form.elements['customer-forecast-id-hidden'].value;
 
-        if (isNaN(amount) || amount < 0) {
-            return App.UI.toast('Please enter a valid forecast amount.', 'error');
+        if (!monthVal || !yearVal || isNaN(amount) || amount < 0) {
+            App.UI.toast('Please select a valid month/year and amount.', 'error');
+            return;
         }
 
-        let customers = App.DB.get('customers');
-        const customerIndex = customers.findIndex(c => c.accountNo === accountNo);
+        const month = `${yearVal}-${monthVal}`;
+        let forecasts = App.DB.get('customerForecasts');
 
-        if (customerIndex > -1) {
-            const originalAmount = customers[customerIndex].forecastAmount || 0;
-            customers[customerIndex].forecastAmount = amount;
-            App.DB.set('customers', customers);
-            App.Helpers.logChange('Updated', 'Customer Forecast', `${customers[customerIndex].companyName}`, `'forecastAmount' changed from "${originalAmount}" to "${amount}"`);
-            App.UI.toast('Forecast updated!', 'success');
-            App.UI.closeModal('customer-forecast-modal');
-            this.render();
-        } else {
-            App.UI.toast('Could not find customer to update.', 'error');
+        if (forecastId) { // Editing
+            const index = forecasts.findIndex(f => f.id === forecastId);
+            if (index > -1) {
+                forecasts[index].amount = amount;
+                App.Helpers.logChange('Updated', 'Customer Forecast', `for ${accountNo} on ${month}`, `New amount: ${App.Helpers.formatCurrency(amount)}`);
+            }
+        } else { // Adding new
+            const existingIndex = forecasts.findIndex(f => f.accountNo === accountNo && f.month === month);
+            if (existingIndex > -1) {
+                forecasts[existingIndex].amount = amount;
+                 App.Helpers.logChange('Updated', 'Customer Forecast', `for ${accountNo} on ${month}`, `New amount: ${App.Helpers.formatCurrency(amount)}`);
+            } else {
+                const newForecast = { id: `cf-${Date.now()}`, accountNo, month, amount };
+                forecasts.push(newForecast);
+                App.Helpers.logChange('Created', 'Customer Forecast', `for ${accountNo} on ${month}`, `Amount: ${App.Helpers.formatCurrency(amount)}`);
+            }
         }
+        
+        App.DB.set('customerForecasts', forecasts);
+        App.UI.toast('Forecast saved!', 'success');
+        
+        form.reset();
+        form.elements['customer-forecast-id-hidden'].value = '';
+        form.elements['customer-forecast-accountNo'].value = accountNo; // Keep the accountNo for subsequent additions
+        const now = new Date();
+        App.Helpers.populateMonthYearDropdowns('customer-forecast-month-select', 'customer-forecast-year-select', now.getMonth(), now.getFullYear());
+        form.elements['customer-forecast-month-select'].disabled = false;
+        form.elements['customer-forecast-year-select'].disabled = false;
+
+        this.renderForecastsForCustomer(accountNo);
+        if (App.state.activePage === 'customers') this.render();
+        if (App.state.activePage === 'performance') App.Performance.render();
     },
     showBulkUpdateModal() {
         const filteredCustomers = this.getCurrentFilteredData();
@@ -2693,15 +3118,43 @@ Object.assign(App.Customers, {
         this.renderComments(accountNo);
         App.UI.toast('Comment added!', 'success');
     },
-    switchDetailTab: function(tabId) { document.querySelectorAll('.detail-tab-btn').forEach(btn => btn.classList.remove('active')); document.querySelector(`.detail-tab-btn[data-tab="${tabId}"]`)?.classList.add('active'); document.querySelectorAll('#customer-detail-content .tab-content').forEach(c => c.classList.add('hidden')); document.getElementById(`${tabId}-content`).classList.remove('hidden'); }, 
+    switchDetailTab: function(tabId) { document.querySelectorAll('.detail-tab-btn').forEach(btn => btn.classList.remove('active')); 
+	document.querySelector(`.detail-tab-btn[data-tab="${tabId}"]`)?.classList.add('active'); document.querySelectorAll('#customer-detail-content .tab-content').forEach(c => c.classList.add('hidden')); document.getElementById(`${tabId}-content`).classList.remove('hidden'); }, 
     deleteCustomer(accountNo) { const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); Swal.fire({ title: `Delete ${customer.companyName}?`, text: "This will permanently delete the customer and all their associated payments and visits. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let customers = App.DB.get('customers'); let visits = App.DB.get('visits'); let payments = App.DB.get('payments'); let comments = App.DB.get('customerComments'); App.DB.set('customers', customers.filter(c => c.accountNo !== accountNo)); App.DB.set('visits', visits.filter(v => v.customerId !== accountNo)); App.DB.set('payments', payments.filter(p => p.customerId !== accountNo)); App.DB.set('customerComments', comments.filter(c => c.accountNo !== accountNo)); App.Helpers.logChange('Deleted', 'Customer', `${customer.companyName} (${accountNo})`, `Reason: ${result.value}`); App.UI.toast('Customer deleted permanently.', 'success'); this.render(); } }); } 
 });
-Object.assign(App.Visits, { calendar: null, logNotesQuill: null, map: null, setupEventListeners: function() { document.getElementById('visit-notes-form').addEventListener('submit', e => this.saveCompletedVisit(e)); document.getElementById('visit-form').addEventListener('submit', (e) => this.saveScheduledVisit(e)); document.getElementById('export-visits-csv').addEventListener('click', () => App.Helpers.exportTableData('csv', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); document.getElementById('export-visits-pdf').addEventListener('click', () => App.Helpers.exportTableData('pdf', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status'])); const page = document.getElementById('visits-page'); const debouncedRender = App.Helpers.debounce(() => {App.state.pagination.visits.currentPage = 1; this.renderListView()}, 300); page.addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; if (button.classList.contains('visit-view-tab')) this.switchView(button.dataset.view); if (button.classList.contains('visit-filter-btn')) this.setFilter(button.dataset.filter); if (button.id === 'visit-date-apply') this.applyDateFilter(); if (button.classList.contains('mark-done-btn')) this.showMarkDoneModal(button.dataset.id); if (button.classList.contains('view-visit-btn')) this.showVisitDetail(button.dataset.id); if (button.id === 'schedule-visit-btn') this.showScheduleModal(); if (button.classList.contains('delete-visit')) this.deleteVisit(button.dataset.id); if(button.id === 'set-visit-date-today') this.setQuickDate('today'); if(button.id === 'set-visit-date-tomorrow') this.setQuickDate('tomorrow'); }); 
+Object.assign(App.Visits, { calendar: null, logNotesQuill: null, map: null, 
+    setupEventListeners: function() { 
+        document.getElementById('visit-notes-form').addEventListener('submit', e => this.saveCompletedVisit(e)); 
+        document.getElementById('visit-form').addEventListener('submit', (e) => this.saveScheduledVisit(e)); 
+        
+        const page = document.getElementById('visits-page'); 
+        const debouncedRender = App.Helpers.debounce(() => {App.state.pagination.visits.currentPage = 1; this.renderListView()}, 300); 
+
+        page.addEventListener('click', (e) => { 
+            const button = e.target.closest('button'); 
+            if (!button) return; 
+
+            if (button.classList.contains('visit-view-tab')) this.switchView(button.dataset.view); 
+            if (button.classList.contains('visit-filter-btn')) this.setFilter(button.dataset.filter); 
+            if (button.id === 'visit-date-apply') this.applyDateFilter(); 
+            if (button.classList.contains('mark-done-btn')) this.showMarkDoneModal(button.dataset.id); 
+            if (button.classList.contains('view-visit-btn')) this.showVisitDetail(button.dataset.id); 
+            if (button.id === 'schedule-visit-btn') this.showScheduleModal(); 
+            if (button.id === 'plan-route-btn') this.showRoutePlannerModal(); 
+            if (button.id === 'clear-route-btn') this.clearRoute(); 
+            if (button.classList.contains('delete-visit')) this.deleteVisit(button.dataset.id); 
+            if (button.id === 'set-visit-date-today') this.setQuickDate('today'); 
+            if (button.id === 'set-visit-date-tomorrow') this.setQuickDate('tomorrow');
+            if (button.id === 'export-visits-csv') App.Helpers.exportTableData('csv', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status']);
+            if (button.id === 'export-visits-pdf') App.Helpers.exportTableData('pdf', 'Visits', this.getCurrentFilteredData, ['dateTime', 'customerId', 'purpose', 'collectorId', 'status']);
+        }); 
+    
     document.getElementById('visit-search').addEventListener('input', (e) => { App.state.visits.search = e.target.value; debouncedRender(); });
     document.getElementById('visit-consultant-filter').addEventListener('change', (e) => { App.state.pagination.visits.currentPage = 1; App.state.visits.consultantFilter = e.target.value; this.renderListView(); });
     document.getElementById('map-consultant-filter').addEventListener('change', (e) => { App.state.visits.mapConsultant = e.target.value; this.renderMapView(); });
     document.getElementById('map-date-filter').addEventListener('change', (e) => { App.state.visits.mapDate = e.target.value; this.renderMapView(); });
     document.querySelector('#visits-page .data-table thead').addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('visits', th.dataset.sort); });
+    document.getElementById('route-planner-form').addEventListener('submit', (e) => this.generateRoute(e));
     
     const visitNotesModal = document.getElementById('visit-notes-modal');
     visitNotesModal.addEventListener('click', e => { 
@@ -2726,7 +3179,7 @@ Object.assign(App.Visits, { calendar: null, logNotesQuill: null, map: null, setu
 setQuickDate(period) {
     const date = new Date();
     if(period === 'tomorrow') date.setDate(date.getDate() + 1);
-    const yyyy = date.getFullYear();
+    const yyyy = date.getFullYear();    
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     document.getElementById('visit-start-date').value = `${yyyy}-${mm}-${dd}`;
@@ -2783,9 +3236,21 @@ render: function() {
     consultantFilter.innerHTML = '<option value="all">All Consultants</option>' + App.DB.get('consultants').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     consultantFilter.value = App.state.visits.consultantFilter;
 
+    const headerActions = document.getElementById('visits-header-actions');
+    headerActions.innerHTML = `
+        <div data-role="admin" class="d-flex gap-2">
+            <button class="btn btn-outline" id="export-visits-csv"><i class="fas fa-file-csv"></i> CSV</button>
+            <button class="btn btn-outline" id="export-visits-pdf"><i class="fas fa-file-pdf"></i> PDF</button>
+        </div>
+        <button class="btn btn-outline" id="plan-route-btn"><i class="fas fa-route"></i> Plan Route</button>
+        <button class="btn btn-primary" id="schedule-visit-btn"><i class="fas fa-plus"></i> Schedule a Visit</button>
+    `;
+
     if (App.state.visits.activeView === 'list') this.renderListView(); 
     else if (App.state.visits.activeView === 'calendar') this.renderCalendarView();
     else if (App.state.visits.activeView === 'map') this.renderMapView();
+
+    document.getElementById('plan-route-btn').style.display = App.state.visits.activeView === 'map' ? 'inline-flex' : 'none';
 }, 
 switchView: function(view) { 
     App.state.visits.activeView = view; 
@@ -2850,7 +3315,7 @@ renderListView: function() {
         }).join('');
     } else {
         const buttonHTML = `<button class="btn btn-primary" onclick="App.Visits.showScheduleModal()"><i class="fas fa-plus"></i> Schedule a Visit</button>`;
-        tbody.innerHTML = App.UI.getEmptyStateHTML('fa-calendar-times', 'No Visits Found', 'Try adjusting your filters or schedule a new visit.', buttonHTML);
+        tbody.innerHTML = `<tr><td colspan="100%">${App.UI.getEmptyStateHTML('fa-calendar-times', 'No Visits Found', 'Try adjusting your filters or schedule a new visit.', buttonHTML)}</td></tr>`;
     }
     App.UI.animateTableRows(tbody);
     App.UI.renderPaginationControls('visits', visits.length);
@@ -2860,6 +3325,8 @@ renderCalendarView: function() { const el = document.getElementById('calendar-vi
 renderMapView: function() {
     const mapContainer = document.getElementById('map-view');
     if (!mapContainer) return;
+
+    document.getElementById('clear-route-btn').classList.toggle('hidden', !App.state.visits.plannedRoute);
 
     const isAdmin = App.state.currentUser.role === 'admin';
     const consultantFilterEl = document.getElementById('map-consultant-filter');
@@ -2883,102 +3350,33 @@ renderMapView: function() {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }).addTo(this.map);
 
-    let visitsToDisplay = App.DB.get('visits')
-        .filter(v => v.status === 'Completed' && v.location && v.dateTime.startsWith(App.state.visits.mapDate));
-
-    if (isAdmin && App.state.visits.mapConsultant !== 'all') {
-        visitsToDisplay = visitsToDisplay.filter(v => v.collectorId == App.state.visits.mapConsultant);
-    } else if (!isAdmin) {
-        visitsToDisplay = visitsToDisplay.filter(v => v.collectorId === App.state.currentUser.assignedConsultantId);
+    if (App.state.visits.plannedRoute) {
+        this.drawPlannedRoute();
+        return;
     }
+
+    let customersToDisplay = App.Helpers.getScopedData('customers', isAdmin ? (App.state.visits.mapConsultant === 'all' ? null : App.state.visits.mapConsultant) : App.state.currentUser.assignedConsultantId);
     
-    visitsToDisplay.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+    const markers = L.markerClusterGroup();
 
-    const customers = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c.companyName; return map; }, {});
-    const consultants = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
-    
-    const markers = [];
-    const latLngs = [];
-
-    if (visitsToDisplay.length > 0) {
-        visitsToDisplay.forEach((visit, index) => {
-            const [lat, lon] = visit.location.split(',').map(coord => parseFloat(coord.trim()));
-
-            if (!isNaN(lat) && !isNaN(lon)) {
-                let popupContent = `
-                    <b>${index + 1}. ${customers[visit.customerId] || 'N/A'}</b><br>
-                    <b>Time:</b> ${App.Helpers.formatDateTime(visit.dateTime)}<br>
-                    <b>Outcome:</b> ${visit.outcome || 'N/A'}
-                `;
-                if (isAdmin) {
-                    popupContent += `<br><b>Consultant:</b> ${consultants[visit.collectorId] || 'N/A'}`;
-                }
-                
-                const numberedIcon = L.divIcon({
-                    className: 'numbered-marker',
-                    html: `<div>${index + 1}</div>`,
-                    iconSize: [28, 28],
-                    iconAnchor: [14, 14]
-                });
-
-                const marker = L.marker([lat, lon], { icon: numberedIcon }).addTo(this.map).bindPopup(popupContent);
-                markers.push(marker);
-                latLngs.push([lat, lon]);
+    if (customersToDisplay.length > 0) {
+        customersToDisplay.forEach((customer) => {
+            if (customer.latitude && customer.longitude) {
+                const icon = App.Helpers.getCustomerMarkerIcon(customer);
+                const marker = L.marker([customer.latitude, customer.longitude], { icon })
+                    .bindPopup(`<b>${customer.companyName}</b><br>Outstanding: ${App.Helpers.formatCurrency(customer.outstanding)}<br><button class="btn btn-primary btn-sm mt-2" onclick="App.Customers.showCustomerDetail('${customer.accountNo}')">View Details</button>`);
+                markers.addLayer(marker);
             }
         });
-
-        if (latLngs.length > 1) {
-            L.polyline(latLngs, { color: '#e2000f', weight: 3, opacity: 0.7 }).addTo(this.map);
-        }
         
-        if (markers.length > 0) {
-            const group = new L.featureGroup(markers);
-            this.map.fitBounds(group.getBounds().pad(0.2));
+        this.map.addLayer(markers);
+        if (markers.getLayers().length > 0) {
+            this.map.fitBounds(markers.getBounds().pad(0.1));
         }
+
     } else {
-         mapContainer.innerHTML = '<div class="empty-state"><i class="fas fa-map-marker-slash"></i><h4>No Tagged Visits Found</h4><p>No completed visits with tagged locations found for the selected consultant and date.</p></div>';
+         mapContainer.innerHTML = App.UI.getEmptyStateHTML('fa-map-marker-slash', 'No Customers Found', 'No customers with location data found for the selected consultant.');
     }
-
-    // Add customer markers for scheduling (unvisited customers)
-    App.DB.get('customers').forEach(c => {
-        if(c.emirate && c.area && !visitsToDisplay.some(v => v.customerId === c.accountNo)) {
-            // NOTE: Lacking a true geocoding service, use a placeholder coordinate or mock system
-            // For the purpose of this SPA demo, we skip actual geocoding and just show a generic marker on the map center if not visited.
-            // A better implementation would use the customer's actual coordinates if available.
-            
-            // To demonstrate the *intent*, we'll mark a customer at a random nearby coordinate only if the consultant filter is "all" 
-            // or the customer is assigned to the selected consultant (for admin view) or current user.
-            let shouldDisplay = true;
-            if (!isAdmin && c.salesConsultantId !== App.state.currentUser.assignedConsultantId) {
-                shouldDisplay = false;
-            } else if (isAdmin && App.state.visits.mapConsultant !== 'all' && c.salesConsultantId != App.state.visits.mapConsultant) {
-                shouldDisplay = false;
-            }
-            
-            if (shouldDisplay) {
-                const allVisits = App.DB.get('visits');
-                const isScheduled = allVisits.some(v => v.customerId === c.accountNo && v.status === 'Scheduled' && v.dateTime.startsWith(App.state.visits.mapDate));
-                if (isScheduled) return; // Skip if already scheduled for the day being viewed
-                
-                // Mock coordinate generation based on a hash of the accountNo to place them randomly but consistently
-                let hash = 0;
-                for (let i = 0; i < c.accountNo.length; i++) hash = c.accountNo.charCodeAt(i) + ((hash << 5) - hash);
-                const mockLat = 25.2048 + ((hash % 100) / 10000);
-                const mockLon = 55.2708 + (((hash / 100) % 100) / 10000);
-
-                const defaultIcon = L.divIcon({
-                    className: 'unvisited-marker',
-                    html: `<i class="fas fa-map-marker-alt" style="color:var(--text-secondary); font-size:24px;"></i>`,
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 24]
-                });
-
-                L.marker([mockLat, mockLon], { icon: defaultIcon, draggable: true }).addTo(this.map)
-                    .bindPopup(`<b>${c.companyName}</b><br>Unvisited Account<br><button class="btn btn-primary btn-sm schedule-from-map-btn mt-2" onclick="App.Visits.showScheduleModal(null, '${App.state.visits.mapDate}', '${c.accountNo}')">Schedule Visit</button>`);
-            }
-        }
-    });
-
 },
 showScheduleModal: function(id = null, d = null, customerId = null) { 
     const f = document.getElementById('visit-form'); 
@@ -3113,18 +3511,92 @@ saveCompletedVisit: function(e) {
     App.UI.closeModal('visit-notes-modal'); 
     App.UI.toast('Visit marked as done!');
 	this.render(); 
+    if (App.state.activePage === 'myday') App.MyDay.render();
 }, 
 checkOverdueVisits: function() { let v = App.DB.get('visits'), c = false; const today = new Date(); today.setHours(0, 0, 0, 0); v.forEach(i => { if (i.status === 'Scheduled' && new Date(i.dateTime) < today) { i.status = 'Overdue'; c = true; } }); if (c) App.DB.set('visits', v); }, 
 tagLocationForVisitLog: function() { 
     if (!navigator.geolocation) return App.UI.toast('Geolocation not supported.', 'error'); 
+    const locationBtn = document.getElementById('log-location-btn');
+    locationBtn.disabled = true;
+    locationBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <span id="log-location-text">Getting Location...</span>`;
+
     navigator.geolocation.getCurrentPosition(p => { 
         const coords = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`; 
         document.getElementById('log-location-text').textContent = `Tagged: ${coords}`; 
         document.getElementById('log-location-hidden').value = coords; 
+        locationBtn.innerHTML = `<i class="fas fa-check-circle" style="color: var(--success);"></i> <span id="log-location-text">Location Tagged!</span>`;
         App.UI.toast('Location tagged for this note!'); 
-    }, () => App.UI.toast('Unable to get location.', 'error')); 
+    }, () => {
+        locationBtn.disabled = false;
+        locationBtn.innerHTML = `<i class="fas fa-map-marker-alt"></i> <span id="log-location-text">Tag Current Location</span>`;
+        App.UI.toast('Unable to get location.', 'error');
+    }); 
 }, 
-deleteVisit(visitId) { const visit = App.DB.get('visits').find(v => v.id === visitId); Swal.fire({ title: `Delete this visit?`, text: "This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let visits = App.DB.get('visits'); App.DB.set('visits', visits.filter(v => v.id !== visitId)); App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose} for customer ${visit.customerId}`, `Reason: ${result.value}`); App.UI.toast('Visit deleted.', 'success'); this.render(); } }); } 
+deleteVisit(visitId) { const visit = App.DB.get('visits').find(v => v.id === visitId); Swal.fire({ title: `Delete this visit?`, text: "This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let visits = App.DB.get('visits'); App.DB.set('visits', visits.filter(v => v.id !== visitId)); App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose} for customer ${visit.customerId}`, `Reason: ${result.value}`); App.UI.toast('Visit deleted.', 'success'); this.render(); } }); } ,
+showRoutePlannerModal() {
+    const form = document.getElementById('route-planner-form');
+    form.reset();
+    document.getElementById('route-date').value = new Date().toISOString().slice(0, 10);
+    const customers = App.Helpers.getScopedData('customers');
+    const customerListEl = document.getElementById('route-customer-list');
+    customerListEl.innerHTML = customers.length > 0 ? customers.map(c => `<div class="d-flex align-items-center gap-2"><input type="checkbox" name="customerToVisit" value="${c.accountNo}" id="route-${c.accountNo}"><label for="route-${c.accountNo}">${c.companyName}</label></div>`).join('') : '<p>No customers to select.</p>';
+    App.UI.openModal('route-planner-modal');
+},
+generateRoute(e) {
+    e.preventDefault();
+    const form = e.target;
+    const selectedCustomerNodes = form.querySelectorAll('input[name="customerToVisit"]:checked');
+    if (selectedCustomerNodes.length < 2) {
+        return App.UI.toast('Please select at least 2 customers to plan a route.', 'warning');
+    }
+    const customerIds = Array.from(selectedCustomerNodes).map(node => node.value);
+    
+    App.state.visits.plannedRoute = App.Helpers.optimizeRoute(customerIds);
+    App.UI.closeModal('route-planner-modal');
+    this.renderMapView();
+},
+clearRoute() {
+    App.state.visits.plannedRoute = null;
+    this.renderMapView();
+},
+drawPlannedRoute() {
+    if (!this.map || !App.state.visits.plannedRoute) return;
+    const route = App.state.visits.plannedRoute;
+    const customerMap = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c; return map; }, {});
+    
+    const markers = [];
+    const latLngs = [];
+
+    route.forEach((customerId, index) => {
+        const customer = customerMap[customerId];
+        if (!customer) return;
+
+        let hash = 0;
+        for (let i = 0; i < customer.accountNo.length; i++) hash = customer.accountNo.charCodeAt(i) + ((hash << 5) - hash);
+        const mockLat = 25.2048 + ((hash % 100) / 10000);
+        const mockLon = 55.2708 + (((hash / 100) % 100) / 10000);
+
+        const numberedIcon = L.divIcon({
+            className: 'numbered-marker',
+            html: `<div>${index + 1}</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+
+        const marker = L.marker([mockLat, mockLon], { icon: numberedIcon }).addTo(this.map).bindPopup(`<b>${index + 1}. ${customer.companyName}</b>`);
+        markers.push(marker);
+        latLngs.push([mockLat, mockLon]);
+    });
+
+    if (latLngs.length > 1) {
+        L.polyline(latLngs, { color: '#e2000f', weight: 3, opacity: 0.7 }).addTo(this.map);
+    }
+    
+    if (markers.length > 0) {
+        const group = new L.featureGroup(markers);
+        this.map.fitBounds(group.getBounds().pad(0.2));
+    }
+}
 });
 Object.assign(App.Payments, { 
     getCurrentFilteredData: function() {
@@ -3192,7 +3664,7 @@ Object.assign(App.Payments, {
             }).join('');
         } else {
             const buttonHTML = `<button class="btn btn-success" onclick="App.Payments.showPaymentForm()"><i class="fas fa-plus"></i> Record First Payment</button>`;
-            tbody.innerHTML = App.UI.getEmptyStateHTML('fa-credit-card', 'No Payments Found', 'Record a payment to see it listed here.', buttonHTML);
+            tbody.innerHTML = `<tr><td colspan="100%">${App.UI.getEmptyStateHTML('fa-credit-card', 'No Payments Found', 'Record a payment to see it listed here.', buttonHTML)}</td></tr>`;
         }
         App.UI.animateTableRows(tbody);
         App.UI.renderPaginationControls('payments', filteredPayments.length);
@@ -3266,9 +3738,6 @@ Object.assign(App.Payments, {
                 customers[customerIndex].balance_2019_2020 -= amt2020;
                 customers[customerIndex].balance_lte_2018 -= amt2018;
 
-                if (customers[customerIndex].forecastAmount) {
-                    customers[customerIndex].forecastAmount = Math.max(0, customers[customerIndex].forecastAmount - a);
-                }
                 if (customers[customerIndex].outstanding <= 0) { 
                     customers[customerIndex].outstanding = 0; 
                     customers[customerIndex].paymentStatus = 'Settlement'; 
@@ -3652,15 +4121,21 @@ Object.assign(App.Reports, {
         const allPayments = App.DB.get('payments').filter(p => p.status === 'Completed' && p.date.startsWith(monthFilter));
         const allVisits = App.DB.get('visits').filter(v => v.dateTime.startsWith(monthFilter));
         const allForecasts = App.DB.get('forecasts').filter(f => f.month === monthFilter);
+        const allCustomerForecasts = App.DB.get('customerForecasts').filter(f => f.month === monthFilter);
 
         const headers = ['Consultant', 'Assigned Customers', 'Total Outstanding', 'Monthly Target', 'Collected MTD', 'Target %', 'Total Forecast', 'Forecast %', 'Visits Completed', 'New Promises'];
         const reportData = consultantsToReportOn.map(consultant => {
             const assignedCustomers = allCustomers.filter(c => c.salesConsultantId === consultant.id);
+            const assignedCustomerIds = assignedCustomers.map(c => c.accountNo);
             const totalOutstanding = assignedCustomers.reduce((sum, c) => sum + c.outstanding, 0);
-            const totalForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+            
+            const totalForecast = allCustomerForecasts
+                .filter(f => assignedCustomerIds.includes(f.accountNo))
+                .reduce((sum, f) => sum + f.amount, 0);
+
             const targetAmount = allForecasts.find(f => f.consultantId === consultant.id)?.amount || 0;
 
-            const collectedPayments = allPayments.filter(p => assignedCustomers.some(c => c.accountNo === p.customerId));
+            const collectedPayments = allPayments.filter(p => assignedCustomerIds.includes(p.customerId));
             const collectedAmount = collectedPayments.reduce((sum, p) => sum + p.amount, 0);
 
             const completedVisits = allVisits.filter(v => v.collectorId === consultant.id && v.status === 'Completed').length;
@@ -3679,7 +4154,7 @@ Object.assign(App.Reports, {
 
         const totalCollected = reportData.reduce((sum, row) => sum + App.Helpers.parseCurrency(row[4]), 0);
         const totalTarget = allForecasts.reduce((sum, f) => sum + f.amount, 0);
-        const totalForecasted = allCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+        const totalForecasted = allCustomerForecasts.reduce((sum, f) => sum + f.amount, 0);
         
         const summaryContent = `<div class="detail-info-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: var(--spacing-4);"><div class="detail-info-card"><div class="label">Total Collected</div><div class="value" style="color: var(--success);">${App.Helpers.formatCurrency(totalCollected)}</div></div><div class="detail-info-card"><div class="label">Total Monthly Target</div><div class="value">${App.Helpers.formatCurrency(totalTarget)}</div></div><div class="detail-info-card"><div class="label">Total Customer Forecast</div><div class="value">${App.Helpers.formatCurrency(totalForecasted)}</div></div></div>`;
 
@@ -3968,8 +4443,11 @@ Object.assign(App.Reports, {
         const consultantsToReportOn = consultantIdFilter === 'all' ? App.DB.get('consultants') : App.DB.get('consultants').filter(c => c.id == consultantIdFilter);
         const reportData = consultantsToReportOn.map(consultant => {
             const consultantCustomers = App.DB.get('customers').filter(c => c.salesConsultantId === consultant.id);
-            const forecastedAmount = consultantCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
-            const collectedAmount = App.DB.get('payments').filter(p => p.status === 'Completed' && consultantCustomers.map(c => c.accountNo).includes(p.customerId) && p.date.startsWith(monthFilter)).reduce((sum, p) => sum + p.amount, 0);
+            const consultantCustomerIds = consultantCustomers.map(c => c.accountNo);
+            const forecastedAmount = App.DB.get('customerForecasts')
+                .filter(f => f.month === monthFilter && consultantCustomerIds.includes(f.accountNo))
+                .reduce((sum, f) => sum + f.amount, 0);
+            const collectedAmount = App.DB.get('payments').filter(p => p.status === 'Completed' && consultantCustomerIds.includes(p.customerId) && p.date.startsWith(monthFilter)).reduce((sum, p) => sum + p.amount, 0);
             return [ consultant.name, App.Helpers.formatCurrency(forecastedAmount), App.Helpers.formatCurrency(collectedAmount), forecastedAmount > 0 ? ((collectedAmount / forecastedAmount) * 100).toFixed(2) + '%' : 'N/A' ];
         });
         this.displayReport(`Forecast Performance for ${monthFilter}`, ['Consultant', 'Forecasted Amount', 'Collected Amount', 'Performance'], reportData);
@@ -4241,13 +4719,17 @@ Object.assign(App.Consultants, {
         const customers = App.DB.get('customers'); 
         const visits = App.DB.get('visits');
         const forecasts = App.DB.get('forecasts');
+        const customerForecasts = App.DB.get('customerForecasts');
         const now = new Date();
         const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
 
         let data = consultants.map(consultant => { 
-            const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id); 
+            const assignedCustomers = customers.filter(c => c.salesConsultantId === consultant.id);
+            const assignedCustomerIds = assignedCustomers.map(c => c.accountNo); 
             const totalOutstanding = assignedCustomers.reduce((sum, c) => sum + c.outstanding, 0); 
-            const totalForecast = assignedCustomers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0); 
+            const totalForecast = customerForecasts
+                .filter(f => f.month === currentMonthStr && assignedCustomerIds.includes(f.accountNo))
+                .reduce((sum, f) => sum + f.amount, 0);
             const overdueCustomers = assignedCustomers.filter(c => c.paymentStatus === 'Overdue').length; 
             const upcomingVisits = visits.filter(v => v.collectorId === consultant.id && v.status === 'Scheduled' && new Date(v.dateTime) >= new Date()).length;
             const currentTarget = forecasts.find(f => f.consultantId === consultant.id && f.month === currentMonthStr)?.amount || 0;
@@ -4271,7 +4753,7 @@ Object.assign(App.Consultants, {
             tbody.innerHTML = paginatedData.map(c => `<tr><td><div style="font-weight:600;">${c.name}</div></td><td>${c.noOfCustomers}</td><td>${App.Helpers.formatCurrency(c.totalOutstanding)}</td><td>${App.Helpers.formatCurrency(c.totalForecast)}</td><td>${App.Helpers.formatCurrency(c.currentTarget)}</td><td>${c.overdueCustomers}</td><td>${c.upcomingVisits}</td><td><div class="d-flex gap-2"><button class="btn btn-outline view-dashboard" data-id="${c.id}" title="View Dashboard"><i class="fas fa-tachometer-alt"></i></button><button class="btn btn-outline view-customers" data-id="${c.id}" title="View Customers"><i class="fas fa-users"></i></button><button class="btn btn-outline reassign-customers" data-id="${c.id}" title="Reassign Customers"><i class="fas fa-random"></i></button><button class="btn btn-outline set-target-btn" data-id="${c.id}" title="Set Monthly Target"><i class="fas fa-bullseye"></i></button><button class="btn btn-outline edit-consultant" data-id="${c.id}" title="Edit"><i class="fas fa-edit"></i></button><button class="btn btn-danger delete-consultant" data-id="${c.id}" title="Delete"><i class="fas fa-trash"></i></button></div></td></tr>`).join(''); 
         } else { 
             const buttonHTML = `<button class="btn btn-primary" onclick="App.Consultants.showConsultantForm()"><i class="fas fa-plus"></i> Add Consultant</button>`; 
-            tbody.innerHTML = App.UI.getEmptyStateHTML('fa-user-tie', 'No Consultants Found', 'Add a consultant to begin assigning customers.', buttonHTML); 
+            tbody.innerHTML = `<tr><td colspan="100%">${App.UI.getEmptyStateHTML('fa-user-tie', 'No Consultants Found', 'Add a consultant to begin assigning customers.', buttonHTML)}</td></tr>`; 
         } 
         App.UI.animateTableRows(tbody); 
         App.UI.renderPaginationControls('consultants', data.length); 
@@ -4548,7 +5030,7 @@ Object.assign(App.Users, {
         if (paginatedUsers.length > 0) {
             tbody.innerHTML = paginatedUsers.map(u => `<tr><td><div style="font-weight:600;">${u.username}</div></td><td>${u.fullName}</td><td><span class="status-badge ${u.role}">${u.role}</span></td><td>${consultantMap[u.assignedConsultantId] || 'N/A'}</td><td>${u.department || 'N/A'}</td><td>${u.lastLogin ? App.Helpers.timeAgo(u.lastLogin) : 'Never'}</td><td><div class="d-flex gap-2"><button class="btn btn-outline edit-user" data-id="${u.id}" title="Edit"><i class="fas fa-edit"></i></button><button class="btn btn-danger delete-user" data-id="${u.id}" title="Delete"><i class="fas fa-trash"></i></button></div></td></tr>`).join('');
         } else {
-            tbody.innerHTML = App.UI.getEmptyStateHTML('fa-users-cog', 'No Users Found', 'Click the button above to add a new user.');
+            tbody.innerHTML = `<tr><td colspan="100%">${App.UI.getEmptyStateHTML('fa-users-cog', 'No Users Found', 'Click the button above to add a new user.')}</td></tr>`;
         }
         App.UI.animateTableRows(tbody);
         App.UI.renderPaginationControls('users', users.length);
@@ -4675,7 +5157,7 @@ Object.assign(App.ChangeLog, {
                 </tr>`;
             }).join(''); 
         } else { 
-            tbody.innerHTML = App.UI.getEmptyStateHTML('fa-history', 'No Log Entries Found', 'Changes to data will be recorded here.'); 
+            tbody.innerHTML = `<tr><td colspan="100%">${App.UI.getEmptyStateHTML('fa-history', 'No Log Entries Found', 'Changes to data will be recorded here.')}</td></tr>`; 
         } 
         App.UI.animateTableRows(tbody); 
         App.UI.renderPaginationControls('changelog', log.length); 
@@ -4809,6 +5291,8 @@ processCSV: function(csvText) {
         const bal2 = parseFloat(getCellValue('balance20192020')) || 0;
         const bal3 = parseFloat(getCellValue('balancelte2018')) || 0;
         const outstanding = bal1 + bal2 + bal3;
+        
+        const coords = App.Geo.getMockCoordinates(getCellValue('accountnumber'));
 
         return {
             accountNo: getCellValue('accountnumber'), 
@@ -4817,6 +5301,8 @@ processCSV: function(csvText) {
             mobile: getCellValue('mobile') || '',
             emirate: getCellValue('emirate') || 'Dubai', 
             area: getCellValue('area') || 'N/A', 
+            latitude: coords.lat,
+            longitude: coords.lng,
             status: getCellValue('status') || 'Active', 
             paymentStatus: getCellValue('paymentstatus') || 'Negotiation', 
             initialDebt: parseFloat(getCellValue('initialdebt')) || outstanding, 
@@ -4867,6 +5353,7 @@ Object.assign(App.Settings, {
         settingsPage.addEventListener('click', e => {
             if (e.target.id === 'backup-data-btn') this.backupData();
             if (e.target.id === 'restore-data-btn') this.handleRestore();
+            if (e.target.id === 'enable-offline-mode-btn') App.Offline.enableOfflineMaps();
         });
 
         const restoreInput = document.getElementById('restore-file-input');
@@ -4883,7 +5370,7 @@ Object.assign(App.Settings, {
 
         if (format === 'json') {
             const dataToBackup = {};
-            const keysToBackup = ['customers', 'visits', 'payments', 'users', 'consultants', 'activityLog', 'changeLog', 'notifications', 'dataModelVersion', 'forecasts', 'customerComments', 'paginationSettings'];
+            const keysToBackup = ['customers', 'visits', 'payments', 'users', 'consultants', 'activityLog', 'changeLog', 'notifications', 'dataModelVersion', 'forecasts', 'customerComments', 'customerForecasts', 'paginationSettings'];
             keysToBackup.forEach(key => {
                 const data = localStorage.getItem(key);
                 if (data) {
@@ -4892,7 +5379,7 @@ Object.assign(App.Settings, {
             });
             App.Helpers.downloadBlob(JSON.stringify(dataToBackup, null, 2), `erp-backup-${dateStr}.json`, 'application/json');
         } else if (format === 'csv') {
-            const tables = ['customers', 'visits', 'payments', 'consultants', 'users', 'forecasts', 'customerComments'];
+            const tables = ['customers', 'visits', 'payments', 'consultants', 'users', 'forecasts', 'customerComments', 'customerForecasts'];
             tables.forEach(key => {
                 const data = App.DB.get(key);
                 if (data.length > 0) {
@@ -4948,17 +5435,21 @@ Object.assign(App.Performance, {
         App.UI.observeProgressBars();
     },
     getConsultantCardHTML(consultant) {
-        const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${App.state.dashboardTimeFrame.month}`;
+        const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${(App.state.dashboardTimeFrame.month).toString().padStart(2, '0')}`;
         const customers = App.DB.get('customers').filter(c => c.salesConsultantId === consultant.id);
-        const payments = App.DB.get('payments').filter(p => customers.some(c => c.accountNo === p.customerId) && p.status === 'Completed' && p.date.startsWith(currentMonthStr));
+        const customerIds = customers.map(c => c.accountNo);
+        const payments = App.DB.get('payments').filter(p => customerIds.includes(p.customerId) && p.status === 'Completed' && p.date.startsWith(currentMonthStr));
         const visits = App.DB.get('visits').filter(v => v.collectorId === consultant.id && v.dateTime.startsWith(currentMonthStr));
         const target = App.DB.get('forecasts').find(f => f.consultantId === consultant.id && f.month === currentMonthStr);
+        const customerForecasts = App.DB.get('customerForecasts');
 
         const collectedAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         const targetAmount = target ? target.amount : 0;
         const targetPercentage = targetAmount > 0 ? ((collectedAmount / targetAmount) * 100).toFixed(0) : 0;
 
-        const forecastAmount = customers.reduce((sum, c) => sum + (c.forecastAmount || 0), 0);
+        const forecastAmount = customerForecasts
+            .filter(f => f.month === currentMonthStr && customerIds.includes(f.accountNo))
+            .reduce((sum, f) => sum + f.amount, 0);
         const forecastPercentage = forecastAmount > 0 ? ((collectedAmount / forecastAmount) * 100).toFixed(0) : 0;
 
         // --- Outstanding Balances (current state) ---
@@ -5009,7 +5500,7 @@ Object.assign(App.Performance, {
                     </div>
                     <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
                     <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Outstanding Balance Breakdown</h4>
-                    <div class="detail-info-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: var(--spacing-2);">
+                    <div class="detail-info-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--spacing-2);">
                          <div class="detail-info-card">
                             <div class="label"><=2018</div>
                             <div class="breakdown-item">
@@ -5035,7 +5526,7 @@ Object.assign(App.Performance, {
                     
                     <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
                     <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Collected This Month Breakdown</h4>
-                    <div class="detail-info-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: var(--spacing-2);">
+                    <div class="detail-info-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--spacing-2);">
                          <div class="detail-info-card">
                             <div class="label"><=2018</div>
                             <div class="breakdown-item">
@@ -5067,6 +5558,54 @@ Object.assign(App.Performance, {
                 </div>
             </div>
         `;
+    }
+});
+Object.assign(App.Geo, {
+    // A mock geocoding service. Replace with a real API call.
+    async geocodeAddress(addressString, accountNo) {
+        console.log(`Geocoding: ${addressString}`);
+        // In a real app, you would make an API call here.
+        // For now, we'll use the consistent mock coordinates.
+        return new Promise(resolve => {
+            setTimeout(() => { // Simulate network delay
+                const coords = this.getMockCoordinates(accountNo);
+                resolve(coords);
+            }, 50);
+        });
+    },
+    getMockCoordinates(accountNo) {
+        // This hash function ensures the same account number always gets the same pseudo-random location.
+        let hash = 0;
+        for (let i = 0; i < accountNo.length; i++) {
+            hash = accountNo.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        // Base coordinates (e.g., Dubai) with a small, deterministic offset
+        const lat = 25.2048 + ((hash % 1000) / 10000);
+        const lng = 55.2708 + (((hash / 1000) % 1000) / 10000);
+        return { lat, lng };
+    }
+});
+Object.assign(App.Offline, {
+    init() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    },
+    enableOfflineMaps() {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            App.UI.confirm('Enable Offline Maps?', 'This will download map data for offline use. This may take some time and use significant storage. Proceed?', () => {
+                navigator.serviceWorker.controller.postMessage({ action: 'cache-tiles' });
+                App.UI.toast('Map caching started in the background.', 'info');
+            });
+        } else {
+            App.UI.toast('Offline functionality is not available.', 'error');
+        }
     }
 });
 Object.assign(App.Helpers, { 
@@ -5146,7 +5685,7 @@ Object.assign(App.Helpers, {
         
         const scopedCustomerIds = scopedCustomers.map(c => c.accountNo);
         
-        if (dataType === 'visits') return App.DB.get('visits').filter(v => scopedCustomerIds.includes(v.customerId));
+        if (dataType === 'visits') return App.DB.get('visits').filter(v => v.collectorId === effectiveConsultantId);
         if (dataType === 'payments') return App.DB.get('payments').filter(p => scopedCustomerIds.includes(p.customerId));
         
         return App.DB.get(dataType); // Fallback for other data types
@@ -5250,6 +5789,61 @@ Object.assign(App.Helpers, {
         if (diffDays <= 90) return '61-90 Days';
         if (diffDays <= 180) return '91-180 Days';
         return '180+ Days';
+    },
+    calculateCustomerHealth(customer, allPayments, allVisits) {
+        let score = 100;
+        let reasons = [];
+
+        // Factor 1: Outstanding Balance
+        if (customer.outstanding > 50000) {
+            score -= 40;
+            reasons.push("High balance");
+        } else if (customer.outstanding > 10000) {
+            score -= 20;
+            reasons.push("Moderate balance");
+        }
+
+        // Factor 2: Last Payment Date
+        const customerPayments = allPayments.filter(p => p.customerId === customer.accountNo && p.status === 'Completed').sort((a,b) => new Date(b.date) - new Date(a.date));
+        if (customerPayments.length > 0) {
+            const lastPaymentDate = new Date(customerPayments[0].date);
+            const daysSincePayment = (new Date() - lastPaymentDate) / (1000 * 3600 * 24);
+            if (daysSincePayment > 90) {
+                score -= 30;
+                reasons.push("No payment in 90+ days");
+            } else if (daysSincePayment > 60) {
+                score -= 15;
+                reasons.push("No payment in 60+ days");
+            }
+        } else {
+            score -= 20; // Penalty for no payment history at all
+            reasons.push("No payment history");
+        }
+        
+        // Factor 3: Overdue Visits
+        const hasOverdueVisit = allVisits.some(v => v.customerId === customer.accountNo && v.status === 'Overdue');
+        if (hasOverdueVisit) {
+            score -= 50;
+            reasons.push("Overdue tasks");
+        }
+
+        // Determine Status and Title
+        if (score >= 80) {
+            return { status: 'good', title: 'Good Standing' };
+        } else if (score >= 50) {
+            return { status: 'warning', title: `Needs Attention: ${reasons.join(', ')}.` };
+        } else {
+            return { status: 'critical', title: `Critical: ${reasons.join(', ')}.` };
+        }
+    },
+    getCustomerMarkerIcon(customer, isCompleted = false) {
+        const health = isCompleted ? { status: 'completed' } : this.calculateCustomerHealth(customer, App.DB.get('payments'), App.DB.get('visits'));
+        return L.divIcon({
+            className: 'leaflet-div-icon',
+            html: `<i class="fas fa-map-marker-alt status-marker ${health.status}" title="${health.title || ''}"></i>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 28]
+        });
     },
     getTagColor(tag) {
         const lowerTag = tag.toLowerCase();
@@ -5362,6 +5956,8 @@ Object.assign(App.Helpers, {
         const allData = getDataCallback();
         const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
         const customerMap = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c.companyName; return map; }, {});
+        const customerForecasts = App.DB.get('customerForecasts');
+        const currentMonthStr = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
 
         const allColumnLabels = {
             accountNo: 'Account #', companyName: 'Company Name', customerStatus: 'Customer Status', agingCategory: 'Aging Category', outstanding: 'Balance',
@@ -5385,9 +5981,11 @@ Object.assign(App.Helpers, {
                     case 'dateTime':
                     case 'date':
                         return App.Helpers.formatDate(value);
+                    case 'forecastAmount':
+                        const forecast = customerForecasts.find(f => f.accountNo === item.accountNo && f.month === currentMonthStr);
+                        return forecast ? forecast.amount.toFixed(2) : '0.00';
                     case 'outstanding':
                     case 'amount':
-                    case 'forecastAmount':
                     case 'balance_2020_2025':
                     case 'balance_2019_2020':
                     case 'balance_lte_2018':
@@ -5416,9 +6014,11 @@ Object.assign(App.Helpers, {
                         case 'dateTime':
                         case 'date':
                             return App.Helpers.formatDate(value);
+                        case 'forecastAmount':
+                             const forecast = customerForecasts.find(f => f.accountNo === item.accountNo && f.month === currentMonthStr);
+                             return App.Helpers.formatCurrency(forecast ? forecast.amount : 0);
                         case 'outstanding':
                         case 'amount':
-                        case 'forecastAmount':
                         case 'balance_2020_2025':
                         case 'balance_2019_2020':
                         case 'balance_lte_2018':
@@ -5437,6 +6037,7 @@ Object.assign(App.Helpers, {
         const allCustomers = App.DB.get('customers');
         const allPayments = App.DB.get('payments');
         const allVisits = App.DB.get('visits');
+        const allCustomerForecasts = App.DB.get('customerForecasts');
         const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
         const customerMap = allCustomers.reduce((map, c) => { map[c.accountNo] = c; return map; }, {});
 
@@ -5572,7 +6173,40 @@ Object.assign(App.Helpers, {
         });
 
         return { data, headers };
+    },
+    optimizeRoute(customerIds) {
+        if (customerIds.length < 2) return customerIds;
+
+        const customerMap = App.DB.get('customers').reduce((map, c) => {
+            map[c.accountNo] = c;
+            return map;
+        }, {});
+
+        // Simple TSP solver (Nearest Neighbor)
+        let unvisited = customerIds.map(id => customerMap[id]).filter(c => c && c.latitude && c.longitude);
+        if (unvisited.length < 2) return customerIds;
+
+        let route = [];
+        let current = unvisited.shift();
+        route.push(current.accountNo);
+
+        const getDist = (c1, c2) => Math.sqrt(Math.pow(c1.latitude - c2.latitude, 2) + Math.pow(c1.longitude - c2.longitude, 2));
+
+        while (unvisited.length > 0) {
+            let nearestIndex = -1;
+            let minDistance = Infinity;
+            for (let i = 0; i < unvisited.length; i++) {
+                let distance = getDist(current, unvisited[i]);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestIndex = i;
+                }
+            }
+            current = unvisited[nearestIndex];
+            route.push(current.accountNo);
+            unvisited.splice(nearestIndex, 1);
+        }
+        return route;
     }
 });
 </script></body> </html>
-````````````
