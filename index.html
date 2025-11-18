@@ -496,7 +496,6 @@
 <div id="changelog-detail-modal" class="modal"></div>
 <div id="route-planner-modal" class="modal"></div>
 
-
 <!-- Notification Dropdown -->
 <div id="notification-dropdown" class="card hidden" style="position: absolute; width: 350px; z-index: 1001; max-height: 400px; overflow-y: auto; padding: var(--spacing-4);">
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -620,7 +619,6 @@ Object.assign(App.DB, {
         if (!localStorage.getItem('notifications')) localStorage.setItem('notifications', JSON.stringify([]));
         if (!localStorage.getItem('changeLog')) localStorage.setItem('changeLog', JSON.stringify([]));
         if (!localStorage.getItem('forecasts')) localStorage.setItem('forecasts', JSON.stringify([]));
-        if (!localStorage.getItem('statusForecasts')) localStorage.setItem('statusForecasts', JSON.stringify([]));
         if (!localStorage.getItem('customerComments')) localStorage.setItem('customerComments', JSON.stringify([]));
         if (!localStorage.getItem('customerForecasts')) localStorage.setItem('customerForecasts', JSON.stringify([]));
 
@@ -1073,6 +1071,24 @@ Object.assign(App.UI, {
         <button id="generate-forecast-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
     </div>
     <div class="card">
+        <div class="card-header"><h3 class="card-title">Consultant Status Target Performance</h3></div>
+        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze performance against targets for specific customer statuses.</p>
+        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <div class="form-group">
+                <label for="report-status-target-consultant-select">Consultant</label>
+                <select id="report-status-target-consultant-select" class="form-control"></select>
+            </div>
+            <div class="form-group">
+                <label for="report-status-target-month-select">Month</label>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);">
+                    <select id="report-status-target-month-select" class="form-control"></select>
+                    <select id="report-status-target-year-select" class="form-control"></select>
+                </div>
+            </div>
+        </div>
+        <button id="generate-status-target-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
+    </div>
+    <div class="card">
         <div class="card-header"><h3 class="card-title">Consultant Visits Report</h3></div>
         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a detailed visit history and performance report for a selected consultant and date range.</p>
         <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
@@ -1169,7 +1185,7 @@ Object.assign(App.UI, {
         document.getElementById('consultant-customers-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="consultant-customers-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('consultant-customers-modal')">&times;</button></div><div id="consultant-customers-body" class="table-container"></div></div>`;
         document.getElementById('reassign-customers-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 id="reassign-customers-title">Reassign Customers</h3><button class="btn btn-outline" onclick="App.UI.closeModal('reassign-customers-modal')">&times;</button></div><form id="reassign-customers-form"><input type="hidden" id="from-consultant-hidden"><div class="form-group"><label>Customers assigned to <strong id="from-consultant-name"></strong></label><div id="reassign-customer-list" style="height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: var(--spacing-2); border-radius: 8px;"></div></div><div class="form-group"><label for="reassign-to-consultant">Reassign selected to</label><select id="reassign-to-consultant" class="form-control" required></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('reassign-customers-modal')">Cancel</button><button type="submit" class="btn btn-primary">Reassign</button></div></form></div>`;
         document.getElementById('reassign-and-delete-consultant-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 id="reassign-delete-title">Delete Consultant</h3><button class="btn btn-outline" onclick="App.UI.closeModal('reassign-and-delete-consultant-modal')">&times;</button></div><form id="reassign-and-delete-form"><input type="hidden" id="delete-consultant-id-hidden"><p id="reassign-delete-message"></p><div class="form-group mt-4"><label for="reassign-delete-to-consultant">Reassign all customers to</label><select id="reassign-delete-to-consultant" class="form-control" required></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('reassign-and-delete-consultant-modal')">Cancel</button><button type="submit" class="btn btn-danger">Reassign & Delete</button></div></form></div>`;
-        document.getElementById('forecast-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('forecast-modal')">&times;</button></div><form id="forecast-form"><input type="hidden" id="forecast-consultant-id"><input type="hidden" id="forecast-id-hidden"><div class="form-grid"><div class="form-group"><label for="forecast-month-select">Month</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="forecast-month-select" class="form-control" required></select><select id="forecast-year-select" class="form-control" required></select></div></div><div class="form-group"><label for="forecast-amount">Overall Target Amount (AED)</label><input type="number" id="forecast-amount" class="form-control" required></div></div><hr style="margin: var(--spacing-4) 0; border-color: var(--border-color);"><h5 style="font-size: var(--fs-lg); margin-bottom: var(--spacing-4);">Status-wise Targets (Optional)</h5><div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;"><div class="form-group"><label for="forecast-collectors">Collectors</label><input type="number" id="forecast-collectors" class="form-control" placeholder="0.00"></div><div class="form-group"><label for="forecast-sales-3-months">Sales (3 Months)</label><input type="number" id="forecast-sales-3-months" class="form-control" placeholder="0.00"></div><div class="form-group"><label for="forecast-sales-360-days">Sales (360 Days)</label><input type="number" id="forecast-sales-360-days" class="form-control" placeholder="0.00"></div></div><button type="submit" class="btn btn-primary">Save Target</button></form><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title mb-4">Target History</h4><div class="table-container"><table class="data-table"><thead></thead><tbody id="existing-forecasts-body"></tbody></table></div></div>`;
+        document.getElementById('forecast-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('forecast-modal')">&times;</button></div><form id="forecast-form"><input type="hidden" id="forecast-consultant-id"><input type="hidden" id="forecast-id-hidden"><div class="form-grid"><div class="form-group"><label for="forecast-month-select">Month</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="forecast-month-select" class="form-control" required></select><select id="forecast-year-select" class="form-control" required></select></div></div><div class="form-group"><label for="forecast-amount">Overall Target Amount (AED)</label><input type="number" id="forecast-amount" class="form-control" required></div></div><hr style="margin: var(--spacing-4) 0; border-color: var(--border-color);"><h4 class="card-title mb-2">Targets by Customer Status (Optional)</h4><div class="form-grid"><div class="form-group"><label for="forecast-amount-collectors">"Collectors" Target</label><input type="number" step="any" id="forecast-amount-collectors" class="form-control" placeholder="0.00"></div><div class="form-group"><label for="forecast-amount-sales3m">"Sales (3+ Months)" Target</label><input type="number" step="any" id="forecast-amount-sales3m" class="form-control" placeholder="0.00"></div><div class="form-group full-width"><label for="forecast-amount-sales360d">"Sales (360+ Days)" Target</label><input type="number" step="any" id="forecast-amount-sales360d" class="form-control" placeholder="0.00"></div></div><button type="submit" class="btn btn-primary mt-4">Save Target</button></form><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title mb-4">Target History</h4><div class="table-container"><table class="data-table"><thead><tr><th>Month</th><th>Overall Target</th><th>Collectors</th><th>Sales (3+ mo)</th><th>Sales (360+ d)</th><th>Actions</th></tr></thead><tbody id="existing-forecasts-body"></tbody></table></div></div>`;
         document.getElementById('customer-forecast-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-forecast-modal')">&times;</button></div><form id="customer-forecast-form"><input type="hidden" id="customer-forecast-accountNo"><input type="hidden" id="customer-forecast-id-hidden"><div class="form-grid"><div class="form-group"><label for="customer-forecast-month-select">Month</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="customer-forecast-month-select" class="form-control" required></select><select id="customer-forecast-year-select" class="form-control" required></select></div></div><div class="form-group"><label for="customer-forecast-amount">Forecast Amount (AED)</label><input type="number" id="customer-forecast-amount" class="form-control" required></div></div><button type="submit" class="btn btn-primary">Save Forecast</button></form><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title mb-4">Forecast History</h4><div class="table-container"><table class="data-table"><thead><tr><th>Month</th><th>Forecast Amount</th><th>Actions</th></tr></thead><tbody id="existing-customer-forecasts-body"></tbody></table></div></div>`;
         document.getElementById('report-modal').innerHTML = `<div class="modal-content" style="max-width: 90%; width: 1200px;"><div class="modal-header"><h3 id="report-modal-title" style="flex-grow: 1;"></h3><div id="report-modal-actions" class="d-flex gap-2"></div><button class="btn btn-outline" onclick="App.UI.closeModal('report-modal')" style="margin-left: 1rem;">&times;</button></div><div id="report-modal-body" style="margin-top: var(--spacing-4);"></div></div>`;
         document.getElementById('bulk-update-customers-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Bulk Customer Update</h3><button class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">&times;</button></div><p id="bulk-update-count-msg" class="text-secondary"></p><form id="bulk-update-form"><div class="form-group"><label for="bulk-update-consultant">Assign to Consultant (Optional)</label><select id="bulk-update-consultant" class="form-control"><option value="">-- Do Not Change --</option></select></div><div class="form-group"><label for="bulk-update-status">Set Account Status (Optional)</label><select id="bulk-update-status" class="form-control"><option value="">-- Do Not Change --</option><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="bulk-update-payment-status">Set Payment Status (Optional)</label><select id="bulk-update-payment-status" class="form-control"><option value="">-- Do Not Change --</option><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">Cancel</button><button type="submit" class="btn btn-warning">Apply Bulk Update</button></div></form></div>`;
@@ -3800,7 +3816,7 @@ Object.assign(App.Reports, {
     
     render: function() { 
         this.initializeCustomReportBuilder();
-        const consultantSelects = ['report-consultant-select', 'report-visits-consultant-select', 'report-target-consultant-select', 'report-forecast-consultant-select', 'report-aging-consultant-select', 'report-comprehensive-consultant-select', 'report-aging-collection-consultant-select']; 
+        const consultantSelects = ['report-consultant-select', 'report-visits-consultant-select', 'report-target-consultant-select', 'report-forecast-consultant-select', 'report-aging-consultant-select', 'report-comprehensive-consultant-select', 'report-aging-collection-consultant-select', 'report-status-target-consultant-select']; 
         
         consultantSelects.forEach(id => {
             const selectEl = document.getElementById(id);
@@ -3818,6 +3834,7 @@ Object.assign(App.Reports, {
         App.Helpers.populateMonthYearDropdowns('report-target-month-select', 'report-target-year-select', today.getMonth(), today.getFullYear());
         App.Helpers.populateMonthYearDropdowns('report-forecast-month-select', 'report-forecast-year-select', today.getMonth(), today.getFullYear());
         App.Helpers.populateMonthYearDropdowns('report-comprehensive-month-select', 'report-comprehensive-year-select', today.getMonth(), today.getFullYear());
+        App.Helpers.populateMonthYearDropdowns('report-status-target-month-select', 'report-status-target-year-select', today.getMonth(), today.getFullYear());
         
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const dateElements = ['report-activity-start-date', 'report-activity-end-date', 'report-collection-start-date', 'report-collection-end-date', 'report-standard-start-date', 'report-standard-end-date', 'report-visits-start-date', 'report-visits-end-date', 'report-aging-start-date', 'report-aging-end-date', 'report-aging-collection-start-date', 'report-aging-collection-end-date'];
@@ -3849,6 +3866,7 @@ Object.assign(App.Reports, {
                 'generate-consultant-visits-btn-new': () => this.generateConsultantVisitsReport(),
                 'generate-target-perf-btn': () => this.generateTargetPerformanceReport(),
                 'generate-forecast-perf-btn': () => this.generateForecastPerformanceReport(),
+                'generate-status-target-perf-btn': () => this.generateStatusTargetPerformanceReport(),
                 'generate-detailed-aging-report-btn': () => this.generateDetailedAgingReport(),
                 'generate-custom-report-btn': () => this.generateCustomReport(),
                 'generate-comprehensive-perf-btn': () => this.generateComprehensivePerformanceReport(),
@@ -4453,6 +4471,47 @@ Object.assign(App.Reports, {
         });
         this.displayReport(`Forecast Performance for ${monthFilter}`, ['Consultant', 'Forecasted Amount', 'Collected Amount', 'Performance'], reportData);
     },
+    generateStatusTargetPerformanceReport: function() {
+        const consultantIdFilter = document.getElementById('report-status-target-consultant-select').value;
+        const monthVal = document.getElementById('report-status-target-month-select').value;
+        const yearVal = document.getElementById('report-status-target-year-select').value;
+        const monthFilter = `${yearVal}-${monthVal}`;
+        if (!monthVal || !yearVal) return App.UI.toast('Please select a month and year.', 'warning');
+        
+        const consultantsToReportOn = consultantIdFilter === 'all' ? App.DB.get('consultants') : App.DB.get('consultants').filter(c => c.id == consultantIdFilter);
+        const allCustomers = App.DB.get('customers');
+        const paymentsInMonth = App.DB.get('payments').filter(p => p.date.startsWith(monthFilter) && p.status === 'Completed');
+        const allForecasts = App.DB.get('forecasts').filter(f => f.month === monthFilter);
+
+        let reportData = [];
+        const customerStatuses = ['Collectors', 'Sales (Above 3 Months)', 'Sales (Above 360 Days)'];
+
+        consultantsToReportOn.forEach(consultant => {
+            const consultantForecast = allForecasts.find(f => f.consultantId === consultant.id);
+            if (!consultantForecast) return;
+
+            customerStatuses.forEach(status => {
+                const targetAmount = consultantForecast[`amount_${status.replace(/\s/g, '').replace(/[()+]/g, '')}`] || 0;
+                
+                const customersInStatus = allCustomers.filter(c => c.salesConsultantId === consultant.id && c.customerStatus === status).map(c => c.accountNo);
+                const collectedAmount = paymentsInMonth.filter(p => customersInStatus.includes(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
+                
+                reportData.push([
+                    consultant.name,
+                    status,
+                    App.Helpers.formatCurrency(targetAmount),
+                    App.Helpers.formatCurrency(collectedAmount),
+                    targetAmount > 0 ? `${((collectedAmount / targetAmount) * 100).toFixed(1)}%` : 'N/A'
+                ]);
+            });
+        });
+
+        this.displayReport(
+            `Status Target Performance for ${monthFilter}`,
+            ['Consultant', 'Customer Status', 'Target Amount', 'Collected Amount', 'Performance %'],
+            reportData
+        );
+    },
     exportConsultantVisitsCSV: function() {
         if (!this.currentConsultantVisitsData) return App.UI.toast('No report data to export.', 'error');
         let csvContent = `Consultant Visits Report\nGenerated on: ${new Date().toLocaleDateString()}\n\nVISIT SUMMARY\n`;
@@ -4918,55 +4977,20 @@ Object.assign(App.Consultants, {
     },
     renderForecastsForConsultant(consultantId) {
         const allForecasts = App.DB.get('forecasts');
-        const allStatusForecasts = App.DB.get('statusForecasts');
-
-        const combinedForecasts = {};
-
-        allForecasts.forEach(f => {
-            if (f.consultantId == consultantId) {
-                if (!combinedForecasts[f.month]) {
-                    combinedForecasts[f.month] = { id: f.id, month: f.month, amount: 0 };
-                }
-                combinedForecasts[f.month].amount = f.amount;
-                combinedForecasts[f.month].forecastId = f.id;
-            }
-        });
-
-        allStatusForecasts.forEach(sf => {
-            if (sf.consultantId == consultantId) {
-                if (!combinedForecasts[sf.month]) {
-                    combinedForecasts[sf.month] = { id: sf.id, month: sf.month, amount: 0 };
-                }
-                combinedForecasts[sf.month].statusForecastId = sf.id;
-                combinedForecasts[sf.month].statusTargets = sf.targets;
-            }
-        });
-        
-        const sortedForecasts = Object.values(combinedForecasts).sort((a, b) => b.month.localeCompare(a.month));
-
+        const consultantForecasts = allForecasts.filter(f => f.consultantId == consultantId).sort((a, b) => b.month.localeCompare(a.month));
         const tbody = document.getElementById('existing-forecasts-body');
-        const thead = tbody.previousElementSibling;
-        thead.innerHTML = '<tr><th>Month</th><th>Overall Target</th><th>Collectors</th><th>Sales (3 Mon)</th><th>Sales (360)</th><th>Actions</th></tr>';
-
-        tbody.innerHTML = sortedForecasts.length > 0
-            ? sortedForecasts.map(f => {
-                const collectors = f.statusTargets?.collectors || 0;
-                const sales3Months = f.statusTargets?.sales3Months || 0;
-                const sales360Days = f.statusTargets?.sales360Days || 0;
-                return `<tr>
-                    <td>${f.month}</td>
-                    <td>${App.Helpers.formatCurrency(f.amount || 0)}</td>
-                    <td>${App.Helpers.formatCurrency(collectors)}</td>
-                    <td>${App.Helpers.formatCurrency(sales3Months)}</td>
-                    <td>${App.Helpers.formatCurrency(sales360Days)}</td>
-                    <td>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-outline edit-forecast" data-month="${f.month}" data-consultant-id="${consultantId}"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-danger delete-forecast" data-month="${f.month}" data-consultant-id="${consultantId}"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </td>
-                </tr>`
-            }).join('')
+        tbody.innerHTML = consultantForecasts.length > 0
+            ? consultantForecasts.map(f => `<tr>
+                <td>${f.month}</td>
+                <td>${App.Helpers.formatCurrency(f.amount)}</td>
+                <td>${App.Helpers.formatCurrency(f.amount_Collectors || 0)}</td>
+                <td>${App.Helpers.formatCurrency(f.amount_SalesAbove3Months || 0)}</td>
+                <td>${App.Helpers.formatCurrency(f.amount_SalesAbove360Days || 0)}</td>
+                <td><div class="d-flex gap-2">
+                    <button class="btn btn-outline edit-forecast" data-id="${f.id}"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-danger delete-forecast" data-id="${f.id}"><i class="fas fa-trash"></i></button>
+                </div></td>
+            </tr>`).join('')
             : '<tr><td colspan="6">No targets found.</td></tr>';
         App.UI.animateTableRows(tbody);
     },
@@ -4977,48 +5001,47 @@ Object.assign(App.Consultants, {
         const monthVal = form.elements['forecast-month-select'].value;
         const yearVal = form.elements['forecast-year-select'].value;
         const amount = parseFloat(form.elements['forecast-amount'].value);
-        
-        // New status-wise targets
-        const collectorsTarget = parseFloat(form.elements['forecast-collectors'].value) || 0;
-        const sales3MonthsTarget = parseFloat(form.elements['forecast-sales-3-months'].value) || 0;
-        const sales360DaysTarget = parseFloat(form.elements['forecast-sales-360-days'].value) || 0;
+        const amountCollectors = parseFloat(form.elements['forecast-amount-collectors'].value) || 0;
+        const amountSales3m = parseFloat(form.elements['forecast-amount-sales3m'].value) || 0;
+        const amountSales360d = parseFloat(form.elements['forecast-amount-sales360d'].value) || 0;
+        const forecastId = form.elements['forecast-id-hidden'].value;
 
-        if (!monthVal || !yearVal || isNaN(amount) || amount < 0) {
-            App.UI.toast('Please select a valid month/year and a positive overall amount.', 'error');
+        if (!monthVal || !yearVal || isNaN(amount) || amount <= 0) {
+            App.UI.toast('Please select a valid month/year and a positive overall target amount.', 'error');
             return;
         }
 
         const month = `${yearVal}-${monthVal}`;
         let forecasts = App.DB.get('forecasts');
-        let statusForecasts = App.DB.get('statusForecasts');
 
-        // --- Handle Overall Target ---
-        const existingForecastIndex = forecasts.findIndex(f => f.consultantId === consultantId && f.month === month);
-        if (existingForecastIndex > -1) {
-            forecasts[existingForecastIndex].amount = amount;
-            App.Helpers.logChange('Updated', 'Target', `for ${month}`, `New overall amount: ${App.Helpers.formatCurrency(amount)}`);
-        } else {
-            forecasts.push({ id: `f-${Date.now()}`, consultantId, month, amount });
-            App.Helpers.logChange('Created', 'Target', `for ${month}`, `Overall amount: ${App.Helpers.formatCurrency(amount)}`);
-        }
-        App.DB.set('forecasts', forecasts);
-
-        // --- Handle Status-wise Targets ---
-        const existingStatusForecastIndex = statusForecasts.findIndex(f => f.consultantId === consultantId && f.month === month);
-        const statusTargets = {
-            collectors: collectorsTarget,
-            sales3Months: sales3MonthsTarget,
-            sales360Days: sales360DaysTarget
+        const forecastData = { 
+            consultantId, 
+            month, 
+            amount,
+            amount_Collectors: amountCollectors,
+            amount_SalesAbove3Months: amountSales3m,
+            amount_SalesAbove360Days: amountSales360d,
         };
-        if (existingStatusForecastIndex > -1) {
-            statusForecasts[existingStatusForecastIndex].targets = statusTargets;
-            App.Helpers.logChange('Updated', 'Status Target', `for ${month}`, `New status targets set.`);
-        } else {
-            statusForecasts.push({ id: `sf-${Date.now()}`, consultantId, month, targets: statusTargets });
-            App.Helpers.logChange('Created', 'Status Target', `for ${month}`, `Status targets set.`);
+
+        if (forecastId) { // Editing existing
+            const index = forecasts.findIndex(f => f.id === forecastId);
+            if (index > -1) {
+                forecasts[index] = { ...forecasts[index], ...forecastData };
+                App.Helpers.logChange('Updated', 'Target', `for ${month}`, `New amounts set.`);
+            }
+        } else { // Adding new
+            const existingIndex = forecasts.findIndex(f => f.consultantId === consultantId && f.month === month);
+            if (existingIndex > -1) { // If user tries to create a duplicate month, update it instead
+                forecasts[existingIndex] = { ...forecasts[existingIndex], ...forecastData };
+                App.Helpers.logChange('Updated', 'Target', `for ${month}`, `New amounts set.`);
+            } else {
+                const newForecast = { id: `f-${Date.now()}`, ...forecastData };
+                forecasts.push(newForecast);
+                App.Helpers.logChange('Created', 'Target', `for ${month}`, `Amounts set.`);
+            }
         }
-        App.DB.set('statusForecasts', statusForecasts);
         
+        App.DB.set('forecasts', forecasts);
         App.UI.toast('Target saved!', 'success');
         form.reset();
         document.getElementById('forecast-id-hidden').value = '';
@@ -5032,44 +5055,41 @@ Object.assign(App.Consultants, {
         this.renderForecastsForConsultant(consultantId);
         if (App.state.activePage === 'performance') App.Performance.render();
     },
-    deleteForecast(month, consultantId) {
+    deleteForecast(forecastId) {
+        const forecasts = App.DB.get('forecasts');
+        const forecast = forecasts.find(f => f.id === forecastId);
+        if (!forecast) return;
+        
         App.UI.confirm(
-            'Delete all targets for this month?', 
-            `Are you sure you want to delete all targets for ${month}?`, 
+            'Delete this target?', 
+            `Are you sure you want to delete the target for ${forecast.month}?`, 
             () => {
-                let forecasts = App.DB.get('forecasts');
-                let statusForecasts = App.DB.get('statusForecasts');
-
-                const updatedForecasts = forecasts.filter(f => !(f.consultantId == consultantId && f.month === month));
-                const updatedStatusForecasts = statusForecasts.filter(f => !(f.consultantId == consultantId && f.month === month));
-
+                const updatedForecasts = forecasts.filter(f => f.id !== forecastId);
                 App.DB.set('forecasts', updatedForecasts);
-                App.DB.set('statusForecasts', updatedStatusForecasts);
-
-                App.Helpers.logChange('Deleted', 'Target', `for month ${month}`);
-                App.UI.toast('Targets deleted.', 'success');
-                this.renderForecastsForConsultant(consultantId);
+                App.Helpers.logChange('Deleted', 'Target', `for ${forecast.month}`);
+                App.UI.toast('Target deleted.', 'success');
+                this.renderForecastsForConsultant(forecast.consultantId);
                 if (App.state.activePage === 'performance') App.Performance.render();
             },
             '#forecast-modal'
         );
     },
-    editForecast(month, consultantId) {
-        const forecast = App.DB.get('forecasts').find(f => f.consultantId == consultantId && f.month === month);
-        const statusForecast = App.DB.get('statusForecasts').find(f => f.consultantId == consultantId && f.month === month);
-
+    editForecast(forecastId) {
+        const forecast = App.DB.get('forecasts').find(f => f.id === forecastId);
+        if (!forecast) return;
         const form = document.getElementById('forecast-form');
+        form.elements['forecast-id-hidden'].value = forecast.id;
         
-        const [year, monthVal] = month.split('-');
-        App.Helpers.populateMonthYearDropdowns('forecast-month-select', 'forecast-year-select', parseInt(monthVal, 10) - 1, parseInt(year, 10));
+        const [year, month] = forecast.month.split('-');
+        App.Helpers.populateMonthYearDropdowns('forecast-month-select', 'forecast-year-select', parseInt(month, 10) - 1, parseInt(year, 10));
 
         document.getElementById('forecast-month-select').disabled = true;
         document.getElementById('forecast-year-select').disabled = true;
         
-        form.elements['forecast-amount'].value = forecast?.amount || '';
-        form.elements['forecast-collectors'].value = statusForecast?.targets?.collectors || '';
-        form.elements['forecast-sales-3-months'].value = statusForecast?.targets?.sales3Months || '';
-        form.elements['forecast-sales-360-days'].value = statusForecast?.targets?.sales360Days || '';
+        form.elements['forecast-amount'].value = forecast.amount;
+        form.elements['forecast-amount-collectors'].value = forecast.amount_Collectors || '';
+        form.elements['forecast-amount-sales3m'].value = forecast.amount_SalesAbove3Months || '';
+        form.elements['forecast-amount-sales360d'].value = forecast.amount_SalesAbove360Days || '';
         form.elements['forecast-amount'].focus();
     }
 });
@@ -5435,7 +5455,7 @@ Object.assign(App.Settings, {
 
         if (format === 'json') {
             const dataToBackup = {};
-            const keysToBackup = ['customers', 'visits', 'payments', 'users', 'consultants', 'activityLog', 'changeLog', 'notifications', 'dataModelVersion', 'forecasts', 'statusForecasts', 'customerComments', 'customerForecasts', 'paginationSettings'];
+            const keysToBackup = ['customers', 'visits', 'payments', 'users', 'consultants', 'activityLog', 'changeLog', 'notifications', 'dataModelVersion', 'forecasts', 'customerComments', 'customerForecasts', 'paginationSettings'];
             keysToBackup.forEach(key => {
                 const data = localStorage.getItem(key);
                 if (data) {
@@ -5444,7 +5464,7 @@ Object.assign(App.Settings, {
             });
             App.Helpers.downloadBlob(JSON.stringify(dataToBackup, null, 2), `erp-backup-${dateStr}.json`, 'application/json');
         } else if (format === 'csv') {
-            const tables = ['customers', 'visits', 'payments', 'consultants', 'users', 'forecasts', 'statusForecasts', 'customerComments', 'customerForecasts'];
+            const tables = ['customers', 'visits', 'payments', 'consultants', 'users', 'forecasts', 'customerComments', 'customerForecasts'];
             tables.forEach(key => {
                 const data = App.DB.get(key);
                 if (data.length > 0) {
@@ -5503,42 +5523,58 @@ Object.assign(App.Performance, {
         const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${(App.state.dashboardTimeFrame.month).toString().padStart(2, '0')}`;
         const customers = App.DB.get('customers').filter(c => c.salesConsultantId === consultant.id);
         const customerIds = customers.map(c => c.accountNo);
-        const payments = App.DB.get('payments').filter(p => customerIds.includes(p.customerId) && p.status === 'Completed' && p.date.startsWith(currentMonthStr));
+        const paymentsInMonth = App.DB.get('payments').filter(p => customerIds.includes(p.customerId) && p.status === 'Completed' && p.date.startsWith(currentMonthStr));
         const visits = App.DB.get('visits').filter(v => v.collectorId === consultant.id && v.dateTime.startsWith(currentMonthStr));
-        const target = App.DB.get('forecasts').find(f => f.consultantId === consultant.id && f.month === currentMonthStr);
+        const forecast = App.DB.get('forecasts').find(f => f.consultantId === consultant.id && f.month === currentMonthStr) || {};
         const customerForecasts = App.DB.get('customerForecasts');
 
-        const collectedAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-        const targetAmount = target ? target.amount : 0;
+        const collectedAmount = paymentsInMonth.reduce((sum, p) => sum + p.amount, 0);
+        
+        // --- Overall Target ---
+        const targetAmount = forecast.amount || 0;
         const targetPercentage = targetAmount > 0 ? ((collectedAmount / targetAmount) * 100).toFixed(0) : 0;
 
-        const forecastAmount = customerForecasts
-            .filter(f => f.month === currentMonthStr && customerIds.includes(f.accountNo))
-            .reduce((sum, f) => sum + f.amount, 0);
+        // --- Customer Forecast ---
+        const forecastAmount = customerForecasts.filter(f => f.month === currentMonthStr && customerIds.includes(f.accountNo)).reduce((sum, f) => sum + f.amount, 0);
         const forecastPercentage = forecastAmount > 0 ? ((collectedAmount / forecastAmount) * 100).toFixed(0) : 0;
 
-        // --- Outstanding Balances (current state) ---
-        const totalOutstanding = customers.reduce((sum, c) => sum + (c.balance_lte_2018 || 0) + (c.balance_2019_2020 || 0) + (c.balance_2020_2025 || 0), 0);
-        const balance_lte_2018 = customers.reduce((sum, c) => sum + (c.balance_lte_2018 || 0), 0);
-        const balance_2019_2020 = customers.reduce((sum, c) => sum + (c.balance_2019_2020 || 0), 0);
-        const balance_2020_2025 = customers.reduce((sum, c) => sum + (c.balance_2020_2025 || 0), 0);
-        
-        const perc_outstanding_lte_2018 = totalOutstanding > 0 ? (balance_lte_2018 / totalOutstanding * 100).toFixed(1) : 0;
-        const perc_outstanding_2019_2020 = totalOutstanding > 0 ? (balance_2019_2020 / totalOutstanding * 100).toFixed(1) : 0;
-        const perc_outstanding_2020_2025 = totalOutstanding > 0 ? (balance_2020_2025 / totalOutstanding * 100).toFixed(1) : 0;
-        
-        // --- Collected This Month Breakdown ---
-        const collected_lte_2018 = payments.reduce((sum, p) => sum + (p.amount_lte_2018 || 0), 0);
-        const collected_2019_2020 = payments.reduce((sum, p) => sum + (p.amount_2019_2020 || 0), 0);
-        const collected_2020_2025 = payments.reduce((sum, p) => sum + (p.amount_2020_2025 || 0), 0);
-        
-        // --- Calculate initial balances for the month to get correct percentages ---
-        const initial_balance_lte_2018 = balance_lte_2018 + collected_lte_2018;
-        const initial_balance_2019_2020 = balance_2019_2020 + collected_2019_2020;
-        const initial_balance_2020_2025 = balance_2020_2025 + collected_2020_2025;
+        // --- Status-wise Targets ---
+        const customerStatuses = ['Collectors', 'Sales (Above 3 Months)', 'Sales (Above 360 Days)'];
+        let statusProgressHTML = '';
+        customerStatuses.forEach(status => {
+            const key = `amount_${status.replace(/\s/g, '').replace(/[()+]/g, '')}`;
+            const statusTarget = forecast[key] || 0;
+            
+            const customersInStatus = customers.filter(c => c.customerStatus === status).map(c => c.accountNo);
+            const collectedForStatus = paymentsInMonth.filter(p => customersInStatus.includes(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
+            
+            const percentage = statusTarget > 0 ? ((collectedForStatus / statusTarget) * 100).toFixed(0) : 0;
 
+            statusProgressHTML += `
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span style="font-size: var(--fs-sm);">${status}</span>
+                        <span>${percentage}%</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-bar-inner" data-width="${percentage}" style="background-color: var(--success);"></div></div>
+                    <div style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedForStatus)} of ${App.Helpers.formatCurrency(statusTarget)}</div>
+                </div>`;
+        });
+        
+        // --- Outstanding Balances & Collected This Month Breakdown ---
+        const balance_lte_2018 = customers.reduce((sum, c) => sum + (c.balance_lte_2018 || 0), 0);
+        const collected_lte_2018 = paymentsInMonth.reduce((sum, p) => sum + (p.amount_lte_2018 || 0), 0);
+        const initial_balance_lte_2018 = balance_lte_2018 + collected_lte_2018;
         const perc_collected_lte_2018 = initial_balance_lte_2018 > 0 ? (collected_lte_2018 / initial_balance_lte_2018 * 100).toFixed(1) : 0;
+
+        const balance_2019_2020 = customers.reduce((sum, c) => sum + (c.balance_2019_2020 || 0), 0);
+        const collected_2019_2020 = paymentsInMonth.reduce((sum, p) => sum + (p.amount_2019_2020 || 0), 0);
+        const initial_balance_2019_2020 = balance_2019_2020 + collected_2019_2020;
         const perc_collected_2019_2020 = initial_balance_2019_2020 > 0 ? (collected_2019_2020 / initial_balance_2019_2020 * 100).toFixed(1) : 0;
+
+        const balance_2020_2025 = customers.reduce((sum, c) => sum + (c.balance_2020_2025 || 0), 0);
+        const collected_2020_2025 = paymentsInMonth.reduce((sum, p) => sum + (p.amount_2020_2025 || 0), 0);
+        const initial_balance_2020_2025 = balance_2020_2025 + collected_2020_2025;
         const perc_collected_2020_2025 = initial_balance_2020_2025 > 0 ? (collected_2020_2025 / initial_balance_2020_2025 * 100).toFixed(1) : 0;
 
         return `
@@ -5549,7 +5585,7 @@ Object.assign(App.Performance, {
                 <div>
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span>Monthly Target (${currentMonthStr})</span>
+                            <span>Overall Monthly Target (${currentMonthStr})</span>
                             <span>${targetPercentage}%</span>
                         </div>
                         <div class="progress-bar"><div class="progress-bar-inner" data-width="${targetPercentage}"></div></div>
@@ -5557,40 +5593,19 @@ Object.assign(App.Performance, {
                     </div>
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span>Customer Forecast (${currentMonthStr})</span>
+                            <span>Overall Customer Forecast (${currentMonthStr})</span>
                             <span>${forecastPercentage}%</span>
                         </div>
                         <div class="progress-bar"><div class="progress-bar-inner" data-width="${forecastPercentage}" style="background-color: var(--warning);"></div></div>
                          <div class="text-right" style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedAmount)} of ${App.Helpers.formatCurrency(forecastAmount)}</div>
                     </div>
-                    <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
-                    <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Outstanding Balance Breakdown</h4>
-                    <div class="detail-info-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--spacing-2);">
-                         <div class="detail-info-card">
-                            <div class="label"><=2018</div>
-                            <div class="breakdown-item">
-                                <span class="value">${App.Helpers.formatCurrency(balance_lte_2018)}</span>
-                                <span class="percentage">${perc_outstanding_lte_2018}%</span>
-                            </div>
-                        </div>
-                         <div class="detail-info-card">
-                            <div class="label">2019-2020</div>
-                            <div class="breakdown-item">
-                                <span class="value">${App.Helpers.formatCurrency(balance_2019_2020)}</span>
-                                <span class="percentage">${perc_outstanding_2019_2020}%</span>
-                            </div>
-                        </div>
-                         <div class="detail-info-card">
-                            <div class="label">2020-2025</div>
-                            <div class="breakdown-item">
-                                <span class="value">${App.Helpers.formatCurrency(balance_2020_2025)}</span>
-                                <span class="percentage">${perc_outstanding_2020_2025}%</span>
-                            </div>
-                        </div>
-                    </div>
                     
                     <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
-                    <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Collected This Month Breakdown</h4>
+                    <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Status-wise Target Progress</h4>
+                    ${statusProgressHTML}
+
+                    <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
+                    <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Collected This Month vs Initial Balance</h4>
                     <div class="detail-info-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--spacing-2);">
                          <div class="detail-info-card">
                             <div class="label"><=2018</div>
@@ -5618,7 +5633,7 @@ Object.assign(App.Performance, {
                      <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
                     <div class="detail-info-grid" style="grid-template-columns: 1fr 1fr;">
                         <div class="detail-info-card"><div class="label">Visits This Month</div><div class="value">${visits.length}</div></div>
-                        <div class="detail-info-card"><div class="label">Payments This Month</div><div class="value">${payments.length}</div></div>
+                        <div class="detail-info-card"><div class="label">Payments This Month</div><div class="value">${paymentsInMonth.length}</div></div>
                     </div>
                 </div>
             </div>
