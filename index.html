@@ -1,4 +1,4 @@
-<!-- v2.3 --><!DOCTYPE html><html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Customer Recovery App - v2.3</title>
+<!-- v2.4 --><!DOCTYPE html><html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Customer Recovery App - v2.4</title>
 
 <!-- Dependencies -->
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -525,7 +525,37 @@
 <!-- Sidebar Overlay for Mobile -->
 <div id="sidebar-overlay" class="hidden"></div>
 <script>
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', () => {
+    // Version Control & Session Recovery Logic
+    const currentAppVersion = '2.5';
+    const storedVersion = localStorage.getItem('appVersion');
+
+    if (storedVersion !== currentAppVersion) {
+        console.warn(`App version mismatch. Stored: ${storedVersion}, Current: ${currentAppVersion}. Clearing local storage.`);
+        // Clear all local data which might be in an old format
+        localStorage.clear();
+        // Set the new version
+        localStorage.setItem('appVersion', currentAppVersion);
+        // We reload the page to ensure a completely clean state
+        location.reload();
+        return; // Stop further execution
+    }
+    
+    // Session Recovery for corrupt data within the same version
+    const userSession = sessionStorage.getItem('user');
+    if (userSession) {
+        try {
+            JSON.parse(userSession);
+        } catch (error) {
+            console.warn("Corrupt session data detected. Clearing session and reloading.");
+            sessionStorage.removeItem('user');
+            location.reload();
+            return; 
+        }
+    }
+    App.init();
+});
+
 
 const App = {
     state: { currentUser: null, reports: { activityView: 'summary', customReportFilters: [] }, activePage: 'dashboard', activeCustomerId: null, activeConsultantId: null,
@@ -3591,7 +3621,7 @@ drawPlannedRoute() {
         let hash = 0;
         for (let i = 0; i < customer.accountNo.length; i++) hash = customer.accountNo.charCodeAt(i) + ((hash << 5) - hash);
         const mockLat = 25.2048 + ((hash % 100) / 10000);
-        const mockLon = 55.2708 + (((hash / 100) % 100) / 10000);
+        const mockLon = 55.2708 + (((hash / 1000) % 100) / 10000);
 
         const numberedIcon = L.divIcon({
             className: 'numbered-marker',
@@ -3813,7 +3843,8 @@ Object.assign(App.Reports, {
         'date': [{id: 'ON', name: 'On'}, {id: 'BEFORE', name: 'Before'}, {id: 'AFTER', name: 'After'}],
         'select': [{id: 'EQ', name: 'Is'}, {id: 'NEQ', name: 'Is Not'}]
     },
-    
+	
+	
     render: function() { 
         this.initializeCustomReportBuilder();
         const consultantSelects = ['report-consultant-select', 'report-visits-consultant-select', 'report-target-consultant-select', 'report-forecast-consultant-select', 'report-aging-consultant-select', 'report-comprehensive-consultant-select', 'report-aging-collection-consultant-select', 'report-status-target-consultant-select']; 
@@ -4491,7 +4522,8 @@ Object.assign(App.Reports, {
             if (!consultantForecast) return;
 
             customerStatuses.forEach(status => {
-                const targetAmount = consultantForecast[`amount_${status.replace(/\s/g, '').replace(/[()+]/g, '')}`] || 0;
+                const key = `amount_${status.replace(/\s/g, '').replace(/[()+]/g, '')}`;
+                const targetAmount = consultantForecast[key] || 0;
                 
                 const customersInStatus = allCustomers.filter(c => c.salesConsultantId === consultant.id && c.customerStatus === status).map(c => c.accountNo);
                 const collectedAmount = paymentsInMonth.filter(p => customersInStatus.includes(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
