@@ -1,10 +1,10 @@
-<!-- Version: 2.5 -->
+<!-- Version: 2.6 (Reports Aligned) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Customer Recovery App - v2.5</title>
+<title>Customer Recovery App - v2.6</title>
 
 <!-- Dependencies -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -448,6 +448,68 @@
     .health-dot.warning { background-color: var(--warning); }
     .health-dot.critical { background-color: var(--danger); }
 
+    /* --- Reports Page Improvements (NEW) --- */
+    .report-section-header {
+        font-size: var(--fs-lg);
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-top: var(--spacing-8);
+        margin-bottom: var(--spacing-4);
+        padding-bottom: var(--spacing-2);
+        border-bottom: 2px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-2);
+    }
+
+    .report-section-header i {
+        color: var(--primary);
+    }
+
+    .report-category-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: var(--spacing-6);
+    }
+
+    /* Make cards equal height and push buttons to bottom */
+    .report-category-grid .card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .report-category-grid .card .form-grid {
+        flex-grow: 1; /* Pushes the button down */
+    }
+
+    .report-category-grid .card button {
+        margin-top: var(--spacing-4);
+        align-self: flex-start;
+    }
+
+    /* Improve Standard Reports Buttons */
+    .standard-reports-buttons {
+        display: flex;
+        gap: var(--spacing-4);
+        flex-wrap: wrap;
+    }
+
+    .standard-reports-buttons button {
+        flex: 1 1 calc(20% - var(--spacing-4)); /* distribute evenly */
+        min-width: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: var(--spacing-4);
+        gap: var(--spacing-2);
+    }
+
+    .standard-reports-buttons button i {
+        font-size: 1.5rem;
+        margin-bottom: 5px;
+    }
 
     /* --- Accessibility --- */
     *:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
@@ -537,7 +599,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // Version Control & Session Recovery Logic
-    const currentAppVersion = '2.5';
+    const currentAppVersion = '2.6';
     const storedVersion = localStorage.getItem('appVersion');
 
     if (storedVersion !== currentAppVersion) {
@@ -921,266 +983,372 @@ Object.assign(App.UI, {
         document.getElementById('visits-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Upcoming Visits</div><div id="visit-kpi-upcoming" class="value">0</div></div><div class="kpi-card"><div class="title">Overdue Visits</div><div id="visit-kpi-overdue" class="value">0</div></div><div class="kpi-card"><div class="title">Completed Today</div><div id="visit-kpi-completed-today" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><div class="d-flex gap-2"><button class="btn btn-outline visit-view-tab active" data-view="list"><i class="fas fa-list"></i> List View</button><button class="btn btn-outline visit-view-tab" data-view="calendar"><i class="fas fa-calendar"></i> Calendar View</button><button class="btn btn-outline visit-view-tab" data-view="map"><i class="fas fa-map-marked-alt"></i> Map View</button></div><div id="visits-header-actions" class="d-flex gap-2"></div></div><div id="list-view-controls" class="d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap"><div class="d-flex gap-2" data-role="admin"><div class="input-with-icon"><input type="search" id="visit-search" placeholder="Search customer or purpose..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="visit-consultant-filter" class="form-control" style="width: auto;"><option value="all">All Consultants</option></select></div><button class="btn filter-btn visit-filter-btn active" data-filter="Upcoming">Upcoming</button><button class="btn filter-btn visit-filter-btn" data-filter="Today">Today</button><button class="btn filter-btn visit-filter-btn" data-filter="Overdue">Overdue</button><button class="btn filter-btn visit-filter-btn" data-filter="All">All Visits</button></div><div class="d-flex gap-2 align-items-center flex-wrap"><input type="date" id="visit-start-date" class="form-control" style="width:auto;"><div class="d-flex gap-1"><button class="btn btn-outline" id="set-visit-date-today">Today</button><button class="btn btn-outline" id="set-visit-date-tomorrow">Tomorrow</button></div><span>to</span><input type="date" id="visit-end-date" class="form-control" style="width:auto;"><button class="btn btn-primary" id="visit-date-apply">Apply</button></div></div><div id="map-view-controls" class="hidden d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap align-items-center"><div data-role="admin" class="form-group mb-0"><label for="map-consultant-filter">Consultant</label><select id="map-consultant-filter" class="form-control"></select></div><div class="form-group mb-0"><label for="map-date-filter">Date</label><input type="date" id="map-date-filter" class="form-control"></div></div><button id="clear-route-btn" class="btn btn-outline hidden"><i class="fas fa-times"></i> Clear Route</button></div><div id="list-view-content" class="visit-view-content"><div class="table-container"><table class="data-table"><thead></thead><tbody id="visit-table-body"></tbody></table></div><div id="visits-pagination" class="pagination-controls"></div></div><div id="calendar-view-content" class="visit-view-content hidden"><div id="calendar-view" style="min-height: 600px;"></div></div><div id="map-view-content" class="visit-view-content hidden"><div id="map-view" style="height: 600px; border-radius: 8px;"></div></div></div>`; 
         document.getElementById('payments-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Recovered This Month</div><div id="payment-kpi-recovered-month" class="value">0</div></div><div class="kpi-card"><div class="title">Total Payments Recorded</div><div id="payment-kpi-total-count" class="value">0</div></div><div class="kpi-card"><div class="title">Pending Payments</div><div id="payment-kpi-pending" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Recent Payments</h3><div class="d-flex gap-2"><div class="input-with-icon"><input type="search" id="payment-search" placeholder="Search customer..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="payment-status-filter" class="form-control" style="width: auto;"><option value="all">All Status</option><option>Completed</option><option>Pending</option><option>Failed</option></select><select id="payment-method-filter" class="form-control" style="width: auto;"><option value="all">All Methods</option><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="d-flex gap-2"><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-payments-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-payments-pdf"><i class="fas fa-file-pdf"></i> PDF</button></div><button class="btn btn-success" id="record-payment-btn"><i class="fas fa-plus"></i> Record Payment</button></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="date">Date</th><th data-sort="customerId">Customer</th><th data-sort="consultantId">Consultant</th><th data-sort="amount">Amount</th><th data-sort="method">Method</th><th data-sort="status">Status</th><th>Actions</th></tr></thead><tbody id="payment-table-body"></tbody></table></div><div id="payments-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('analytics-page').innerHTML = `<div class="page-header"><h2>Analytics Dashboard</h2><p>Visual insights into recovery performance and activities.</p></div><div id="analytics-kpi-grid" class="kpi-card-grid"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div class="card"><div class="card-header"><h3 class="card-title">Recovery Performance by Consultant</h3></div><div class="chart-container"><canvas id="recovery-by-consultant-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Outstanding Debt by Emirate</h3></div><div class="chart-container"><canvas id="recovery-by-emirate-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Payment Methods</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="payment-methods-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="visit-outcome-chart"></canvas></div></div></div>`;
+        
+        // UPDATED REPORTS PAGE HTML STRUCTURE
         document.getElementById('reports-page').innerHTML = `
-            <div class="card">
-    <div class="card-header"><h3 class="card-title">Custom Report Generator</h3></div>
-    <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Build your own report by selecting data sources, columns, and filters.</p>
+    <!-- 1. Custom Report Builder (Full Width) -->
+    <div class="card mb-4">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-magic"></i> Custom Report Generator</h3></div>
+        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Build your own report by selecting data sources, columns, and filters.</p>
+        
+        <div id="custom-report-builder">
+            <!-- Step 1: Select Data Source -->
+            <h4 style="font-size: var(--fs-base); font-weight: 600; margin-bottom: var(--spacing-2);">1. Select Data Source</h4>
+            <div class="form-group">
+                <div id="data-source-selector" class="d-flex gap-2 flex-wrap">
+                     <label class="btn btn-outline filter-btn active" style="box-shadow: none;">
+                        <input type="radio" name="dataSource" value="customers" class="hidden" checked> <i class="fas fa-users"></i> Customers
+                    </label>
+                    <label class="btn btn-outline filter-btn" style="box-shadow: none;">
+                        <input type="radio" name="dataSource" value="payments" class="hidden"> <i class="fas fa-credit-card"></i> Payments
+                    </label>
+                    <label class="btn btn-outline filter-btn" style="box-shadow: none;">
+                        <input type="radio" name="dataSource" value="visits" class="hidden"> <i class="fas fa-calendar-check"></i> Visits
+                    </label>
+                </div>
+            </div>
+
+            <!-- Step 2: Select Columns -->
+            <h4 style="font-size: var(--fs-base); font-weight: 600; margin-bottom: var(--spacing-2); margin-top: var(--spacing-4);">2. Choose Columns</h4>
+            <div id="column-selector" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); background: var(--bg-color); padding: var(--spacing-4); border-radius: 8px;">
+                <!-- Column checkboxes inserted via JS -->
+            </div>
+
+            <!-- Step 3: Filters -->
+            <h4 style="font-size: var(--fs-base); font-weight: 600; margin-bottom: var(--spacing-2); margin-top: var(--spacing-4);">3. Apply Filters</h4>
+            <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                <div class="form-group">
+                    <label for="custom-report-consultant-filter">Sales Consultant</label>
+                    <select id="custom-report-consultant-filter" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label for="custom-report-start-date">Date From</label>
+                    <input type="date" id="custom-report-start-date" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="custom-report-end-date">Date To</label>
+                    <input type="date" id="custom-report-end-date" class="form-control">
+                </div>
+            </div>
+            
+            <!-- Dynamic Filters -->
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <label style="font-weight: 500;">Advanced Filters</label>
+                <button class="btn btn-outline btn-sm" id="add-dynamic-filter-btn"><i class="fas fa-plus"></i> Add Condition</button>
+            </div>
+            <div id="dynamic-filter-container" class="mt-2"></div>
+            
+            <div id="custom-report-preview" class="card mt-4 p-4" style="background: var(--bg-color); box-shadow: none; border: 1px dashed var(--border-color);">
+                <h5 class="card-title" style="font-size: var(--fs-sm);">Live Preview (First 5 Rows)</h5>
+                <div class="table-container">
+                    <table class="data-table report-table-small" id="custom-report-preview-table"><thead></thead><tbody></tbody></table>
+                </div>
+            </div>
+
+            <button id="generate-custom-report-btn" class="btn btn-primary mt-4" style="width: 100%;"><i class="fas fa-file-export"></i> Generate Custom Report</button>
+        </div>
+    </div>
+
+    <!-- 2. Performance Reports Section -->
+    <div class="report-section-header"><i class="fas fa-tachometer-alt"></i> Performance & Targets</div>
+    <div class="report-category-grid">
+         <!-- Comprehensive Performance -->
+         <div class="card">
+            <div class="card-header"><h3 class="card-title">Comprehensive Performance</h3></div>
+             <p class="text-secondary mb-4">Overview of all key consultant KPIs (Target vs Actual, Visits, etc).</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Consultant (Optional)</label>
+                    <select id="report-comprehensive-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-comprehensive-month-select" class="form-control"></select>
+                        <select id="report-comprehensive-year-select" class="form-control"></select>
+                    </div>
+                </div>
+            </div>
+            <button id="generate-comprehensive-perf-btn" class="btn btn-primary"><i class="fas fa-chart-bar"></i> Generate Report</button>
+        </div>
+
+        <!-- Target Performance -->
+         <div class="card">
+            <div class="card-header"><h3 class="card-title">Target vs. Actual</h3></div>
+             <p class="text-secondary mb-4">Analyze monthly target vs. actual collections.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-target-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-target-month-select" class="form-control"></select>
+                        <select id="report-target-year-select" class="form-control"></select>
+                    </div>
+                </div>
+            </div>
+            <button id="generate-target-perf-btn" class="btn btn-primary"><i class="fas fa-bullseye"></i> Generate Report</button>
+        </div>
+
+        <!-- Forecast Performance -->
+         <div class="card">
+            <div class="card-header"><h3 class="card-title">Forecast vs. Actual</h3></div>
+             <p class="text-secondary mb-4">Analyze monthly forecast vs. actual collections.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-forecast-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-forecast-month-select" class="form-control"></select>
+                        <select id="report-forecast-year-select" class="form-control"></select>
+                    </div>
+                </div>
+            </div>
+            <button id="generate-forecast-perf-btn" class="btn btn-primary"><i class="fas fa-chart-line"></i> Generate Report</button>
+        </div>
+        
+        <!-- Status Target Performance -->
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Status Target Performance</h3></div>
+            <p class="text-secondary mb-4">Analyze performance against targets for specific statuses (Collectors, Sales).</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-status-target-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-status-target-month-select" class="form-control"></select>
+                        <select id="report-status-target-year-select" class="form-control"></select>
+                    </div>
+                </div>
+            </div>
+            <button id="generate-status-target-perf-btn" class="btn btn-primary"><i class="fas fa-tasks"></i> Generate Report</button>
+        </div>
+    </div>
+
+    <!-- 3. Financial & Aging Section -->
+    <div class="report-section-header"><i class="fas fa-coins"></i> Financial & Aging</div>
+    <div class="report-category-grid">
+        <!-- Aging Collection -->
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Collection by Aging</h3></div>
+            <p class="text-secondary mb-4">Analyze collected amounts against aging buckets.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Consultant (Optional)</label>
+                    <select id="report-aging-collection-consultant-select" class="form-control"></select>
+                </div>
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-aging-collection-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-aging-collection-end-date" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <button id="generate-aging-collection-report-btn" class="btn btn-primary"><i class="fas fa-hourglass-half"></i> Generate Report</button>
+        </div>
+
+        <!-- Detailed Aging -->
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Detailed Aging Breakdown</h3></div>
+            <p class="text-secondary mb-4">Deep dive into collections vs aging debt per customer.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                 <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-aging-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-aging-end-date" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-aging-consultant-select" class="form-control"></select>
+                </div>
+                 <div class="form-group">
+                    <label>Customer (Optional)</label>
+                    <div id="report-aging-customer-select-container"></div>
+                </div>
+            </div>
+            <button id="generate-detailed-aging-report-btn" class="btn btn-primary"><i class="fas fa-list-ol"></i> Generate Report</button>
+        </div>
+
+        <!-- Collection Details -->
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Collection Transaction Log</h3></div>
+            <p class="text-secondary mb-4">Detailed list of all collections within date range.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-collection-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-collection-end-date" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="report-collection-method-filter" class="form-control">
+                        <option value="all">All Methods</option>
+                        <option>Bank Transfer</option>
+                        <option>Cheque</option>
+                        <option>Cash</option>
+                    </select>
+                </div>
+            </div>
+            <button id="generate-collection-report-btn" class="btn btn-primary"><i class="fas fa-money-bill-wave"></i> Generate Report</button>
+        </div>
+    </div>
+
+    <!-- 4. Operational & Risk Section -->
+    <div class="report-section-header"><i class="fas fa-clipboard-list"></i> Operations & Risk</div>
+    <div class="report-category-grid">
+         <!-- Consultant Visits -->
+         <div class="card">
+            <div class="card-header"><h3 class="card-title">Consultant Visits</h3></div>
+            <p class="text-secondary mb-4">Detailed visit history and performance stats.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-visits-consultant-select" class="form-control"></select>
+                </div>
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-visits-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-visits-end-date" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <button id="generate-consultant-visits-btn-new" class="btn btn-primary"><i class="fas fa-route"></i> Generate Report</button>
+        </div>
+
+        <!-- Risk Report -->
+        <div class="card" style="border-left: 4px solid var(--danger);">
+            <div class="card-header"><h3 class="card-title text-danger">Risk & Exception Report</h3></div>
+             <p class="text-secondary mb-4">Identify high-risk customers based on criteria.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Min Outstanding</label>
+                        <input type="number" id="report-risk-min-balance" class="form-control" value="10000">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>Days Since Visit</label>
+                        <input type="number" id="report-risk-days-since-visit" class="form-control" value="30">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Missed Promise</label>
+                    <select id="report-risk-missed-promise" class="form-control">
+                        <option value="false">Include All</option>
+                        <option value="true">Only with Missed Promise</option>
+                    </select>
+                </div>
+            </div>
+            <button id="generate-risk-report-btn" class="btn btn-danger"><i class="fas fa-exclamation-triangle"></i> Generate Risk Report</button>
+        </div>
+        
+        <!-- Visit Outcome -->
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Visit Outcome Analysis</h3></div>
+            <p class="text-secondary mb-4">Analyzes the results of all completed visits in a chart.</p>
+            <div class="form-group">
+                <p style="font-size: var(--fs-sm); color: var(--text-secondary);">Generates a Pie Chart visualization of outcomes (Paid, Promise to Pay, No Answer, etc).</p>
+            </div>
+            <button id="generate-outcome-analysis-btn" class="btn btn-primary"><i class="fas fa-chart-pie"></i> Generate Analysis</button>
+        </div>
+    </div>
+
+    <!-- 5. Daily Activity & Standard Exports -->
+    <div class="report-section-header"><i class="fas fa-print"></i> Daily Activity & Standard Exports</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: var(--spacing-6);">
+        <!-- Consultant Daily Activity -->
+        <div class="card" data-role="admin">
+            <div class="card-header"><h3 class="card-title">Consultant Daily Activity</h3></div>
+            <div class="d-flex flex-column gap-3">
+                <div class="d-flex gap-2 flex-wrap align-items-end">
+                    <div class="form-group mb-0 flex-grow-1">
+                        <label>Consultant</label>
+                        <select id="report-consultant-select" class="form-control"></select>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label>Date Range</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="date" id="report-activity-start-date" class="form-control">
+                            <span>to</span>
+                            <input type="date" id="report-activity-end-date" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Customer Filter (Optional)</label>
+                    <div id="report-activity-customer-filter-container"></div>
+                </div>
+                <div class="d-flex gap-2 justify-content-between align-items-center">
+                    <div class="d-flex gap-2">
+                        <button id="activity-report-summary-btn" class="btn btn-outline filter-btn active"><i class="fas fa-chart-pie"></i> Summary</button>
+                        <button id="activity-report-table-btn" class="btn btn-outline filter-btn"><i class="fas fa-table"></i> Table</button>
+                    </div>
+                    <button id="generate-activity-report-btn" class="btn btn-primary"><i class="fas fa-play"></i> Generate</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Standard Reports -->
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Standard List Exports</h3></div>
+            <div class="form-group mb-4">
+                <label>Date Range (Optional for some reports)</label>
+                <div class="d-flex gap-2">
+                    <input type="date" id="report-standard-start-date" class="form-control">
+                    <input type="date" id="report-standard-end-date" class="form-control">
+                </div>
+            </div>
+            <div class="standard-reports-buttons">
+                <button id="generate-customer-report-btn" class="btn btn-primary">
+                    <i class="fas fa-users"></i>
+                    <span>Customer List</span>
+                </button>
+                <button id="generate-consultant-report-btn" class="btn btn-primary">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Consultants</span>
+                </button>
+                <button id="generate-aging-report-btn" class="btn btn-info">
+                    <i class="fas fa-history"></i>
+                    <span>Aging List</span>
+                </button>
+                <button id="generate-customer-status-report-btn" class="btn btn-info">
+                    <i class="fas fa-user-check"></i>
+                    <span>Status Report</span>
+                </button>
+                <button id="generate-recovery-report-btn" class="btn btn-success">
+                    <i class="fas fa-percentage"></i>
+                    <span>Recovery Perf.</span>
+                </button>
+            </div>
+        </div>
+    </div>
     
-    <div id="custom-report-builder">
-        <!-- Step 1: Select Data Source -->
-        <h4 style="font-size: var(--fs-lg); margin-bottom: var(--spacing-2);">Step 1: Select Data</h4>
-        <div class="form-group">
-            <label>Primary Data Source</label>
-            <div id="data-source-selector" class="d-flex gap-2 flex-wrap">
-                 <label class="btn btn-outline filter-btn active" style="box-shadow: none;">
-                    <input type="radio" name="dataSource" value="customers" class="hidden" checked> Customers
-                </label>
-                <label class="btn btn-outline filter-btn" style="box-shadow: none;">
-                    <input type="radio" name="dataSource" value="payments" class="hidden"> Payments
-                </label>
-                <label class="btn btn-outline filter-btn" style="box-shadow: none;">
-                    <input type="radio" name="dataSource" value="visits" class="hidden"> Visits
-                </label>
-            </div>
-        </div>
-
-        <!-- Step 2: Select Columns -->
-        <h4 style="font-size: var(--fs-lg); margin-bottom: var(--spacing-2); margin-top: var(--spacing-6);">Step 2: Choose Columns</h4>
-        <div id="column-selector" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <!-- Column checkboxes will be inserted here by JavaScript -->
-        </div>
-
-        <!-- Step 3: Filters -->
-        <h4 style="font-size: var(--fs-lg); margin-bottom: var(--spacing-2); margin-top: var(--spacing-6);">Step 3: Apply Filters (Optional)</h4>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="custom-report-consultant-filter">Sales Consultant</label>
-                <select id="custom-report-consultant-filter" class="form-control"></select>
-            </div>
-            <div class="form-group">
-                <label for="custom-report-start-date">Date From (for time-based data)</label>
-                <input type="date" id="custom-report-start-date" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="custom-report-end-date">Date To (for time-based data)</label>
-                <input type="date" id="custom-report-end-date" class="form-control">
-            </div>
-        </div>
-        
-        <!-- Dynamic Filters -->
-        <div class="d-flex justify-content-between align-items-center mt-4">
-            <h5 class="card-title">Dynamic Filters</h5>
-            <button class="btn btn-outline btn-sm" id="add-dynamic-filter-btn"><i class="fas fa-plus"></i> Add Filter</button>
-        </div>
-        <div id="dynamic-filter-container" class="mt-2">
-            <!-- Dynamic filter rows added here -->
-        </div>
-        
-        <div id="custom-report-preview" class="card mt-4 p-4" style="background: var(--bg-color); box-shadow: none; border: 1px dashed var(--border-color);">
-            <h5 class="card-title">Live Preview (First 5 Rows)</h5>
-            <div class="table-container">
-                <table class="data-table report-table-small" id="custom-report-preview-table">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Step 4: Generate -->
-        <button id="generate-custom-report-btn" class="btn btn-primary mt-4"><i class="fas fa-cogs"></i> Generate Custom Report</button>
-    </div>
-</div>
-<div class="report-generators-grid">
-     <div class="card">
-        <div class="card-header"><h3 class="card-title">Customer Risk and Exception Report</h3></div>
-         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a list of high-risk customers based on custom criteria.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-risk-min-balance">Min Outstanding (AED)</label>
-                <input type="number" id="report-risk-min-balance" class="form-control" value="10000">
-            </div>
-            <div class="form-group">
-                <label for="report-risk-days-since-visit">Days Since Last Visit</label>
-                <input type="number" id="report-risk-days-since-visit" class="form-control" value="30">
-            </div>
-            <div class="form-group">
-                <label for="report-risk-missed-promise">Missed Promise to Pay</label>
-                <select id="report-risk-missed-promise" class="form-control">
-                    <option value="false">Include All</option>
-                    <option value="true">Only with Missed Promise</option>
-                </select>
-            </div>
-        </div>
-        <button id="generate-risk-report-btn" class="btn btn-danger mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Risk Report</button>
-    </div>
-     <div class="card">
-        <div class="card-header"><h3 class="card-title">Comprehensive Consultant Performance</h3></div>
-         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate an overview of all key consultant KPIs for a specific month.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-comprehensive-consultant-select">Consultant (Optional)</label>
-                <select id="report-comprehensive-consultant-select" class="form-control"></select>
-            </div>
-            <div class="form-group">
-                <label for="report-comprehensive-month-select">Month</label>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);">
-                    <select id="report-comprehensive-month-select" class="form-control"></select>
-                    <select id="report-comprehensive-year-select" class="form-control"></select>
-                </div>
-            </div>
-        </div>
-        <button id="generate-comprehensive-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Collection by Aging Category</h3></div>
-        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze collected amounts against the three defined aging buckets.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-aging-collection-consultant-select">Consultant (Optional)</label>
-                <select id="report-aging-collection-consultant-select" class="form-control"></select>
-            </div>
-            <div class="form-group">
-                <label for="report-aging-collection-start-date">Start Date</label>
-                <input type="date" id="report-aging-collection-start-date" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="report-aging-collection-end-date">End Date</label>
-                <input type="date" id="report-aging-collection-end-date" class="form-control">
-            </div>
-        </div>
-        <button id="generate-aging-collection-report-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Collection Details Report</h3></div>
-        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a detailed list of all collections within a specific date range.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-collection-start-date">Start Date</label>
-                <input type="date" id="report-collection-start-date" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="report-collection-end-date">End Date</label>
-                <input type="date" id="report-collection-end-date" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="report-collection-method-filter">Payment Method (Optional)</label>
-                <select id="report-collection-method-filter" class="form-control">
-                    <option value="all">All Methods</option>
-                    <option>Bank Transfer</option>
-                    <option>Cheque</option>
-                    <option>Cash</option>
-                </select>
-            </div>
-        </div>
-        <button id="generate-collection-report-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-     <div class="card">
-        <div class="card-header"><h3 class="card-title">Consultant Target Performance</h3></div>
-         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly target vs. actual collections for selected consultants.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-target-consultant-select">Consultant</label>
-                <select id="report-target-consultant-select" class="form-control"></select>
-            </div>
-            <div class="form-group">
-                <label for="report-target-month-select">Month</label>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);">
-                    <select id="report-target-month-select" class="form-control"></select>
-                    <select id="report-target-year-select" class="form-control"></select>
-                </div>
-            </div>
-        </div>
-        <button id="generate-target-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-     <div class="card">
-        <div class="card-header"><h3 class="card-title">Consultant Forecast Performance</h3></div>
-         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze monthly forecast vs. actual collections for selected consultants.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-forecast-consultant-select">Consultant</label>
-                <select id="report-forecast-consultant-select" class="form-control"></select>
-            </div>
-            <div class="form-group">
-                <label for="report-forecast-month-select">Month</label>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);">
-                    <select id="report-forecast-month-select" class="form-control"></select>
-                    <select id="report-forecast-year-select" class="form-control"></select>
-                </div>
-            </div>
-        </div>
-        <button id="generate-forecast-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Consultant Status Target Performance</h3></div>
-        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze performance against targets for specific customer statuses.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-status-target-consultant-select">Consultant</label>
-                <select id="report-status-target-consultant-select" class="form-control"></select>
-            </div>
-            <div class="form-group">
-                <label for="report-status-target-month-select">Month</label>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);">
-                    <select id="report-status-target-month-select" class="form-control"></select>
-                    <select id="report-status-target-year-select" class="form-control"></select>
-                </div>
-            </div>
-        </div>
-        <button id="generate-status-target-perf-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Consultant Visits Report</h3></div>
-        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Generate a detailed visit history and performance report for a selected consultant and date range.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-            <div class="form-group">
-                <label for="report-visits-consultant-select">Consultant</label>
-                <select id="report-visits-consultant-select" class="form-control"></select>
-            </div>
-            <div class="form-group">
-                <label for="report-visits-start-date">Start Date</label>
-                <input type="date" id="report-visits-start-date" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="report-visits-end-date">End Date</label>
-                <input type="date" id="report-visits-end-date" class="form-control">
-            </div>
-        </div>
-        <button id="generate-consultant-visits-btn-new" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Detailed Aging Report</h3></div>
-        <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyze collections against aging debt within a specific period.</p>
-        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-             <div class="form-group">
-                <label for="report-aging-start-date">Start Date</label>
-                <input type="date" id="report-aging-start-date" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="report-aging-end-date">End Date</label>
-                <input type="date" id="report-aging-end-date" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="report-aging-consultant-select">Consultant</label>
-                <select id="report-aging-consultant-select" class="form-control"></select>
-            </div>
-             <div class="form-group">
-                <label for="report-aging-customer-select">Customer (Optional)</label>
-                <div id="report-aging-customer-select-container"></div>
-            </div>
-        </div>
-        <button id="generate-detailed-aging-report-btn" class="btn btn-primary mt-4" style="align-self: flex-start;"><i class="fas fa-cogs"></i> Generate Report</button>
-    </div>
-</div>
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);">
-    <div>
-        <div class="card mb-4" data-role="admin"><div class="card-header"><h3 class="card-title">Consultant Daily Activity</h3></div><div class="d-flex flex-column gap-4"><div class="d-flex gap-2 flex-wrap align-items-center"><select id="report-consultant-select" class="form-control" style="width:auto;"></select><input type="date" id="report-activity-start-date" class="form-control" style="width:auto;"> <span class="mx-2">to</span> <input type="date" id="report-activity-end-date" class="form-control" style="width:auto;"><button id="generate-activity-report-btn" class="btn btn-primary"><i class="fas fa-cogs"></i> Generate</button></div><div class="d-flex gap-2 align-items-center"><label for="report-activity-customer-filter">Customer Filter:</label><div id="report-activity-customer-filter-container" style="min-width: 250px;"></div></div><div class="d-flex gap-2"><button id="activity-report-summary-btn" class="btn btn-outline filter-btn active"><i class="fas fa-chart-pie"></i> Summary</button><button id="activity-report-table-btn" class="btn btn-outline filter-btn"><i class="fas fa-table"></i> Table</button></div></div></div>
-        <div class="card"><div class="card-header"><h3 class="card-title">Standard Reports</h3></div><div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: var(--spacing-4);"><div class="form-group"><label for="report-standard-start-date">Start Date</label><input type="date" id="report-standard-start-date" class="form-control"></div><div class="form-group"><label for="report-standard-end-date">End Date</label><input type="date" id="report-standard-end-date" class="form-control"></div></div><div class="d-flex gap-2 flex-wrap"><button id="generate-customer-report-btn" class="btn btn-primary"><i class="fas fa-users"></i> Customer Report</button><button id="generate-consultant-report-btn" class="btn btn-primary"><i class="fas fa-user-tie"></i> Consultant Report</button><button id="generate-aging-report-btn" class="btn btn-info"><i class="fas fa-hourglass-half"></i> Aging Report</button><button id="generate-customer-status-report-btn" class="btn btn-info"><i class="fas fa-user-check"></i> Customer Status Report</button><button id="generate-recovery-report-btn" class="btn btn-success"><i class="fas fa-chart-line"></i> Recovery Performance</button></div></div>
-    </div>
-    <div>
-        <div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis Report</h3></div><p class="text-secondary" style="margin-bottom: var(--spacing-4);">Analyzes the results of all completed visits.</p><button id="generate-outcome-analysis-btn" class="btn btn-primary"><i class="fas fa-poll"></i> Generate Analysis</button></div>
-    </div>
-</div>
-<div id="report-output" class="mt-4"></div>`; 
+    <div id="report-output" class="mt-4"></div>`; 
         document.getElementById('performance-page').innerHTML = `<div class="page-header"><h2>Performance Snapshot</h2><p>An at-a-glance overview of consultant performance for the current month.</p></div><div id="performance-grid-container" class="performance-grid"></div>`;
         document.getElementById('consultants-page').innerHTML = `<div class="page-header"><h2 >Sales Consultant Management</h2><p >Home > Consultants</p></div><div class="card"><div class="card-header"><h3 class="card-title">Consultant List</h3><button id="add-consultant-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Consultant</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="name">Consultant Name</th><th data-sort="noOfCustomers">No. of Customers</th><th data-sort="totalOutstanding">Total Outstanding</th><th data-sort="totalForecast">Total Forecast</th><th data-sort="currentTarget">Current Month Target</th><th data-sort="overdueCustomers">Overdue Customers</th><th data-sort="upcomingVisits">Upcoming Visits</th><th>Actions</th></tr></thead><tbody id="consultant-table-body"></tbody></table></div><div id="consultants-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('changelog-page').innerHTML = `<div class="page-header"><h2>Change Log</h2><p>Tracks all data modifications in the system.</p></div><div class="card"><div class="card-header"><h3 class="card-title">Log Entries</h3><div class="d-flex gap-2 align-items-center flex-wrap"><div class="input-with-icon"><input type="search" id="changelog-search" placeholder="Search log..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="changelog-entity-filter" class="form-control" style="width:auto;"><option value="all">All Entities</option><option value="Customer">Customer</option><option value="Payment">Payment</option><option value="Visit">Visit</option><option value="Consultant">Consultant</option><option value="User">User</option></select><select id="changelog-action-filter" class="form-control" style="width:auto;"><option value="all">All Actions</option><option value="Created">Created</option><option value="Updated">Updated</option><option value="Deleted">Deleted</option></select></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="timestamp">Timestamp</th><th data-sort="user">User</th><th data-sort="action">Action</th><th data-sort="entityName">Entity</th><th>Change Details</th><th>Actions</th></tr></thead><tbody id="changelog-table-body"></tbody></table></div><div id="changelog-pagination" class="pagination-controls"></div></div>`; 
@@ -3836,8 +4004,6 @@ Object.assign(App.Payments, {
     showPaymentDetail: function(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); if (!payment) return; const customer = App.DB.get('customers').find(c => c.accountNo === payment.customerId); const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); const contentEl = document.getElementById('payment-detail-content'); contentEl.innerHTML = `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr; gap: var(--spacing-6);"><div class="detail-info-card"><div class="label">TRANSACTION ID</div><div class="value">${payment.id}</div></div><div class="detail-info-card"><div class="label">AMOUNT</div><div class="value" style="color: var(--success);">${App.Helpers.formatCurrency(payment.amount)}</div></div><div class="detail-info-card"><div class="label">PAYMENT DATE</div><div class="value">${App.Helpers.formatDate(payment.date)}</div></div><div class="detail-info-card"><div class="label">PAYMENT METHOD</div><div class="value">${payment.method}</div></div><div class="detail-info-card"><div class="label">STATUS</div><div class="value"><span class="status-badge ${payment.status.toLowerCase()}">${payment.status}</span></div></div></div><hr style="border: none; border-top: 1px solid var(--border-color); margin: var(--spacing-6) 0;"><h4 class="card-title mb-4">Customer Information</h4>${customer ? `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr;"><div class="detail-info-card"><div class="label">COMPANY NAME</div><div class="value">${customer.companyName}</div></div><div class="detail-info-card"><div class="label">ACCOUNT #</div><div class="value">${customer.accountNo}</div></div><div class="detail-info-card"><div class="label">SALES CONSULTANT</div><div class="value">${consultantMap[customer.salesConsultantId] || 'N/A'}</div></div><div class="detail-info-card"><div class="label">CURRENT OUTSTANDING</div><div class="value">${App.Helpers.formatCurrency(customer.outstanding)}</div></div></div>` : '<p>No customer associated with this payment.</p>'}`; App.UI.openModal('payment-detail-modal'); }, 
     deletePayment(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); Swal.fire({ title: `Delete this payment?`, text: "This will add the amount back to the customer's outstanding balance. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let payments = App.DB.get('payments'); let customers = App.DB.get('customers'); const customerIndex = customers.findIndex(c => c.accountNo === payment.customerId); if (customerIndex !== -1) { customers[customerIndex].outstanding += payment.amount; if (customers[customerIndex].outstanding > 0) { customers[customerIndex].paymentStatus = 'Negotiation'; } App.DB.set('customers', customers); } App.DB.set('payments', payments.filter(p => p.id !== paymentId)); App.Helpers.logChange('Deleted', 'Payment', `${App.Helpers.formatCurrency(payment.amount)} for customer ${payment.customerId}`, `Reason: ${result.value}`); App.UI.toast('Payment deleted and balance adjusted.', 'success'); this.render(); if(App.state.activePage === 'dashboard') App.Dashboard.render(); if(App.state.activePage === 'customers') App.Customers.render(); } }); } 
 });
-</script>
-<script>
 Object.assign(App.Reports, { 
     charts: {}, 
     currentReportData: null, 
