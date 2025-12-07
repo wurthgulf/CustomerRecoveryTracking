@@ -1030,136 +1030,242 @@ Object.assign(App.Auth, {
         resetTimer(); // Start immediately
     }
 });
-
 Object.assign(App.DB, { 
-    // ✅ YOUR ACTUAL GOOGLE SCRIPT URL
-    apiUrl: 'https://script.google.com/macros/s/AKfycbz6ekyso6yi8OXyYr-o3e6qoSCGR2CB2daGDWLJ3ZF7NDWDuTjQmWEWkNWVwhdkvP29Rg/exec', 
+    initialize() {
+        if (!localStorage.getItem('consultants')) localStorage.setItem('consultants', JSON.stringify([]));
+        if (!localStorage.getItem('users')) localStorage.setItem('users', JSON.stringify([]));
+        if (!localStorage.getItem('customers')) localStorage.setItem('customers', JSON.stringify([]));
+        if (!localStorage.getItem('visits')) localStorage.setItem('visits', JSON.stringify([]));
+        if (!localStorage.getItem('payments')) localStorage.setItem('payments', JSON.stringify([]));
+        if (!localStorage.getItem('activityLog')) localStorage.setItem('activityLog', JSON.stringify([]));
+        if (!localStorage.getItem('notifications')) localStorage.setItem('notifications', JSON.stringify([]));
+        if (!localStorage.getItem('changeLog')) localStorage.setItem('changeLog', JSON.stringify([]));
+        if (!localStorage.getItem('forecasts')) localStorage.setItem('forecasts', JSON.stringify([]));
+        if (!localStorage.getItem('customerComments')) localStorage.setItem('customerComments', JSON.stringify([]));
+        if (!localStorage.getItem('customerForecasts')) localStorage.setItem('customerForecasts', JSON.stringify([]));
 
-    cache: {}, 
-    syncInterval: null,
+        // Initialize customer table column settings
+        if (!localStorage.getItem('customerTableColumns')) localStorage.setItem('customerTableColumns', JSON.stringify(App.state.customerTableColumns));
+        else App.state.customerTableColumns = JSON.parse(localStorage.getItem('customerTableColumns'));
+        // Initialize pagination settings
+        const paginationSettings = JSON.parse(localStorage.getItem('paginationSettings'));
+        if (paginationSettings) {
+            // Deep merge the pagination settings to preserve currentPage property
+            Object.keys(paginationSettings).forEach(key => {
+                if (App.state.pagination[key]) {
+                    Object.assign(App.state.pagination[key], paginationSettings[key]);
+                }
+            });
+        }
 
-    async initialize() {
-        // Initial Load (Blocking UI - Shows Spinner)
-        document.getElementById('loading-overlay').style.display = 'flex';
-        await this.syncFromCloud(false); 
-        document.getElementById('loading-overlay').style.display = 'none';
-        
-        this.runMigrations(); 
-        this.startAutoSync(); // <--- Starts the 5-minute timer
-    },
 
-    // --- NEW: Reusable Sync Function ---
-    async syncFromCloud(isBackground = true) {
-        try {
-            if (!isBackground) console.log("Syncing with Cloud...");
-            
-            // Add timestamp to prevent browser caching
-            const response = await fetch(this.apiUrl + '?action=getAll&t=' + Date.now());
-            const cloudData = await response.json();
-            
-            // Update Local Storage & Memory
-            Object.keys(cloudData).forEach(key => {
-                localStorage.setItem(key, JSON.stringify(cloudData[key]));
-                this.cache[key] = cloudData[key];
+        const users = this.get('users');
+        if (users.length === 0) {
+            console.log("No users found. Creating a default admin account.");
+            const defaultAdmin = { 
+                id: 1, 
+                username: 'admin', 
+                fullName: 'Admin User', 
+                password: btoa('admin123'), // Encode the default password
+                role: 'admin', 
+                department: 'Administration', 
+                lastLogin: null, 
+                assignedConsultantId: null 
+            };
+            this.set('users', [defaultAdmin]);
+            console.log("Default admin created. Username: admin, Password: admin123");
+        }
+
+        this.runMigrations();
+    }, 
+    runMigrations() {
+        const dataModelVersion = parseInt(localStorage.getItem('dataModelVersion') || '1');
+        if (dataModelVersion < 2) {
+            console.log("Running data migration to v2 (Consultant IDs)...");
+            const consultants = this.get('consultants');
+            const consultantMap = consultants.reduce((map, c) => { map[c.name] = c.id; return map; }, {});
+
+            let customers = this.get('customers');
+            customers.forEach(c => { if (c.salesConsultant && !c.salesConsultantId) c.salesConsultantId = consultantMap[c.salesConsultant]; });
+            this.set('customers', customers);
+
+            let users = this.get('users');
+            users.forEach(u => { if (u.assignedConsultant && !u.assignedConsultantId) u.assignedConsultantId = consultantMap[u.assignedConsultant]; });
+            this.set('users', users);
+
+            let visits = this.get('visits');
+            visits.forEach(v => { if (v.collector && !v.collectorId) v.collectorId = consultantMap[v.collector]; });
+            this.set('visits', visits);
+
+            let activityLog = this.get('activityLog');
+            activityLog.forEach(log => { if (log.consultant && !log.consultantId) log.consultantId = consultantMap[log.consultant]; });
+            this.set('activityLog', activityLog);
+
+            localStorage.setItem('dataModelVersion', '2');
+            console.log("Migration to v2 complete.");
+        }
+        if (dataModelVersion < 3) {
+            console.log("Running data migration to v3 (Encode Passwords)...");
+            let users = this.get('users');
+            let updated = false;
+            users.forEach(user => {
+                try {
+                    atob(user.password);
+                } catch(e) {
+                    user.password = btoa(user.password);
+                    updated = true;
+                }
+            });
+            if (updated) {
+                this.set('users', users);
+                console.log("All existing user passwords have been encoded.");
+            }
+            localStorage.setItem('dataModelVersion', '3');
+            console.log("Migration to v3 complete.");
+        }
+        if (dataModelVersion < 4) {
+            console.log("Running data migration to v4 (Customer Tags)...");
+            let customers = this.get('customers');
+            let updated = false;
+            customers.forEach(customer => {
+                if (!customer.tags) {
+                    customer.tags = [];
+                    updated = true;
+                }
+            });
+            if(updated) {
+                this.set('customers', customers);
+                console.log("Added 'tags' array to all customers.");
+            }
+            localStorage.setItem('dataModelVersion', '4');
+            console.log("Migration to v4 complete.");
+        }
+        if (dataModelVersion < 5) {
+            console.log("Running data migration to v5 (Customer Contacts)...");
+            let customers = this.get('customers');
+            let updated = false;
+            customers.forEach(customer => {
+                if (customer.email === undefined) {
+                    customer.email = '';
+                    updated = true;
+                }
+                if (customer.mobile === undefined) {
+                    customer.mobile = '';
+                    updated = true;
+                }
+            });
+            if(updated) {
+                this.set('customers', customers);
+                console.log("Added 'email' and 'mobile' fields to all customers.");
+            }
+            localStorage.setItem('dataModelVersion', '5');
+            console.log("Migration to v5 complete.");
+        }
+        if (dataModelVersion < 6) {
+            console.log("Running data migration to v6 (Detailed Balances)...");
+            let customers = this.get('customers');
+            let updated = false;
+            customers.forEach(customer => {
+                if (customer.balance_2020_2025 === undefined) {
+                    customer.balance_2020_2025 = 0;
+                    updated = true;
+                }
+                if (customer.balance_2019_2020 === undefined) {
+                    customer.balance_2019_2020 = 0;
+                    updated = true;
+                }
+                if (customer.balance_lte_2018 === undefined) {
+                    // To preserve data, if old outstanding exists, move it to the oldest category
+                    customer.balance_lte_2018 = customer.outstanding || 0;
+                    updated = true;
+                }
+            });
+            if (updated) {
+                this.set('customers', customers);
+                console.log("Added detailed balance fields to all customers.");
+            }
+            localStorage.setItem('dataModelVersion', '6');
+            console.log("Migration to v6 complete.");
+        }
+        if (dataModelVersion < 7) {
+            console.log("Running data migration to v7 (Detailed Payments)...");
+            let payments = this.get('payments');
+            let updated = false;
+            payments.forEach(p => {
+                if (p.amount_2020_2025 === undefined) {
+                    p.amount_2020_2025 = 0;
+                    updated = true;
+                }
+                if (p.amount_2019_2020 === undefined) {
+                    p.amount_2019_2020 = 0;
+                    updated = true;
+                }
+                if (p.amount_lte_2018 === undefined) {
+                    p.amount_lte_2018 = 0;
+                    updated = true;
+                }
+            });
+            if (updated) {
+                this.set('payments', payments);
+                console.log("Added detailed payment amount fields to all payments.");
+            }
+            localStorage.setItem('dataModelVersion', '7');
+            console.log("Migration to v7 complete.");
+        }
+         if (dataModelVersion < 8) {
+            console.log("Running data migration to v8 (Customer Monthly Forecasts)...");
+            let customers = this.get('customers');
+            let customerForecasts = this.get('customerForecasts');
+            let updated = false;
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+            customers.forEach(customer => {
+                if (customer.forecastAmount && customer.forecastAmount > 0) {
+                    const existingForecast = customerForecasts.find(f => f.accountNo === customer.accountNo && f.month === currentMonth);
+                    if (!existingForecast) {
+                        customerForecasts.push({
+                            id: `cf-${Date.now()}-${customer.accountNo}`,
+                            accountNo: customer.accountNo,
+                            month: currentMonth,
+                            amount: customer.forecastAmount
+                        });
+                        updated = true;
+                    }
+                }
             });
 
-            const time = new Date().toLocaleTimeString();
-            console.log(`Cloud Sync Complete at ${time}`);
-            
-            if (isBackground) {
-                // If dashboard is active, refresh stats live
-                if (App.state.activePage === 'dashboard') {
-                    App.Dashboard.render();
-                }
-                // Show subtle notification
-                App.UI.toast(`Data synced from cloud (${time}) ☁️`, "info");
-            } else {
-                App.UI.toast("Data Synced from Cloud", "success");
+            if (updated) {
+                this.set('customerForecasts', customerForecasts);
+                console.log("Migrated legacy customer forecasts to new monthly structure.");
             }
-            
-        } catch (error) {
-            console.error("Cloud Error:", error);
-            if (!isBackground) App.UI.toast("Working Offline (Cloud Sync Failed)", "warning");
-            this.loadFromLocal();
+            localStorage.setItem('dataModelVersion', '8');
+            console.log("Migration to v8 complete.");
+        }
+        if (dataModelVersion < 9) {
+            console.log("Running data migration to v9 (Geocoding)...");
+            let customers = this.get('customers');
+            let updated = false;
+            customers.forEach(customer => {
+                if (customer.latitude === undefined || customer.longitude === undefined) {
+                    // Simulate geocoding for existing customers
+                    const coords = App.Geo.getMockCoordinates(customer.accountNo);
+                    customer.latitude = coords.lat;
+                    customer.longitude = coords.lng;
+                    updated = true;
+                }
+            });
+             if (updated) {
+                this.set('customers', customers);
+                console.log("Added latitude and longitude to all customers.");
+            }
+            localStorage.setItem('dataModelVersion', '9');
+            console.log("Migration to v9 complete.");
         }
     },
-
-    // --- NEW: Auto-Sync Timer ---
-    startAutoSync() {
-        if (this.syncInterval) clearInterval(this.syncInterval);
-        
-        // Sync every 5 minutes (300,000 ms)
-        this.syncInterval = setInterval(() => {
-            this.syncFromCloud(true);
-        }, 300000); 
-        
-        console.log("Auto-Sync enabled: Running every 5 minutes.");
-    },
-
-    loadFromLocal() {
-        const tables = ['customers', 'visits', 'payments', 'users', 'consultants', 'activityLog', 'notifications', 'changeLog', 'forecasts', 'customerComments', 'customerForecasts'];
-        tables.forEach(t => {
-            this.cache[t] = JSON.parse(localStorage.getItem(t) || '[]');
-        });
-    },
-
-    get(key) {
-        if (!this.cache[key]) {
-            this.cache[key] = JSON.parse(localStorage.getItem(key) || '[]');
-        }
-        return this.cache[key];
-    },
-
-    set(key, data) {
-        this.cache[key] = data;
-        localStorage.setItem(key, JSON.stringify(data));
-    },
-    
-    // --- CLOUD WRITE METHODS ---
-    async addToCloud(table, item) {
-        // 1. Update UI Instantly (Optimistic)
-        const list = this.get(table);
-        list.push(item);
-        this.set(table, list);
-
-        // 2. Send to Google
-        this.sendToGoogle('add', table, item);
-    },
-
-    async updateInCloud(table, item) {
-        const list = this.get(table);
-        const idKey = item.accountNo ? 'accountNo' : 'id';
-        const index = list.findIndex(i => i[idKey] == item[idKey]);
-        if(index > -1) {
-            list[index] = item;
-            this.set(table, list);
-            this.sendToGoogle('update', table, item);
-        }
-    },
-    
-    async deleteFromCloud(table, id) {
-        let list = this.get(table);
-        const isCustomer = table === 'customers';
-        const idKey = isCustomer ? 'accountNo' : 'id';
-        list = list.filter(i => i[idKey] != id);
-        this.set(table, list);
-        this.sendToGoogle('delete', table, { [idKey]: id });
-    },
-
-    sendToGoogle(action, table, data) {
-        fetch(this.apiUrl, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, table, data })
-        }).catch(err => console.error("Cloud Save Failed:", err));
-    },
-
-    runMigrations() {
-        // Keep existing migrations empty
-    }
+    get: (key) => JSON.parse(localStorage.getItem(key) || '[]'), 
+    set: (key, data) => localStorage.setItem(key, JSON.stringify(data)),
 });
-
 Object.assign(App.UI, { 
     intersectionObserver: null,
     hydrate() { 
@@ -1188,25 +1294,25 @@ Object.assign(App.UI, {
                 </form>
                 <div class="mt-4" style="color: var(--text-secondary); font-size: var(--fs-sm);"></div>
             </div>`; 
-        
-        // --- UPDATED MAIN LAYOUT WITH SYNC BUTTON ---
-        document.getElementById('app').innerHTML = `<aside class="sidebar"><div class="logo logo-text"><img src="https://i.ibb.co/pvvsMy1X/Wurth-Gulf-CMYK-PNG-01.png" alt="Wuerth Gulf Logo"></div><nav><div class="sidebar-heading">Main</div><ul style="list-style:none;"><li><a href="#dashboard" class="nav-link active" data-page="dashboard"><i class="fas fa-chart-pie"></i> <span class="nav-text">Dashboard</span></a></li><li data-role="user"><a href="#myday" class="nav-link" data-page="myday"><i class="fas fa-clipboard-list"></i> <span class="nav-text">My Day</span></a></li><li><a href="#customers" class="nav-link" data-page="customers"><i class="fas fa-users"></i> <span class="nav-text">Customers</span></a></li><li><a href="#visits" class="nav-link" data-page="visits"><i class="fas fa-calendar-alt"></i> <span class="nav-text">Visits & Follow-ups</span></a></li><li><a href="#payments" class="nav-link" data-page="payments"><i class="fas fa-credit-card"></i> <span class="nav-text">Payments</span></a></li><li data-role="admin"><a href="#analytics" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> <span class="nav-text">Analytics</span></a></li><li data-role="admin"><a href="#reports" class="nav-link" data-page="reports"><i class="fas fa-file-alt"></i> <span class="nav-text">Reports</span></a></li></ul><div data-role="admin"><div class="sidebar-heading">Administration</div><ul style="list-style:none;"><li><a href="#performance" class="nav-link" data-page="performance"><i class="fas fa-tachometer-alt"></i> <span class="nav-text">Performance</span></a></li><li><a href="#consultants" class="nav-link" data-page="consultants"><i class="fas fa-user-tie"></i> <span class="nav-text">Consultants</span></a></li><li><a href="#users" class="nav-link" data-page="users"><i class="fas fa-users-cog"></i> <span class="nav-text">User Management</span></a></li><li><a href="#changelog" class="nav-link" data-page="changelog"><i class="fas fa-history"></i> <span class="nav-text">Change Log</span></a></li><li><a href="#settings" class="nav-link" data-page="settings"><i class="fas fa-cog"></i> <span class="nav-text">Settings</span></a></li></ul></div></nav></aside><header class="main-header"><button class="hamburger" id="hamburger-menu"><i class="fas fa-bars"></i></button><div id="page-title" style="font-weight: 600; font-size: var(--fs-lg);">Dashboard</div><div class="d-flex gap-4 align-items-center"><div id="notification-bell-wrapper" data-role="admin" style="position: relative;"><button id="notification-bell-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-bell"></i></button><span id="notification-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background-color: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: var(--fs-sm); display: flex; justify-content: center; align-items: center; font-weight: 600; border: 2px solid var(--card-bg);">0</span></div><button id="theme-toggle-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-moon"></i></button><div class="d-flex gap-2 align-items-center"><button id="manual-sync-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;" title="Sync Now"><i class="fas fa-sync-alt"></i></button><span id="username-display" style="font-weight: 500;"></span><button id="logout-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem;"><i class="fas fa-sign-out-alt"></i></button></div></div></header><main class="main-content"><section id="dashboard-page" class="page active"></section><section id="myday-page" class="page" data-role="user"></section><section id="customers-page" class="page"></section><section id="visits-page" class="page"></section><section id="payments-page" class="page"></section><section id="analytics-page" class="page" data-role="admin"></section><section id="reports-page" class="page" data-role="admin"></section><section id="performance-page" class="page" data-role="admin"></section><section id="consultants-page" class="page" data-role="admin"></section><section id="users-page" class="page" data-role="admin"></section><section id="changelog-page" class="page" data-role="admin"></section><section id="settings-page" class="page" data-role="admin"></section></main>`; 
-        
+        document.getElementById('app').innerHTML = `<aside class="sidebar"><div class="logo logo-text"><img src="https://i.ibb.co/pvvsMy1X/Wurth-Gulf-CMYK-PNG-01.png" alt="Wuerth Gulf Logo"></div><nav><div class="sidebar-heading">Main</div><ul style="list-style:none;"><li><a href="#dashboard" class="nav-link active" data-page="dashboard"><i class="fas fa-chart-pie"></i> <span class="nav-text">Dashboard</span></a></li><li data-role="user"><a href="#myday" class="nav-link" data-page="myday"><i class="fas fa-clipboard-list"></i> <span class="nav-text">My Day</span></a></li><li><a href="#customers" class="nav-link" data-page="customers"><i class="fas fa-users"></i> <span class="nav-text">Customers</span></a></li><li><a href="#visits" class="nav-link" data-page="visits"><i class="fas fa-calendar-alt"></i> <span class="nav-text">Visits & Follow-ups</span></a></li><li><a href="#payments" class="nav-link" data-page="payments"><i class="fas fa-credit-card"></i> <span class="nav-text">Payments</span></a></li><li data-role="admin"><a href="#analytics" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> <span class="nav-text">Analytics</span></a></li><li data-role="admin"><a href="#reports" class="nav-link" data-page="reports"><i class="fas fa-file-alt"></i> <span class="nav-text">Reports</span></a></li></ul><div data-role="admin"><div class="sidebar-heading">Administration</div><ul style="list-style:none;"><li><a href="#performance" class="nav-link" data-page="performance"><i class="fas fa-tachometer-alt"></i> <span class="nav-text">Performance</span></a></li><li><a href="#consultants" class="nav-link" data-page="consultants"><i class="fas fa-user-tie"></i> <span class="nav-text">Consultants</span></a></li><li><a href="#users" class="nav-link" data-page="users"><i class="fas fa-users-cog"></i> <span class="nav-text">User Management</span></a></li><li><a href="#changelog" class="nav-link" data-page="changelog"><i class="fas fa-history"></i> <span class="nav-text">Change Log</span></a></li><li><a href="#settings" class="nav-link" data-page="settings"><i class="fas fa-cog"></i> <span class="nav-text">Settings</span></a></li></ul></div></nav></aside><header class="main-header"><button class="hamburger" id="hamburger-menu"><i class="fas fa-bars"></i></button><div id="page-title" style="font-weight: 600; font-size: var(--fs-lg);">Dashboard</div><div class="d-flex gap-4 align-items-center"><div id="notification-bell-wrapper" data-role="admin" style="position: relative;"><button id="notification-bell-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-bell"></i></button><span id="notification-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background-color: var(--danger); color: white; border-radius: 50%; width: 22px; height: 22px; font-size: var(--fs-sm); display: flex; justify-content: center; align-items: center; font-weight: 600; border: 2px solid var(--card-bg);">0</span></div><button id="theme-toggle-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem; border-radius: 50%; width: 44px; height: 44px;"><i class="fas fa-moon"></i></button><div class="d-flex gap-2 align-items-center"><span id="username-display" style="font-weight: 500;"></span><button id="logout-btn" class="btn btn-outline" style="min-width:auto; padding: 0.5rem;"><i class="fas fa-sign-out-alt"></i></button></div></div></header><main class="main-content"><section id="dashboard-page" class="page active"></section><section id="myday-page" class="page" data-role="user"></section><section id="customers-page" class="page"></section><section id="visits-page" class="page"></section><section id="payments-page" class="page"></section><section id="analytics-page" class="page" data-role="admin"></section><section id="reports-page" class="page" data-role="admin"></section><section id="performance-page" class="page" data-role="admin"></section><section id="consultants-page" class="page" data-role="admin"></section><section id="users-page" class="page" data-role="admin"></section><section id="changelog-page" class="page" data-role="admin"></section><section id="settings-page" class="page" data-role="admin"></section></main>`; 
         document.getElementById('customers-page').innerHTML = `<div class="kpi-card-grid" data-role="admin"><div class="kpi-card"><div class="title">Total Customers</div><div id="customer-kpi-total" class="value">0</div></div><div class="kpi-card"><div class="title">Total Outstanding</div><div id="customer-kpi-outstanding" class="value">0</div></div><div class="kpi-card"><div class="title">Active Accounts</div><div id="customer-kpi-active" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Manage Customers</h3><div class="d-flex gap-2 flex-wrap align-items-center"><div class="input-with-icon"><input type="search" id="customer-search" placeholder="Search customers..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear search"></i></div><div class="input-with-icon"><input type="search" id="customer-tag-filter" placeholder="Filter by tag..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear tag filter"></i></div><select id="customer-account-status-filter" class="form-control" style="width: auto;"><option value="all">All Account Status</option><option>Active</option><option>Inactive</option></select><select id="customer-status-filter" class="form-control" style="width: auto;"><option value="all">All Statuses</option><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select><div style="position: relative;"><button class="btn btn-outline" id="toggle-columns-btn"><i class="fas fa-columns"></i> Columns</button><div id="column-toggle-dropdown" class="column-toggle-dropdown"></div></div><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-customers-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-customers-pdf"><i class="fas fa-file-pdf"></i> PDF</button><button class="btn btn-outline" id="import-customer-btn"><i class="fas fa-upload"></i> Import</button><button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button><button class="btn btn-warning" id="bulk-update-btn"><i class="fas fa-edit"></i> Bulk Update</button></div></div></div><div class="table-container"><table class="data-table"><thead></thead><tbody id="customer-table-body"></tbody></table></div><div id="customers-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('users-page').innerHTML = `<div class="page-header"><h2 >User Management</h2><p >Home > Users</p></div><div class="card"><div class="card-header"><h3 class="card-title">User List</h3><button id="add-user-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add User</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="username">Username</th><th data-sort="fullName">Full Name</th><th data-sort="role">Role</th><th data-sort="assignedConsultantId">Assigned Consultant</th><th data-sort="department">Department</th><th data-sort="lastLogin">Last Login</th><th>Actions</th></tr></thead><tbody id="user-table-body"></tbody></table></div><div id="users-pagination" class="pagination-controls"></div></div>`; 
-        document.getElementById('user-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="user-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">×</button></div><form id="user-form"><input type="hidden" id="user-id-hidden"><div class="form-grid"><div class="form-group"><label for="username">Username*</label><input type="text" id="username" class="form-control" required></div><div class="form-group"><label for="fullName">Full Name*</label><input type="text" id="fullName" class="form-control" required></div></div><div class="form-group"><label for="password">Password*</label><input type="password" id="password" class="form-control" required></div><div class="form-group"><label for="department">Department</label><input type="text" id="department" class="form-control" placeholder="e.g., Collections"></div><div class="form-group"><label for="role">Role</label><select id="role" class="form-control"><option value="user">User</option><option value="admin">Admin</option></select></div><div class="form-group" id="assigned-consultant-group"><label for="assignedConsultantId">Assigned Sales Consultant</label><select id="assignedConsultantId" class="form-control"></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save User</button></div></form></div>`;
+        document.getElementById('user-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="user-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">&times;</button></div><form id="user-form"><input type="hidden" id="user-id-hidden"><div class="form-grid"><div class="form-group"><label for="username">Username*</label><input type="text" id="username" class="form-control" required></div><div class="form-group"><label for="fullName">Full Name*</label><input type="text" id="fullName" class="form-control" required></div></div><div class="form-group"><label for="password">Password*</label><input type="password" id="password" class="form-control" required></div><div class="form-group"><label for="department">Department</label><input type="text" id="department" class="form-control" placeholder="e.g., Collections"></div><div class="form-group"><label for="role">Role</label><select id="role" class="form-control"><option value="user">User</option><option value="admin">Admin</option></select></div><div class="form-group" id="assigned-consultant-group"><label for="assignedConsultantId">Assigned Sales Consultant</label><select id="assignedConsultantId" class="form-control"></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save User</button></div></form></div>`;
         document.getElementById('dashboard-page').innerHTML = `<div id="admin-dashboard-wrapper" class="hidden"><div class="d-flex justify-content-between align-items-center mb-4 flex-wrap"><h2 class="page-header" style="margin-bottom: 0;">Admin Dashboard</h2><div class="d-flex gap-2 align-items-center"><label for="dashboard-month-select" style="margin-bottom:0;">Data for:</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="dashboard-month-select" class="form-control" style="width: auto;"></select><select id="dashboard-year-select" class="form-control" style="width: auto;"></select></div></div><div id="consultant-dashboard-header" class="hidden"></div><button id="toggle-dashboard-view-btn" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Switch to Chart View</button></div><div id="admin-dashboard-content"></div></div><div id="chart-dashboard-wrapper"><div id="attendance-controls" class="mb-4"></div><div id="todays-agenda" class="mb-4"></div><div id="priority-actions" class="mb-4"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);"><div class="card"><div class="card-title">Total Customers</div><div id="stat-total-customers" class="value">0</div></div><div class="card"><div class="card-title">Total Outstanding</div><div id="stat-outstanding-debt" class="value">0</div></div><div class="card" id="user-dashboard-forecast-card"><div class="card-title">Total Forecast</div><div id="stat-total-forecast" class="value">0</div></div><div class="card"><div class="card-title">Recovered This Month</div><div id="stat-recovered-this-month" class="value">0</div></div><div class="card"><div class="card-title">Upcoming Visits</div><div id="stat-upcoming-visits" class="value">0</div></div></div><div id="recovery-progress-card" class="card mb-4"></div><div id="dashboard-bottom-content"></div></div>`; 
         document.getElementById('myday-page').innerHTML = `<div class="page-header"><h2 id="myday-title">My Day</h2><p id="myday-date"></p></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-tasks" style="margin-right: 8px;"></i>Today's Visits</h3></div><div id="myday-visits-list"></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-map-route" style="margin-right: 8px;"></i>Today's Map Route</h3></div><div id="myday-map-view" style="height: 400px; border-radius: 8px;"></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-hand-holding-usd" style="margin-right: 8px;"></i>Follow-ups Due Today</h3></div><div id="myday-promises-list"></div></div><div class="card" style="border-color: var(--danger);"><div class="card-header"><h3 class="card-title" style="color: var(--danger);"><i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>Overdue Tasks</h3></div><div id="myday-overdue-list"></div></div></div>`;
         document.getElementById('visits-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Upcoming Visits</div><div id="visit-kpi-upcoming" class="value">0</div></div><div class="kpi-card"><div class="title">Overdue Visits</div><div id="visit-kpi-overdue" class="value">0</div></div><div class="kpi-card"><div class="title">Completed Today</div><div id="visit-kpi-completed-today" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><div class="d-flex gap-2"><button class="btn btn-outline visit-view-tab active" data-view="list"><i class="fas fa-list"></i> List View</button><button class="btn btn-outline visit-view-tab" data-view="calendar"><i class="fas fa-calendar"></i> Calendar View</button><button class="btn btn-outline visit-view-tab" data-view="map"><i class="fas fa-map-marked-alt"></i> Map View</button></div><div id="visits-header-actions" class="d-flex gap-2"></div></div><div id="list-view-controls" class="d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap"><div class="d-flex gap-2" data-role="admin"><div class="input-with-icon"><input type="search" id="visit-search" placeholder="Search customer or purpose..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="visit-consultant-filter" class="form-control" style="width: auto;"><option value="all">All Consultants</option></select></div><button class="btn filter-btn visit-filter-btn active" data-filter="Upcoming">Upcoming</button><button class="btn filter-btn visit-filter-btn" data-filter="Today">Today</button><button class="btn filter-btn visit-filter-btn" data-filter="Overdue">Overdue</button><button class="btn filter-btn visit-filter-btn" data-filter="All">All Visits</button></div><div class="d-flex gap-2 align-items-center flex-wrap"><input type="date" id="visit-start-date" class="form-control" style="width:auto;"><div class="d-flex gap-1"><button class="btn btn-outline" id="set-visit-date-today">Today</button><button class="btn btn-outline" id="set-visit-date-tomorrow">Tomorrow</button></div><span>to</span><input type="date" id="visit-end-date" class="form-control" style="width:auto;"><button class="btn btn-primary" id="visit-date-apply">Apply</button></div></div><div id="map-view-controls" class="hidden d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap align-items-center"><div data-role="admin" class="form-group mb-0"><label for="map-consultant-filter">Consultant</label><select id="map-consultant-filter" class="form-control"></select></div><div class="form-group mb-0"><label for="map-date-filter">Date</label><input type="date" id="map-date-filter" class="form-control"></div></div><button id="clear-route-btn" class="btn btn-outline hidden"><i class="fas fa-times"></i> Clear Route</button></div><div id="list-view-content" class="visit-view-content"><div class="table-container"><table class="data-table"><thead></thead><tbody id="visit-table-body"></tbody></table></div><div id="visits-pagination" class="pagination-controls"></div></div><div id="calendar-view-content" class="visit-view-content hidden"><div id="calendar-view" style="min-height: 600px;"></div></div><div id="map-view-content" class="visit-view-content hidden"><div id="map-view" style="height: 600px; border-radius: 8px;"></div></div></div>`; 
         document.getElementById('payments-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Recovered This Month</div><div id="payment-kpi-recovered-month" class="value">0</div></div><div class="kpi-card"><div class="title">Total Payments Recorded</div><div id="payment-kpi-total-count" class="value">0</div></div><div class="kpi-card"><div class="title">Pending Payments</div><div id="payment-kpi-pending" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Recent Payments</h3><div class="d-flex gap-2"><div class="input-with-icon"><input type="search" id="payment-search" placeholder="Search customer..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="payment-status-filter" class="form-control" style="width: auto;"><option value="all">All Status</option><option>Completed</option><option>Pending</option><option>Failed</option></select><select id="payment-method-filter" class="form-control" style="width: auto;"><option value="all">All Methods</option><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="d-flex gap-2"><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-payments-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-payments-pdf"><i class="fas fa-file-pdf"></i> PDF</button></div><button class="btn btn-success" id="record-payment-btn"><i class="fas fa-plus"></i> Record Payment</button></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="date">Date</th><th data-sort="customerId">Customer</th><th data-sort="consultantId">Consultant</th><th data-sort="amount">Amount</th><th data-sort="method">Method</th><th data-sort="status">Status</th><th>Actions</th></tr></thead><tbody id="payment-table-body"></tbody></table></div><div id="payments-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('analytics-page').innerHTML = `<div class="page-header"><h2>Analytics Dashboard</h2><p>Visual insights into recovery performance and activities.</p></div><div id="analytics-kpi-grid" class="kpi-card-grid"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div class="card"><div class="card-header"><h3 class="card-title">Recovery Performance by Consultant</h3></div><div class="chart-container"><canvas id="recovery-by-consultant-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Outstanding Debt by Emirate</h3></div><div class="chart-container"><canvas id="recovery-by-emirate-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Payment Methods</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="payment-methods-chart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title">Visit Outcome Analysis</h3></div><div class="chart-container" style="height: 300px; max-width: 300px; margin: auto;"><canvas id="visit-outcome-chart"></canvas></div></div></div>`;
-		// --- RESTORE REPORTS PAGE HTML ---
+        
+        // UPDATED REPORTS PAGE HTML STRUCTURE
         document.getElementById('reports-page').innerHTML = `
+    <!-- 1. Custom Report Builder (Full Width) -->
     <div class="card mb-4">
         <div class="card-header"><h3 class="card-title"><i class="fas fa-magic"></i> Custom Report Generator</h3></div>
         <p class="text-secondary" style="margin-bottom: var(--spacing-4);">Build your own report by selecting data sources, columns, and filters.</p>
         
         <div id="custom-report-builder">
+            <!-- Step 1: Select Data Source -->
             <h4 style="font-size: var(--fs-base); font-weight: 600; margin-bottom: var(--spacing-2);">1. Select Data Source</h4>
             <div class="form-group">
                 <div id="data-source-selector" class="d-flex gap-2 flex-wrap">
@@ -1222,16 +1328,30 @@ Object.assign(App.UI, {
                 </div>
             </div>
 
+            <!-- Step 2: Select Columns -->
             <h4 style="font-size: var(--fs-base); font-weight: 600; margin-bottom: var(--spacing-2); margin-top: var(--spacing-4);">2. Choose Columns</h4>
-            <div id="column-selector" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); background: var(--bg-color); padding: var(--spacing-4); border-radius: 8px;"></div>
+            <div id="column-selector" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); background: var(--bg-color); padding: var(--spacing-4); border-radius: 8px;">
+                <!-- Column checkboxes inserted via JS -->
+            </div>
 
+            <!-- Step 3: Filters -->
             <h4 style="font-size: var(--fs-base); font-weight: 600; margin-bottom: var(--spacing-2); margin-top: var(--spacing-4);">3. Apply Filters</h4>
             <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-                <div class="form-group"><label for="custom-report-consultant-filter">Sales Consultant</label><select id="custom-report-consultant-filter" class="form-control"></select></div>
-                <div class="form-group"><label for="custom-report-start-date">Date From</label><input type="date" id="custom-report-start-date" class="form-control"></div>
-                <div class="form-group"><label for="custom-report-end-date">Date To</label><input type="date" id="custom-report-end-date" class="form-control"></div>
+                <div class="form-group">
+                    <label for="custom-report-consultant-filter">Sales Consultant</label>
+                    <select id="custom-report-consultant-filter" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label for="custom-report-start-date">Date From</label>
+                    <input type="date" id="custom-report-start-date" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="custom-report-end-date">Date To</label>
+                    <input type="date" id="custom-report-end-date" class="form-control">
+                </div>
             </div>
             
+            <!-- Dynamic Filters -->
             <div class="d-flex justify-content-between align-items-center mt-2">
                 <label style="font-weight: 500;">Advanced Filters</label>
                 <button class="btn btn-outline btn-sm" id="add-dynamic-filter-btn"><i class="fas fa-plus"></i> Add Condition</button>
@@ -1240,134 +1360,318 @@ Object.assign(App.UI, {
             
             <div id="custom-report-preview" class="card mt-4 p-4" style="background: var(--bg-color); box-shadow: none; border: 1px dashed var(--border-color);">
                 <h5 class="card-title" style="font-size: var(--fs-sm);">Live Preview (First 5 Rows)</h5>
-                <div class="table-container"><table class="data-table report-table-small" id="custom-report-preview-table"><thead></thead><tbody></tbody></table></div>
+                <div class="table-container">
+                    <table class="data-table report-table-small" id="custom-report-preview-table"><thead></thead><tbody></tbody></table>
+                </div>
             </div>
 
             <button id="generate-custom-report-btn" class="btn btn-primary mt-4" style="width: 100%;"><i class="fas fa-file-export"></i> Generate Custom Report</button>
         </div>
     </div>
 
+    <!-- 2. Performance Reports Section -->
     <div class="report-section-header"><i class="fas fa-tachometer-alt"></i> Performance & Targets</div>
     <div class="report-category-grid">
+         <!-- Comprehensive Performance -->
          <div class="card">
             <div class="card-header"><h3 class="card-title">Comprehensive Performance</h3></div>
+             <p class="text-secondary mb-4">Overview of all key consultant KPIs (Target vs Actual, Visits, etc).</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group"><label>Consultant (Optional)</label><select id="report-comprehensive-consultant-select" class="form-control"></select></div>
-                <div class="form-group"><label>Month</label><div class="d-flex gap-2"><select id="report-comprehensive-month-select" class="form-control"></select><select id="report-comprehensive-year-select" class="form-control"></select></div></div>
+                <div class="form-group">
+                    <label>Consultant (Optional)</label>
+                    <select id="report-comprehensive-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-comprehensive-month-select" class="form-control"></select>
+                        <select id="report-comprehensive-year-select" class="form-control"></select>
+                    </div>
+                </div>
             </div>
             <button id="generate-comprehensive-perf-btn" class="btn btn-primary"><i class="fas fa-chart-bar"></i> Generate Report</button>
         </div>
+
+        <!-- Target Performance -->
          <div class="card">
             <div class="card-header"><h3 class="card-title">Target vs. Actual</h3></div>
+             <p class="text-secondary mb-4">Analyze monthly target vs. actual collections.</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group"><label>Consultant</label><select id="report-target-consultant-select" class="form-control"></select></div>
-                <div class="form-group"><label>Month</label><div class="d-flex gap-2"><select id="report-target-month-select" class="form-control"></select><select id="report-target-year-select" class="form-control"></select></div></div>
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-target-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-target-month-select" class="form-control"></select>
+                        <select id="report-target-year-select" class="form-control"></select>
+                    </div>
+                </div>
             </div>
             <button id="generate-target-perf-btn" class="btn btn-primary"><i class="fas fa-bullseye"></i> Generate Report</button>
         </div>
+
+        <!-- Forecast Performance -->
          <div class="card">
             <div class="card-header"><h3 class="card-title">Forecast vs. Actual</h3></div>
+             <p class="text-secondary mb-4">Analyze monthly forecast vs. actual collections.</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group"><label>Consultant</label><select id="report-forecast-consultant-select" class="form-control"></select></div>
-                <div class="form-group"><label>Month</label><div class="d-flex gap-2"><select id="report-forecast-month-select" class="form-control"></select><select id="report-forecast-year-select" class="form-control"></select></div></div>
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-forecast-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-forecast-month-select" class="form-control"></select>
+                        <select id="report-forecast-year-select" class="form-control"></select>
+                    </div>
+                </div>
             </div>
             <button id="generate-forecast-perf-btn" class="btn btn-primary"><i class="fas fa-chart-line"></i> Generate Report</button>
         </div>
+        
+        <!-- Status Target Performance -->
         <div class="card">
             <div class="card-header"><h3 class="card-title">Status Target Performance</h3></div>
+            <p class="text-secondary mb-4">Analyze performance against targets for specific statuses (Collectors, Sales).</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group"><label>Consultant</label><select id="report-status-target-consultant-select" class="form-control"></select></div>
-                <div class="form-group"><label>Month</label><div class="d-flex gap-2"><select id="report-status-target-month-select" class="form-control"></select><select id="report-status-target-year-select" class="form-control"></select></div></div>
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-status-target-consultant-select" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <div class="d-flex gap-2">
+                        <select id="report-status-target-month-select" class="form-control"></select>
+                        <select id="report-status-target-year-select" class="form-control"></select>
+                    </div>
+                </div>
             </div>
             <button id="generate-status-target-perf-btn" class="btn btn-primary"><i class="fas fa-tasks"></i> Generate Report</button>
         </div>
     </div>
 
+    <!-- 3. Financial & Aging Section -->
     <div class="report-section-header"><i class="fas fa-coins"></i> Financial & Aging</div>
     <div class="report-category-grid">
+        <!-- Aging Collection -->
         <div class="card">
             <div class="card-header"><h3 class="card-title">Collection by Aging</h3></div>
+            <p class="text-secondary mb-4">Analyze collected amounts against aging buckets.</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group"><label>Consultant (Optional)</label><select id="report-aging-collection-consultant-select" class="form-control"></select></div>
-                <div class="d-flex gap-2"><div class="form-group flex-grow-1"><label>Start</label><input type="date" id="report-aging-collection-start-date" class="form-control"></div><div class="form-group flex-grow-1"><label>End</label><input type="date" id="report-aging-collection-end-date" class="form-control"></div></div>
+                <div class="form-group">
+                    <label>Consultant (Optional)</label>
+                    <select id="report-aging-collection-consultant-select" class="form-control"></select>
+                </div>
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-aging-collection-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-aging-collection-end-date" class="form-control">
+                    </div>
+                </div>
             </div>
             <button id="generate-aging-collection-report-btn" class="btn btn-primary"><i class="fas fa-hourglass-half"></i> Generate Report</button>
         </div>
+
+        <!-- Detailed Aging -->
         <div class="card">
             <div class="card-header"><h3 class="card-title">Detailed Aging Breakdown</h3></div>
+            <p class="text-secondary mb-4">Deep dive into collections vs aging debt per customer.</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                 <div class="d-flex gap-2"><div class="form-group flex-grow-1"><label>Start</label><input type="date" id="report-aging-start-date" class="form-control"></div><div class="form-group flex-grow-1"><label>End</label><input type="date" id="report-aging-end-date" class="form-control"></div></div>
-                <div class="form-group"><label>Consultant</label><select id="report-aging-consultant-select" class="form-control"></select></div>
-                 <div class="form-group"><label>Customer (Optional)</label><div id="report-aging-customer-select-container"></div></div>
+                 <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-aging-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-aging-end-date" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-aging-consultant-select" class="form-control"></select>
+                </div>
+                 <div class="form-group">
+                    <label>Customer (Optional)</label>
+                    <div id="report-aging-customer-select-container"></div>
+                </div>
             </div>
             <button id="generate-detailed-aging-report-btn" class="btn btn-primary"><i class="fas fa-list-ol"></i> Generate Report</button>
         </div>
+
+        <!-- Collection Details -->
         <div class="card">
             <div class="card-header"><h3 class="card-title">Collection Transaction Log</h3></div>
+            <p class="text-secondary mb-4">Detailed list of all collections within date range.</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="d-flex gap-2"><div class="form-group flex-grow-1"><label>Start</label><input type="date" id="report-collection-start-date" class="form-control"></div><div class="form-group flex-grow-1"><label>End</label><input type="date" id="report-collection-end-date" class="form-control"></div></div>
-                <div class="form-group"><label>Payment Method</label><select id="report-collection-method-filter" class="form-control"><option value="all">All Methods</option><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div>
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-collection-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-collection-end-date" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="report-collection-method-filter" class="form-control">
+                        <option value="all">All Methods</option>
+                        <option>Bank Transfer</option>
+                        <option>Cheque</option>
+                        <option>Cash</option>
+                    </select>
+                </div>
             </div>
             <button id="generate-collection-report-btn" class="btn btn-primary"><i class="fas fa-money-bill-wave"></i> Generate Report</button>
         </div>
     </div>
 
+    <!-- 4. Operational & Risk Section -->
     <div class="report-section-header"><i class="fas fa-clipboard-list"></i> Operations & Risk</div>
     <div class="report-category-grid">
+         <!-- Consultant Visits -->
          <div class="card">
             <div class="card-header"><h3 class="card-title">Consultant Visits</h3></div>
+            <p class="text-secondary mb-4">Detailed visit history and performance stats.</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="form-group"><label>Consultant</label><select id="report-visits-consultant-select" class="form-control"></select></div>
-                <div class="d-flex gap-2"><div class="form-group flex-grow-1"><label>Start</label><input type="date" id="report-visits-start-date" class="form-control"></div><div class="form-group flex-grow-1"><label>End</label><input type="date" id="report-visits-end-date" class="form-control"></div></div>
+                <div class="form-group">
+                    <label>Consultant</label>
+                    <select id="report-visits-consultant-select" class="form-control"></select>
+                </div>
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Start</label>
+                        <input type="date" id="report-visits-start-date" class="form-control">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>End</label>
+                        <input type="date" id="report-visits-end-date" class="form-control">
+                    </div>
+                </div>
             </div>
             <button id="generate-consultant-visits-btn-new" class="btn btn-primary"><i class="fas fa-route"></i> Generate Report</button>
         </div>
+
+        <!-- Risk Report -->
         <div class="card" style="border-left: 4px solid var(--danger);">
             <div class="card-header"><h3 class="card-title text-danger">Risk & Exception Report</h3></div>
+             <p class="text-secondary mb-4">Identify high-risk customers based on criteria.</p>
             <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="d-flex gap-2"><div class="form-group flex-grow-1"><label>Min Outstanding</label><input type="number" id="report-risk-min-balance" class="form-control" value="10000"></div><div class="form-group flex-grow-1"><label>Days Since Visit</label><input type="number" id="report-risk-days-since-visit" class="form-control" value="30"></div></div>
-                <div class="form-group"><label>Missed Promise</label><select id="report-risk-missed-promise" class="form-control"><option value="false">Include All</option><option value="true">Only with Missed Promise</option></select></div>
+                <div class="d-flex gap-2">
+                    <div class="form-group flex-grow-1">
+                        <label>Min Outstanding</label>
+                        <input type="number" id="report-risk-min-balance" class="form-control" value="10000">
+                    </div>
+                    <div class="form-group flex-grow-1">
+                        <label>Days Since Visit</label>
+                        <input type="number" id="report-risk-days-since-visit" class="form-control" value="30">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Missed Promise</label>
+                    <select id="report-risk-missed-promise" class="form-control">
+                        <option value="false">Include All</option>
+                        <option value="true">Only with Missed Promise</option>
+                    </select>
+                </div>
             </div>
             <button id="generate-risk-report-btn" class="btn btn-danger"><i class="fas fa-exclamation-triangle"></i> Generate Risk Report</button>
         </div>
+        
+        <!-- Visit Outcome -->
         <div class="card">
             <div class="card-header"><h3 class="card-title">Visit Outcome Analysis</h3></div>
-            <div class="form-group"><p style="font-size: var(--fs-sm); color: var(--text-secondary);">Generates a Pie Chart visualization of outcomes.</p></div>
+            <p class="text-secondary mb-4">Analyzes the results of all completed visits in a chart.</p>
+            <div class="form-group">
+                <p style="font-size: var(--fs-sm); color: var(--text-secondary);">Generates a Pie Chart visualization of outcomes (Paid, Promise to Pay, No Answer, etc).</p>
+            </div>
             <button id="generate-outcome-analysis-btn" class="btn btn-primary"><i class="fas fa-chart-pie"></i> Generate Analysis</button>
         </div>
     </div>
 
+    <!-- 5. Daily Activity & Standard Exports -->
     <div class="report-section-header"><i class="fas fa-print"></i> Daily Activity & Standard Exports</div>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: var(--spacing-6);">
+        <!-- Consultant Daily Activity -->
         <div class="card" data-role="admin">
             <div class="card-header"><h3 class="card-title">Consultant Daily Activity</h3></div>
             <div class="d-flex flex-column gap-3">
                 <div class="d-flex gap-2 flex-wrap align-items-end">
-                    <div class="form-group mb-0 flex-grow-1"><label>Consultant</label><select id="report-consultant-select" class="form-control"></select></div>
-                    <div class="form-group mb-0"><label>Date Range</label><div class="d-flex gap-2 align-items-center"><input type="date" id="report-activity-start-date" class="form-control"><span>to</span><input type="date" id="report-activity-end-date" class="form-control"></div></div>
+                    <div class="form-group mb-0 flex-grow-1">
+                        <label>Consultant</label>
+                        <select id="report-consultant-select" class="form-control"></select>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label>Date Range</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="date" id="report-activity-start-date" class="form-control">
+                            <span>to</span>
+                            <input type="date" id="report-activity-end-date" class="form-control">
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group"><label>Customer Filter (Optional)</label><div id="report-activity-customer-filter-container"></div></div>
+                <div class="form-group">
+                    <label>Customer Filter (Optional)</label>
+                    <div id="report-activity-customer-filter-container"></div>
+                </div>
                 <div class="d-flex gap-2 justify-content-between align-items-center">
-                    <div class="d-flex gap-2"><button id="activity-report-summary-btn" class="btn btn-outline filter-btn active"><i class="fas fa-chart-pie"></i> Summary</button><button id="activity-report-table-btn" class="btn btn-outline filter-btn"><i class="fas fa-table"></i> Table</button></div>
+                    <div class="d-flex gap-2">
+                        <button id="activity-report-summary-btn" class="btn btn-outline filter-btn active"><i class="fas fa-chart-pie"></i> Summary</button>
+                        <button id="activity-report-table-btn" class="btn btn-outline filter-btn"><i class="fas fa-table"></i> Table</button>
+                    </div>
                     <button id="generate-activity-report-btn" class="btn btn-primary"><i class="fas fa-play"></i> Generate</button>
                 </div>
             </div>
         </div>
+
+        <!-- Quick Standard Reports -->
         <div class="card">
             <div class="card-header"><h3 class="card-title">Standard List Exports</h3></div>
-            <div class="form-group mb-4"><label>Date Range (Optional)</label><div class="d-flex gap-2"><input type="date" id="report-standard-start-date" class="form-control"><input type="date" id="report-standard-end-date" class="form-control"></div></div>
+            <div class="form-group mb-4">
+                <label>Date Range (Optional for some reports)</label>
+                <div class="d-flex gap-2">
+                    <input type="date" id="report-standard-start-date" class="form-control">
+                    <input type="date" id="report-standard-end-date" class="form-control">
+                </div>
+            </div>
             <div class="standard-reports-buttons">
-                <button id="generate-customer-report-btn" class="btn btn-primary"><i class="fas fa-users"></i><span>Customer List</span></button>
-                <button id="generate-consultant-report-btn" class="btn btn-primary"><i class="fas fa-user-tie"></i><span>Consultants</span></button>
-                <button id="generate-aging-report-btn" class="btn btn-info"><i class="fas fa-history"></i><span>Aging List</span></button>
-                <button id="generate-customer-status-report-btn" class="btn btn-info"><i class="fas fa-user-check"></i><span>Status Report</span></button>
-                <button id="generate-recovery-report-btn" class="btn btn-success"><i class="fas fa-percentage"></i><span>Recovery Perf.</span></button>
+                <button id="generate-customer-report-btn" class="btn btn-primary">
+                    <i class="fas fa-users"></i>
+                    <span>Customer List</span>
+                </button>
+                <button id="generate-consultant-report-btn" class="btn btn-primary">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Consultants</span>
+                </button>
+                <button id="generate-aging-report-btn" class="btn btn-info">
+                    <i class="fas fa-history"></i>
+                    <span>Aging List</span>
+                </button>
+                <button id="generate-customer-status-report-btn" class="btn btn-info">
+                    <i class="fas fa-user-check"></i>
+                    <span>Status Report</span>
+                </button>
+                <button id="generate-recovery-report-btn" class="btn btn-success">
+                    <i class="fas fa-percentage"></i>
+                    <span>Recovery Perf.</span>
+                </button>
             </div>
         </div>
     </div>
+    
     <div id="report-output" class="mt-4"></div>`; 
-
-        // --- RESTORE SETTINGS PAGE HTML ---
+        document.getElementById('performance-page').innerHTML = `<div class="page-header"><h2>Performance Snapshot</h2><p>An at-a-glance overview of consultant performance for the current month.</p></div><div id="performance-grid-container" class="performance-grid"></div>`;
+        document.getElementById('consultants-page').innerHTML = `<div class="page-header"><h2 >Sales Consultant Management</h2><p >Home > Consultants</p></div><div class="card"><div class="card-header"><h3 class="card-title">Consultant List</h3><button id="add-consultant-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Consultant</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="name">Consultant Name</th><th data-sort="noOfCustomers">No. of Customers</th><th data-sort="totalOutstanding">Total Outstanding</th><th data-sort="totalForecast">Total Forecast</th><th data-sort="currentTarget">Current Month Target</th><th data-sort="overdueCustomers">Overdue Customers</th><th data-sort="upcomingVisits">Upcoming Visits</th><th>Actions</th></tr></thead><tbody id="consultant-table-body"></tbody></table></div><div id="consultants-pagination" class="pagination-controls"></div></div>`; 
+        document.getElementById('changelog-page').innerHTML = `<div class="page-header"><h2>Change Log</h2><p>Tracks all data modifications in the system.</p></div><div class="card"><div class="card-header"><h3 class="card-title">Log Entries</h3><div class="d-flex gap-2 align-items-center flex-wrap"><div class="input-with-icon"><input type="search" id="changelog-search" placeholder="Search log..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="changelog-entity-filter" class="form-control" style="width:auto;"><option value="all">All Entities</option><option value="Customer">Customer</option><option value="Payment">Payment</option><option value="Visit">Visit</option><option value="Consultant">Consultant</option><option value="User">User</option></select><select id="changelog-action-filter" class="form-control" style="width:auto;"><option value="all">All Actions</option><option value="Created">Created</option><option value="Updated">Updated</option><option value="Deleted">Deleted</option></select></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="timestamp">Timestamp</th><th data-sort="user">User</th><th data-sort="action">Action</th><th data-sort="entityName">Entity</th><th>Change Details</th><th>Actions</th></tr></thead><tbody id="changelog-table-body"></tbody></table></div><div id="changelog-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('settings-page').innerHTML = `
             <div class="page-header"><h2>System Settings</h2><p>Manage application-wide configurations and data.</p></div>
             
@@ -1405,9 +1709,42 @@ Object.assign(App.UI, {
                 <button id="generate-demo-data-btn" class="btn btn-success"><i class="fas fa-magic"></i> Generate 50+ Test Records</button>
             </div>
             `;
-        document.getElementById('performance-page').innerHTML = `<div class="page-header"><h2>Performance Snapshot</h2><p>An at-a-glance overview of consultant performance for the current month.</p></div><div id="performance-grid-container" class="performance-grid"></div>`;
-        document.getElementById('consultants-page').innerHTML = `<div class="page-header"><h2 >Sales Consultant Management</h2><p >Home > Consultants</p></div><div class="card"><div class="card-header"><h3 class="card-title">Consultant List</h3><button id="add-consultant-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Consultant</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="name">Consultant Name</th><th data-sort="noOfCustomers">No. of Customers</th><th data-sort="totalOutstanding">Total Outstanding</th><th data-sort="totalForecast">Total Forecast</th><th data-sort="currentTarget">Current Month Target</th><th data-sort="overdueCustomers">Overdue Customers</th><th data-sort="upcomingVisits">Upcoming Visits</th><th>Actions</th></tr></thead><tbody id="consultant-table-body"></tbody></table></div><div id="consultants-pagination" class="pagination-controls"></div></div>`; 
-        document.getElementById('changelog-page').innerHTML = `<div class="page-header"><h2>Change Log</h2><p>Tracks all data modifications in the system.</p></div><div class="card"><div class="card-header"><h3 class="card-title">Log Entries</h3><div class="d-flex gap-2 align-items-center flex-wrap"><div class="input-with-icon"><input type="search" id="changelog-search" placeholder="Search log..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="changelog-entity-filter" class="form-control" style="width:auto;"><option value="all">All Entities</option><option value="Customer">Customer</option><option value="Payment">Payment</option><option value="Visit">Visit</option><option value="Consultant">Consultant</option><option value="User">User</option></select><select id="changelog-action-filter" class="form-control" style="width:auto;"><option value="all">All Actions</option><option value="Created">Created</option><option value="Updated">Updated</option><option value="Deleted">Deleted</option></select></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="timestamp">Timestamp</th><th data-sort="user">User</th><th data-sort="action">Action</th><th data-sort="entityName">Entity</th><th>Change Details</th><th>Actions</th></tr></thead><tbody id="changelog-table-body"></tbody></table></div><div id="changelog-pagination" class="pagination-controls"></div></div>`; 
+        document.getElementById('customer-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">×</button></div><form id="customer-form"><input type="hidden" id="customer-id-hidden"><div class="form-grid"><div class="form-group" data-admin-only="true"><label for="accountNo">Account Number*</label><input type="text" id="accountNo" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="companyName">Company Name*</label><input type="text" id="companyName" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="email">Contact Email</label><input type="email" id="email" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="mobile">Contact Mobile</label><input type="tel" id="mobile" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="debtSince">Debt Since</label><input type="date" id="debtSince" class="form-control"></div><div class="form-group" data-admin-only="true"><label for="emirate">Emirate*</label><select id="emirate" class="form-control" required><option>Dubai</option><option>Abu Dhabi</option><option>Sharjah</option><option>Ajman</option></select></div><div class="form-group" data-admin-only="true"><label for="area">Area*</label><input type="text" id="area" class="form-control" required></div>
+        
+        <div class="form-group" data-admin-only="true"><label for="latitude">Latitude (e.g., 25.2048)</label><input type="number" step="any" id="latitude" class="form-control" placeholder="Optional"></div>
+        <div class="form-group" data-admin-only="true"><label for="longitude">Longitude (e.g., 55.2708)</label><input type="number" step="any" id="longitude" class="form-control" placeholder="Optional"></div>
+        <div class="form-group" data-admin-only="true"><label for="status">Account Status</label><select id="status" class="form-control"><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="paymentStatus">Payment Status</label><select id="paymentStatus" class="form-control"><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="form-group" data-admin-only="true"><label for="initialDebt">Initial Debt (AED)*</label><input type="number" id="initialDebt" class="form-control" required></div><div class="form-group" data-admin-only="true"><label for="salesConsultantId">Sales Consultant*</label><select id="salesConsultantId" class="form-control" required></select></div><div class="form-group"><label for="customerStatus">Customer Status</label><select id="customerStatus" class="form-control"><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select></div><div class="form-group"><label for="agingCategory">Aging Category</label><select id="agingCategory" class="form-control" disabled><option>Auto-Calculated</option></select></div><div class="form-group" data-admin-only="true"><label for="balance_2020_2025">Balance 2020-2025 (AED)</label><input type="number" step="any" id="balance_2020_2025" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_2019_2020">Balance 2019-2020 (AED)</label><input type="number" step="any" id="balance_2019_2020" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="balance_lte_2018">Balance <=2018 (AED)</label><input type="number" step="any" id="balance_lte_2018" class="form-control balance-detail"></div><div class="form-group" data-admin-only="true"><label for="outstanding">Total Outstanding Balance (AED)*</label><input type="number" id="outstanding" class="form-control" required readonly style="background-color: var(--border-color);"></div></div><div class="form-group full-width"><label for="customer-tags">Tags</label><input type="text" id="customer-tags" class="form-control" placeholder="e.g. High-Risk, VIP, Disputed"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Customer</button></div></form></div>`;
+		
+        document.getElementById('payment-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Record a Payment</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-modal')">&times;</button></div><form id="payment-form"><div class="form-group"><label for="payment-customer-id">Customer*</label><div id="payment-customer-select-container"></div></div><div id="payment-details-grid" class="form-grid"><div class="form-group"><label for="payment-amount-2025">For 2020-2025</label><input type="number" step="any" id="payment-amount-2025" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount-2020">For 2019-2020</label><input type="number" step="any" id="payment-amount-2020" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount-2018">For <=2018</label><input type="number" step="any" id="payment-amount-2018" class="form-control payment-detail-input" placeholder="0.00"></div><div class="form-group"><label for="payment-amount">Total Amount*</label><input type="number" id="payment-amount" class="form-control" required readonly style="background-color: var(--border-color);"></div></div><div class="form-group"><label for="payment-method">Payment Method*</label><select id="payment-method" class="form-control" required><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="form-group"><label for="payment-date">Date*</label><input type="date" id="payment-date" class="form-control" required></div><div class="form-group"><label for="payment-status">Status</label><select id="payment-status" class="form-control"><option>Completed</option><option>Pending</option><option>Failed</option></select></div><button type="submit" class="btn btn-primary">Record Payment</button></form></div>`; 
+        document.getElementById('visit-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3>Schedule Visit</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-modal')">&times;</button></div><form id="visit-form"><input type="hidden" id="visit-id"><div class="form-group"><label for="visit-customer-id">Customer*</label><div id="visit-customer-select-container"></div></div><div class="form-group"><label for="visit-purpose">Purpose*</label><input type="text" id="visit-purpose" class="form-control" required></div><div class="form-group"><label for="visit-date">Date & Time*</label><input type="datetime-local" id="visit-date" class="form-control" required></div><button type="submit" class="btn btn-primary">Save Visit</button></form></div>`; 
+        document.getElementById('import-csv-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Upload CSV File</h3><button class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">&times;</button></div><div class="file-upload-wrapper" id="csv-drop-zone"><i class="fas fa-upload" style="font-size: 1.5rem; color: var(--text-secondary);"></i><p>Click to browse or drag & drop file here</p><span id="csv-filename" style="font-weight: 600; color: var(--primary);"></span><input type="file" id="csv-file-input" class="hidden" accept=".csv"></div><div class="info-box"><p>Ensure headers match:</p><code>accountNumber,companyName,email,mobile,emirate,area,status,paymentStatus,initialDebt,salesConsultant,customerStatus,debtSince,balance2020_2025,balance2019_2020,balancelte2018</code></div><a href="#" id="download-sample-csv-link"><i class="fas fa-download"></i> Download Sample Template</a><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('import-csv-modal')">Close</button></div></div>`; 
+        document.getElementById('customer-detail-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-detail-title" class="card-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-detail-modal')">×</button></div>
+        <div class="d-flex gap-2 mb-4">
+            <button class="detail-tab-btn active" data-tab="overview"><i class="fas fa-info-circle"></i> Overview</button>
+            <button class="detail-tab-btn" data-tab="timeline"><i class="fas fa-history"></i> Activity</button>
+            <button class="detail-tab-btn" data-tab="comments"><i class="fas fa-comments"></i> Comments</button>
+            <button class="detail-tab-btn" data-tab="calculator"><i class="fas fa-calculator"></i> Payment Plan</button>
+        </div>
+        <div id="customer-detail-content">
+            <div class="tab-content active" id="overview-content"></div>
+            <div class="tab-content hidden" id="timeline-content"></div>
+            <div class="tab-content hidden" id="comments-content"></div>
+            <div class="tab-content hidden" id="calculator-content"></div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between;"><div class="d-flex gap-2"><button class="btn btn-success" id="detail-record-payment-btn"><i class="fas fa-dollar-sign"></i> Record Payment</button><button class="btn btn-primary" id="detail-schedule-visit-btn"><i class="fas fa-calendar-plus"></i> Schedule Visit</button></div><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('customer-detail-modal')">Close</button></div></div>`;
+        document.getElementById('visit-notes-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 class="card-title">Mark Visit as Done</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-notes-modal')">&times;</button></div><form id="visit-notes-form"><input type="hidden" id="mark-done-visit-id"><input type="hidden" id="log-location-hidden"><div class="form-grid"><div class="form-group"><label>CONTACT METHOD</label><select id="log-contact-method" class="form-control"><option>Site Visit</option><option>Phone Call</option><option>Email</option></select></div><div class="form-group"><label>OUTCOME</label><select id="log-outcome" class="form-control"><option>No Answer</option><option>Promise to Pay</option><option>Dispute</option><option>Paid in Full</option><option>Partial Payment</option></select></div></div><div id="promise-to-pay-fields" class="form-grid hidden"><div class="form-group"><label for="log-promise-amount">Promised Amount (AED)</label><input type="number" id="log-promise-amount" class="form-control"></div><div class="form-group"><label for="log-promise-date">Promised Date</label><input type="date" id="log-promise-date" class="form-control"></div></div><div class="form-group"><label>NOTES</label><div id="log-notes-editor" style="height:150px;"></div></div><div class="form-grid"><div class="form-group"><label>SCHEDULE NEXT VISIT (Optional)</label><input type="date" id="log-next-date" class="form-control"></div><div class="form-group"><label>LOCATION</label><button type="button" class="btn btn-outline" id="log-location-btn" style="width:100%;"><i class="fas fa-map-marker-alt"></i> <span id="log-location-text">Tag Current Location</span></button></div></div><div class="modal-footer" data-role="user"><button type="button" id="log-record-payment-btn" class="btn btn-success"><i class="fas fa-dollar-sign"></i> Record Payment</button><button type="submit" class="btn btn-primary">Save Notes</button></div></form></div>`; 
+        document.getElementById('payment-detail-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Payment Details</h3><button class="btn btn-outline" onclick="App.UI.closeModal('payment-detail-modal')">&times;</button></div><div id="payment-detail-content"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('payment-detail-modal')">Close</button></div></div>`; 
+        document.getElementById('consultant-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="consultant-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('consultant-modal')">&times;</button></div><form id="consultant-form"><input type="hidden" id="consultant-id-hidden"><div class="form-group"><label for="consultantName">Consultant Name*</label><input type="text" id="consultantName" class="form-control" required></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('consultant-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save Consultant</button></div></form></div>`; 
+        document.getElementById('visit-detail-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Visit Details</h3><button class="btn btn-outline" onclick="App.UI.closeModal('visit-detail-modal')">&times;</button></div><div id="visit-detail-content"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('visit-detail-modal')">Close</button></div></div>`;
+        document.getElementById('consultant-customers-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="consultant-customers-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('consultant-customers-modal')">&times;</button></div><div id="consultant-customers-body" class="table-container"></div></div>`;
+        document.getElementById('reassign-customers-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 id="reassign-customers-title">Reassign Customers</h3><button class="btn btn-outline" onclick="App.UI.closeModal('reassign-customers-modal')">&times;</button></div><form id="reassign-customers-form"><input type="hidden" id="from-consultant-hidden"><div class="form-group"><label>Customers assigned to <strong id="from-consultant-name"></strong></label><div id="reassign-customer-list" style="height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: var(--spacing-2); border-radius: 8px;"></div></div><div class="form-group"><label for="reassign-to-consultant">Reassign selected to</label><select id="reassign-to-consultant" class="form-control" required></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('reassign-customers-modal')">Cancel</button><button type="submit" class="btn btn-primary">Reassign</button></div></form></div>`;
+        document.getElementById('reassign-and-delete-consultant-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 id="reassign-delete-title">Delete Consultant</h3><button class="btn btn-outline" onclick="App.UI.closeModal('reassign-and-delete-consultant-modal')">&times;</button></div><form id="reassign-and-delete-form"><input type="hidden" id="delete-consultant-id-hidden"><p id="reassign-delete-message"></p><div class="form-group mt-4"><label for="reassign-delete-to-consultant">Reassign all customers to</label><select id="reassign-delete-to-consultant" class="form-control" required></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('reassign-and-delete-consultant-modal')">Cancel</button><button type="submit" class="btn btn-danger">Reassign & Delete</button></div></form></div>`;
+        document.getElementById('forecast-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('forecast-modal')">&times;</button></div><form id="forecast-form"><input type="hidden" id="forecast-consultant-id"><input type="hidden" id="forecast-id-hidden"><div class="form-grid"><div class="form-group"><label for="forecast-month-select">Month</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="forecast-month-select" class="form-control" required></select><select id="forecast-year-select" class="form-control" required></select></div></div><div class="form-group"><label for="forecast-amount">Overall Target Amount (AED)</label><input type="number" id="forecast-amount" class="form-control" required></div></div><hr style="margin: var(--spacing-4) 0; border-color: var(--border-color);"><h4 class="card-title mb-2">Targets by Customer Status (Optional)</h4><div class="form-grid"><div class="form-group"><label for="forecast-amount-collectors">"Collectors" Target</label><input type="number" step="any" id="forecast-amount-collectors" class="form-control" placeholder="0.00"></div><div class="form-group"><label for="forecast-amount-sales3m">"Sales (3+ Months)" Target</label><input type="number" step="any" id="forecast-amount-sales3m" class="form-control" placeholder="0.00"></div><div class="form-group full-width"><label for="forecast-amount-sales360d">"Sales (360+ Days)" Target</label><input type="number" step="any" id="forecast-amount-sales360d" class="form-control" placeholder="0.00"></div></div><button type="submit" class="btn btn-primary mt-4">Save Target</button></form><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title mb-4">Target History</h4><div class="table-container"><table class="data-table"><thead><tr><th>Month</th><th>Overall Target</th><th>Collectors</th><th>Sales (3+ mo)</th><th>Sales (360+ d)</th><th>Actions</th></tr></thead><tbody id="existing-forecasts-body"></tbody></table></div></div>`;
+        document.getElementById('customer-forecast-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h3 id="customer-forecast-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('customer-forecast-modal')">&times;</button></div><form id="customer-forecast-form"><input type="hidden" id="customer-forecast-accountNo"><input type="hidden" id="customer-forecast-id-hidden"><div class="form-grid"><div class="form-group"><label for="customer-forecast-month-select">Month</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="customer-forecast-month-select" class="form-control" required></select><select id="customer-forecast-year-select" class="form-control" required></select></div></div><div class="form-group"><label for="customer-forecast-amount">Forecast Amount (AED)</label><input type="number" id="customer-forecast-amount" class="form-control" required></div></div><button type="submit" class="btn btn-primary">Save Forecast</button></form><hr style="margin: var(--spacing-6) 0; border-color: var(--border-color);"><h4 class="card-title mb-4">Forecast History</h4><div class="table-container"><table class="data-table"><thead><tr><th>Month</th><th>Forecast Amount</th><th>Actions</th></tr></thead><tbody id="existing-customer-forecasts-body"></tbody></table></div></div>`;
+        document.getElementById('report-modal').innerHTML = `<div class="modal-content" style="max-width: 90%; width: 1200px;"><div class="modal-header"><h3 id="report-modal-title" style="flex-grow: 1;"></h3><div id="report-modal-actions" class="d-flex gap-2"></div><button class="btn btn-outline" onclick="App.UI.closeModal('report-modal')" style="margin-left: 1rem;">&times;</button></div><div id="report-modal-body" style="margin-top: var(--spacing-4);"></div></div>`;
+        document.getElementById('bulk-update-customers-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Bulk Customer Update</h3><button class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">&times;</button></div><p id="bulk-update-count-msg" class="text-secondary"></p><form id="bulk-update-form"><div class="form-group"><label for="bulk-update-consultant">Assign to Consultant (Optional)</label><select id="bulk-update-consultant" class="form-control"><option value="">-- Do Not Change --</option></select></div><div class="form-group"><label for="bulk-update-status">Set Account Status (Optional)</label><select id="bulk-update-status" class="form-control"><option value="">-- Do Not Change --</option><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="bulk-update-payment-status">Set Payment Status (Optional)</label><select id="bulk-update-payment-status" class="form-control"><option value="">-- Do Not Change --</option><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">Cancel</button><button type="submit" class="btn btn-warning">Apply Bulk Update</button></div></form></div>`;
+        document.getElementById('changelog-detail-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Change Log Detail</h3><button class="btn btn-outline" onclick="App.UI.closeModal('changelog-detail-modal')">&times;</button></div><div id="changelog-detail-content"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('changelog-detail-modal')">Close</button></div></div>`;
+        document.getElementById('route-planner-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Plan Daily Route</h3><button class="btn btn-outline" onclick="App.UI.closeModal('route-planner-modal')">&times;</button></div><form id="route-planner-form"><div class="form-group"><label for="route-date">Select Date for Route</label><input type="date" id="route-date" class="form-control"></div><div class="form-group"><label>Select Customers to Visit</label><div id="route-customer-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); padding: var(--spacing-4); border-radius: 8px;"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('route-planner-modal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-route"></i> Generate Route</button></div></form></div>`;
     }, 
     setupEventListeners() { 
         const sidebar = document.querySelector('.sidebar');
@@ -1429,20 +1766,6 @@ Object.assign(App.UI, {
             });
         });
         document.getElementById('theme-toggle-btn').addEventListener('click', () => this.toggleTheme()); 
-        
-        // --- NEW: MANUAL SYNC BUTTON LISTENER ---
-        document.body.addEventListener('click', (e) => {
-            const syncBtn = e.target.closest('#manual-sync-btn');
-            if (syncBtn) {
-                const icon = syncBtn.querySelector('i');
-                icon.classList.add('fa-spin'); 
-                App.DB.syncFromCloud(true).then(() => {
-                    setTimeout(() => icon.classList.remove('fa-spin'), 1000);
-                });
-            }
-        });
-        // ----------------------------------------
-
         hamburger.addEventListener('click', () => {
             sidebar.classList.toggle('open');
             overlay.classList.toggle('hidden');
@@ -1453,6 +1776,7 @@ Object.assign(App.UI, {
         });
         document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', (e) => { e.preventDefault(); this.navigateTo(link.dataset.page); })); 
         
+        // Add listener for customer modal balance calculation
         document.getElementById('customer-modal').addEventListener('input', e => {
             if (e.target.classList.contains('balance-detail')) {
                 const form = document.getElementById('customer-form');
@@ -1463,6 +1787,7 @@ Object.assign(App.UI, {
             }
         });
 
+        // Add listener for payment modal balance calculation
         document.getElementById('payment-modal').addEventListener('input', e => {
             if (e.target.classList.contains('payment-detail-input')) {
                 const form = document.getElementById('payment-form');
@@ -1476,14 +1801,16 @@ Object.assign(App.UI, {
         App.Dashboard.setupEventListeners(); App.Customers.setupEventListeners(); App.Payments.setupEventListeners(); App.Reports.setupEventListeners(); App.Visits.setupEventListeners(); App.Consultants.setupEventListeners(); App.Users.setupEventListeners(); App.ChangeLog.setupEventListeners(); App.Settings.setupEventListeners(); App.Analytics.setupEventListeners(); App.Performance.setupEventListeners(); App.MyDay.setupEventListeners();
         document.body.addEventListener('click', (e) => { if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && !hamburger.contains(e.target)) { sidebar.classList.remove('open'); overlay.classList.add('hidden'); } });
         
+        // Setup clearable input listeners globally
         document.querySelectorAll('.input-with-icon .clear-icon').forEach(icon => {
             const input = icon.previousElementSibling;
             icon.addEventListener('click', () => {
                 input.value = '';
-                input.dispatchEvent(new Event('input', { bubbles: true })); 
+                input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger the input event to re-render tables
             });
         });
         
+        // Dashboard Time Frame Listener
         document.getElementById('dashboard-month-select')?.addEventListener('change', () => {
             App.state.dashboardTimeFrame.month = document.getElementById('dashboard-month-select').value;
             App.Dashboard.render();
@@ -1499,9 +1826,11 @@ Object.assign(App.UI, {
         document.getElementById('username-display').textContent = App.state.currentUser.fullName; 
         App.Auth.checkRole(); 
         
+        // Ensure dashboard month/year dropdowns are populated if they exist
         App.Helpers.populateMonthYearDropdowns('dashboard-month-select', 'dashboard-year-select', new Date().getMonth(), new Date().getFullYear());
         
         if (App.state.activeConsultantId !== null) {
+            // If returning from a consultant dashboard, reset to the main admin view
             App.state.activeConsultantId = null;
             this.navigateTo('dashboard');
         } else {
@@ -2895,18 +3224,17 @@ Object.assign(App.MyDay, {
             const snoozeBtn = e.target.closest('.snooze-btn');
             const taskItem = e.target.closest('.clickable');
 
-            // --- 1. START VISIT LOGIC (With Cloud Sync) ---
+            // --- NEW: Start Visit logic ---
             if (startBtn) {
                 e.stopPropagation();
                 App.Visits.checkIn(startBtn.dataset.id);
             }
+            // ------------------------------
 
-            // --- 2. END VISIT LOGIC ---
             if (visitBtn) {
                 App.Visits.showMarkDoneModal(visitBtn.dataset.id);
             }
             
-            // --- 3. SNOOZE LOGIC (With Cloud Sync) ---
             if (snoozeBtn) {
                 e.stopPropagation(); 
                 const visitId = snoozeBtn.dataset.id;
@@ -2917,17 +3245,10 @@ Object.assign(App.MyDay, {
                     const tomorrow = new Date();
                     tomorrow.setDate(tomorrow.getDate() + 1);
                     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-                    
-                    // Keep original time or default to 9am
                     const originalTime = visits[visitIndex].dateTime.split('T')[1] || '09:00:00.000Z';
-                    
-                    // Update Object
                     visits[visitIndex].dateTime = `${tomorrowStr}T${originalTime}`;
                     visits[visitIndex].status = 'Scheduled'; 
-                    
-                    // ⚠️ CRITICAL CHANGE: Use updateInCloud instead of set
-                    App.DB.updateInCloud('visits', visits[visitIndex]);
-                    
+                    App.DB.set('visits', visits);
                     App.Helpers.logChange('Rescheduled', 'Visit', `Snoozed to ${tomorrowStr}`);
                     App.UI.toast('Task moved to tomorrow.', 'info');
                     this.render();
@@ -2948,7 +3269,8 @@ Object.assign(App.MyDay, {
         const todayStart = new Date();
         todayStart.setHours(0,0,0,0);
 
-        // Filter: Today + (Scheduled OR In Progress)
+        // Render Today's Visits
+        // --- NEW: Filter includes 'In Progress' ---
         const todaysVisits = allVisits.filter(v => 
             v.dateTime.startsWith(today) && (v.status === 'Scheduled' || v.status === 'In Progress')
         );
@@ -2958,6 +3280,7 @@ Object.assign(App.MyDay, {
             visitsListContainer.innerHTML = todaysVisits.map(v => {
                 let actionBtn = '';
                 
+                // --- NEW: Button Logic ---
                 if (v.status === 'Scheduled') {
                     actionBtn = `
                         <button class="btn btn-outline snooze-btn" data-id="${v.id}" title="Snooze" style="padding: 4px 8px; margin-right: 5px; color: #ffc107; border-color: #ffc107;"><i class="fas fa-clock"></i></button>
@@ -2968,6 +3291,7 @@ Object.assign(App.MyDay, {
                         <button class="btn btn-danger mark-done-btn" data-id="${v.id}" title="Check Out" style="padding: 4px 12px;"><i class="fas fa-stop"></i> End</button>
                     `;
                 }
+                // -------------------------
 
                 return `
                 <div class="myday-task-item" style="${v.status === 'In Progress' ? 'background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; padding-left: 10px;' : ''}">
@@ -3115,6 +3439,7 @@ Object.assign(App.MyDay, {
         }).addTo(this.map);
     }
 });
+
 
 Object.assign(App.Customers, { 
     viewMode: 'list', quill: null, 
@@ -3300,21 +3625,9 @@ Object.assign(App.Customers, {
         });
     },
 
-   updateCustomerStatus: function(accountNo, newStatus) {
-        let customers = App.DB.get('customers'); 
-        const index = customers.findIndex(c => c.accountNo === accountNo);
-        
-        if (index > -1 && customers[index].paymentStatus !== newStatus) { 
-            const oldStatus = customers[index].paymentStatus; 
-            customers[index].paymentStatus = newStatus; 
-            
-            // ⚠️ FIX: Sync this change to Google Sheets
-            App.DB.updateInCloud('customers', customers[index]); 
-            
-            App.Helpers.logChange('Updated', 'Customer', `${customers[index].companyName}`, `Status changed: ${oldStatus} -> ${newStatus}`); 
-            App.UI.toast(`Moved to ${newStatus}`, 'success'); 
-            this.render(); 
-        }
+    updateCustomerStatus: function(accountNo, newStatus) {
+        let customers = App.DB.get('customers'); const index = customers.findIndex(c => c.accountNo === accountNo);
+        if (index > -1 && customers[index].paymentStatus !== newStatus) { const oldStatus = customers[index].paymentStatus; customers[index].paymentStatus = newStatus; App.DB.set('customers', customers); App.Helpers.logChange('Updated', 'Customer', `${customers[index].companyName}`, `Status changed: ${oldStatus} -> ${newStatus}`); App.UI.toast(`Moved to ${newStatus}`, 'success'); this.render(); }
     },
 
     renderColumnToggle() {
@@ -3346,89 +3659,32 @@ Object.assign(App.Customers, {
     }, 
     
     saveCustomer: async function(e) { 
-        e.preventDefault(); 
-        const form = e.target; 
-        const id = form.elements['customer-id-hidden'].value; 
-        let customers = App.DB.get('customers'); 
-        const isAdmin = App.state.currentUser.role === 'admin'; 
-        const tags = form.elements['customer-tags'].value.split(',').map(tag => tag.trim()).filter(Boolean);
-        
-        let customerData = { 
-            paymentStatus: form.elements.paymentStatus.value, 
-            customerStatus: form.elements.customerStatus.value, 
-            tags: tags 
-        };
-        
+        e.preventDefault(); const form = e.target; const id = form.elements['customer-id-hidden'].value; let customers = App.DB.get('customers'); const isAdmin = App.state.currentUser.role === 'admin'; const tags = form.elements['customer-tags'].value.split(',').map(tag => tag.trim()).filter(Boolean);
+        let customerData = { paymentStatus: form.elements.paymentStatus.value, customerStatus: form.elements.customerStatus.value, tags: tags };
         if (isAdmin) {
-            const bal_2020_2025 = parseFloat(form.elements.balance_2020_2025.value) || 0; 
-            const bal_2019_2020 = parseFloat(form.elements.balance_2019_2020.value) || 0; 
-            const bal_lte_2018 = parseFloat(form.elements.balance_lte_2018.value) || 0;
+            const bal_2020_2025 = parseFloat(form.elements.balance_2020_2025.value) || 0; const bal_2019_2020 = parseFloat(form.elements.balance_2019_2020.value) || 0; const bal_lte_2018 = parseFloat(form.elements.balance_lte_2018.value) || 0;
             
-            // GPS Logic
+            // --- GPS LOGIC ---
             let finalLat, finalLng;
             const inputLat = parseFloat(form.elements.latitude.value);
             const inputLng = parseFloat(form.elements.longitude.value);
             
             if (!isNaN(inputLat) && !isNaN(inputLng)) {
-                finalLat = inputLat; finalLng = inputLng;
+                finalLat = inputLat;
+                finalLng = inputLng;
             } else {
-                // Fallback to address geocoding
+                // Fallback to address geocoding if fields are empty
                 const addressString = `${form.elements.area.value}, ${form.elements.emirate.value}`; 
                 const coords = await App.Geo.geocodeAddress(addressString, form.elements.accountNo.value);
-                finalLat = coords.lat; finalLng = coords.lng;
+                finalLat = coords.lat;
+                finalLng = coords.lng;
             }
+            // ----------------
 
-            Object.assign(customerData, { 
-                companyName: form.elements.companyName.value, 
-                email: form.elements.email.value, 
-                mobile: form.elements.mobile.value, 
-                emirate: form.elements.emirate.value, 
-                area: form.elements.area.value, 
-                latitude: finalLat, 
-                longitude: finalLng, 
-                initialDebt: parseFloat(form.elements.initialDebt.value), 
-                outstanding: bal_2020_2025 + bal_2019_2020 + bal_lte_2018, 
-                balance_2020_2025: bal_2020_2025, 
-                balance_2019_2020: bal_2019_2020, 
-                balance_lte_2018: bal_lte_2018, 
-                salesConsultantId: parseInt(form.elements.salesConsultantId.value), 
-                status: form.elements.status.value, 
-                debtSince: form.elements.debtSince.value, 
-                agingCategory: App.Helpers.calculateAgingCategory(form.elements.debtSince.value) 
-            });
+            Object.assign(customerData, { companyName: form.elements.companyName.value, email: form.elements.email.value, mobile: form.elements.mobile.value, emirate: form.elements.emirate.value, area: form.elements.area.value, latitude: finalLat, longitude: finalLng, initialDebt: parseFloat(form.elements.initialDebt.value), outstanding: bal_2020_2025 + bal_2019_2020 + bal_lte_2018, balance_2020_2025: bal_2020_2025, balance_2019_2020: bal_2019_2020, balance_lte_2018: bal_lte_2018, salesConsultantId: parseInt(form.elements.salesConsultantId.value), status: form.elements.status.value, debtSince: form.elements.debtSince.value, agingCategory: App.Helpers.calculateAgingCategory(form.elements.debtSince.value) });
         }
-
-        if (id) { 
-            // --- UPDATE EXISTING ---
-            const index = customers.findIndex(c => c.accountNo === id); 
-            const original = form.originalData; 
-            if (isAdmin) { customerData.agingCategory = App.Helpers.calculateAgingCategory(form.elements.debtSince.value); } 
-            
-            const updatedCustomer = { ...customers[index], ...customerData };
-            
-            // Cloud Sync
-            App.DB.updateInCloud('customers', updatedCustomer);
-            
-            const changes = App.Helpers.getObjectChanges(original, updatedCustomer); 
-            App.Helpers.logChange('Updated', 'Customer', `${updatedCustomer.companyName} (${id})`, changes); 
-        } else { 
-            // --- ADD NEW ---
-            const newAccountNo = form.elements.accountNo.value.trim(); 
-            if (!newAccountNo) { App.UI.toast('Account Number is required.', 'error'); return; } 
-            if (customers.some(c => c.accountNo.toLowerCase() === newAccountNo.toLowerCase())) { App.UI.toast('Account Number already exists.', 'error'); return; } 
-            
-            customerData.accountNo = newAccountNo; 
-            
-            // Cloud Sync
-            App.DB.addToCloud('customers', customerData);
-            
-            App.Helpers.logActivity('added a new customer', customerData.companyName, customerData.accountNo); 
-            App.Helpers.logChange('Created', 'Customer', `${customerData.companyName} (${newAccountNo})`); 
-        } 
-        
-        App.UI.closeModal('customer-modal'); 
-        App.UI.toast(`Customer ${id ? 'updated' : 'added'}! (Syncing...)`); 
-        this.render(); 
+        if (id) { const index = customers.findIndex(c => c.accountNo === id); const original = form.originalData; if (isAdmin) { customerData.agingCategory = App.Helpers.calculateAgingCategory(form.elements.debtSince.value); } const changes = App.Helpers.getObjectChanges(original, {...original, ...customerData}); customers[index] = { ...customers[index], ...customerData }; App.Helpers.logChange('Updated', 'Customer', `${customers[index].companyName} (${id})`, changes); } else { const newAccountNo = form.elements.accountNo.value.trim(); if (!newAccountNo) { App.UI.toast('Account Number is required.', 'error'); return; } const accountExists = customers.some(c => c.accountNo.toLowerCase() === newAccountNo.toLowerCase()); if (accountExists) { App.UI.toast('Account Number already exists.', 'error'); return; } customerData.accountNo = newAccountNo; customers.push(customerData); App.Helpers.logActivity('added a new customer', customerData.companyName, customerData.accountNo); App.Helpers.logChange('Created', 'Customer', `${customerData.companyName} (${newAccountNo})`); } 
+        App.DB.set('customers', customers); App.UI.closeModal('customer-modal'); App.UI.toast(`Customer ${id ? 'updated' : 'added'}!`); this.render(); 
     },
 
     showCustomerForecastForm(accountNo) { const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); if (!customer) return App.UI.toast('Customer not found.', 'error'); document.getElementById('customer-forecast-modal-title').textContent = `Monthly Forecasts for ${customer.companyName}`; const form = document.getElementById('customer-forecast-form'); form.reset(); form.elements['customer-forecast-accountNo'].value = customer.accountNo; form.elements['customer-forecast-id-hidden'].value = ''; const now = new Date(); App.Helpers.populateMonthYearDropdowns('customer-forecast-month-select', 'customer-forecast-year-select', now.getMonth(), now.getFullYear()); form.elements['customer-forecast-month-select'].disabled = false; form.elements['customer-forecast-year-select'].disabled = false; this.renderForecastsForCustomer(accountNo); App.UI.openModal('customer-forecast-modal'); },
@@ -3493,37 +3749,7 @@ Object.assign(App.Customers, {
         const finalY = doc.lastAutoTable.finalY + 10; doc.setFontSize(12); doc.text(`Total Outstanding: ${App.Helpers.formatCurrency(customer.outstanding)}`, 140, finalY, { align: 'right' });
         doc.save(`SOA_${customer.companyName.replace(/[^a-z0-9]/gi, '_')}.pdf`); App.UI.toast('Statement generated successfully!', 'success');
     },
-    deleteCustomer(accountNo) { 
-        const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); 
-        Swal.fire({ 
-            title: `Delete ${customer.companyName}?`, 
-            text: "This will permanently delete the customer from the Cloud Database.", 
-            input: 'textarea', 
-            inputLabel: 'Reason for deletion', 
-            inputPlaceholder: 'Enter your reason here...', 
-            showCancelButton: true, 
-            confirmButtonText: 'Yes, delete it!', 
-            confirmButtonColor: 'var(--danger)', 
-            background: 'var(--card-bg)', 
-            color: 'var(--text-primary)', 
-            inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } 
-        }).then(result => { 
-            if (result.isConfirmed && result.value) { 
-                // Cloud Sync: Delete Customer
-                App.DB.deleteFromCloud('customers', accountNo);
-                
-                // Cleanup other local data (Optional: You could sync these deletes too, but keeping it simple)
-                let visits = App.DB.get('visits'); 
-                let payments = App.DB.get('payments'); 
-                App.DB.set('visits', visits.filter(v => v.customerId !== accountNo)); 
-                App.DB.set('payments', payments.filter(p => p.customerId !== accountNo)); 
-                
-                App.Helpers.logChange('Deleted', 'Customer', `${customer.companyName} (${accountNo})`, `Reason: ${result.value}`); 
-                App.UI.toast('Customer deleted from Cloud.', 'success'); 
-                this.render(); 
-            } 
-        }); 
-    },
+    deleteCustomer(accountNo) { const customer = App.DB.get('customers').find(c => c.accountNo === accountNo); Swal.fire({ title: `Delete ${customer.companyName}?`, text: "This will permanently delete the customer and all their associated payments and visits. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let customers = App.DB.get('customers'); let visits = App.DB.get('visits'); let payments = App.DB.get('payments'); let comments = App.DB.get('customerComments'); App.DB.set('customers', customers.filter(c => c.accountNo !== accountNo)); App.DB.set('visits', visits.filter(v => v.customerId !== accountNo)); App.DB.set('payments', payments.filter(p => p.customerId !== accountNo)); App.DB.set('customerComments', comments.filter(c => c.accountNo !== accountNo)); App.Helpers.logChange('Deleted', 'Customer', `${customer.companyName} (${accountNo})`, `Reason: ${result.value}`); App.UI.toast('Customer deleted permanently.', 'success'); this.render(); } }); } 
 });
 
 Object.assign(App.Visits, { 
@@ -3590,25 +3816,19 @@ Object.assign(App.Visits, {
         if (index > -1) {
             visits[index].status = 'In Progress';
             visits[index].checkInTime = Date.now(); 
+            App.DB.set('visits', visits);
             
-            // Cloud Sync
-            App.DB.updateInCloud('visits', visits[index]);
-            
-            // Log Activity (Cloud)
-            const actLog = {
-                id: `log-${Date.now()}`,
-                consultantId: App.state.currentUser.assignedConsultantId,
-                timestamp: Date.now(),
-                date: new Date().toISOString().slice(0, 10),
-                time: new Date().toLocaleTimeString(),
-                action: 'Started Visit',
-                details: 'Check-In recorded.',
-                customerId: visits[index].customerId,
-                visitId: visitId
-            };
-            App.DB.addToCloud('activityLog', actLog);
+            // --- NEW: Log Activity for Check-In ---
+            App.Helpers.logActivity(
+                'Started Visit', 
+                'Check-In recorded.', 
+                visits[index].customerId, 
+                null, 
+                visitId
+            );
+            // -------------------------------------
 
-            App.UI.toast('Visit Started! Synced to Cloud ☁️');
+            App.UI.toast('Visit Started! Clock is ticking... ⏱️');
             this.render();
             if (App.state.activePage === 'myday') App.MyDay.render();
         }
@@ -3883,6 +4103,7 @@ Object.assign(App.Visits, {
         
         const visitDateTimeVal = f.elements['visit-date'].value; 
         if (!visitDateTimeVal) return App.UI.toast('Please select date and time', 'error');
+        
         const visitDateTimeISO = new Date(visitDateTimeVal).toISOString();
         
         const vd = { 
@@ -3892,24 +4113,21 @@ Object.assign(App.Visits, {
             status: 'Scheduled', 
             collectorId: customer ? customer.salesConsultantId : null 
         }; 
-        
-        let visits = App.DB.get('visits'), id = f.elements['visit-id'].value; 
-        
+        let v = App.DB.get('visits'), id = f.elements['visit-id'].value; 
         if (id) { 
-            // Update
-            const i = visits.findIndex(vi => vi.id === id);
-            const updatedVisit = { ...visits[i], ...vd, id: id };
-            App.DB.updateInCloud('visits', updatedVisit);
-            App.Helpers.logChange('Updated', 'Visit', `For ${customer.companyName}`); 
+            const i = v.findIndex(vi => vi.id === id);
+            const original = v[i];
+            const changes = App.Helpers.getObjectChanges(original, {...original, ...vd});
+            v[i] = { ...v[i], ...vd, id: id }; 
+            App.Helpers.logChange('Updated', 'Visit', `For ${customer.companyName}`, changes); 
         } else { 
-            // Add New
             vd.id = `visit-${Date.now()}`; 
-            App.DB.addToCloud('visits', vd);
+            v.push(vd);
             App.Helpers.logChange('Scheduled', 'Visit', `For ${customer.companyName}`); 
         } 
-        
+        App.DB.set('visits', v); 
         App.UI.closeModal('visit-modal'); 
-        App.UI.toast('Visit saved to Cloud!'); 
+        App.UI.toast('Visit saved!'); 
         this.render(); 
     },
     showMarkDoneModal: function(visitId) { 
@@ -4004,7 +4222,6 @@ Object.assign(App.Visits, {
             const visit = visits[visitIndex]; 
             visit.status = "Completed"; 
             
-            // Duration Logic
             if (visit.checkInTime) {
                 const endTime = Date.now();
                 const durationMins = Math.round((endTime - visit.checkInTime) / 60000); 
@@ -4018,9 +4235,10 @@ Object.assign(App.Visits, {
             visit.contactMethod = form.elements['log-contact-method'].value; 
             visit.outcome = form.elements['log-outcome'].value; 
             visit.notes = this.logNotesQuill.root.innerHTML; 
-            if (location) visit.location = location; 
+            if (location) { 
+                visit.location = location; 
+            }
             
-            // Promise Logic
             if (visit.outcome === 'Promise to Pay') {
                 visit.promiseAmount = parseFloat(document.getElementById('log-promise-amount').value);
                 visit.promiseDate = document.getElementById('log-promise-date').value;
@@ -4029,45 +4247,28 @@ Object.assign(App.Visits, {
                 }
             }
             
-            // Cloud Sync: Update the Visit
-            App.DB.updateInCloud('visits', visit);
-            
-            // Create Next Visit if needed
             const nextVisitDate = document.getElementById('log-next-date').value; 
-            if (nextVisitDate) { 
-                const nextVisit = { 
-                    id: `v${Date.now() + 1}`, 
-                    customerId: visit.customerId, 
-                    dateTime: `${nextVisitDate}T09:00:00.000Z`, 
-                    purpose: 'Scheduled Follow-up', 
-                    collectorId: visit.collectorId, 
-                    status: "Scheduled" 
-                };
-                App.DB.addToCloud('visits', nextVisit);
-            } 
+            if (nextVisitDate) { visits.push({ id: `v${Date.now() + 1}`, customerId: visit.customerId, dateTime: `${nextVisitDate}T09:00:00.000Z`, purpose: 'Scheduled Follow-up', collectorId: visit.collectorId, status: "Scheduled" }); } 
             
-            // Log Activity (Cloud)
             let logDetails = `(Outcome: ${visit.outcome})`;
             if(visit.duration) logDetails += `, Duration: ${visit.duration} min`; 
+            if(visit.location) logDetails += ', Location Tagged';
             
-            const actLog = {
-                id: `log-${Date.now()}`,
-                consultantId: App.state.currentUser.assignedConsultantId,
-                timestamp: Date.now(),
-                date: new Date().toISOString().slice(0, 10),
-                time: new Date().toLocaleTimeString(),
-                action: 'Completed Visit (Check-Out)',
-                details: logDetails,
-                customerId: visit.customerId,
-                visitId: visit.id
-            };
-            App.DB.addToCloud('activityLog', actLog);
-            
+            // --- NEW: Log Activity for Check-Out ---
+            App.Helpers.logActivity(
+                'Completed Visit (Check-Out)', // Changed Text
+                logDetails, 
+                visit.customerId, 
+                null, 
+                visit.id
+            );
+            // -------------------------------------
+
             App.Helpers.logChange('Completed', 'Visit', `For customer ${visit.customerId}`);
         } 
-        
+        App.DB.set('visits', visits); 
         App.UI.closeModal('visit-notes-modal'); 
-        App.UI.toast(`Visit synced to Cloud!`);
+        App.UI.toast(`Visit marked as done! (${visits[visitIndex].duration || '0'} min)`);
         this.render(); 
         if (App.state.activePage === 'myday') App.MyDay.render();
     }, 
@@ -4090,23 +4291,7 @@ Object.assign(App.Visits, {
             App.UI.toast('Unable to get location.', 'error');
         }); 
     }, 
-    deleteVisit(visitId) { 
-        const visit = App.DB.get('visits').find(v => v.id === visitId); 
-        Swal.fire({ 
-            title: `Delete this visit?`, 
-            text: "This action cannot be undone.", 
-            showCancelButton: true, 
-            confirmButtonText: 'Yes, delete it!', 
-            confirmButtonColor: 'var(--danger)'
-        }).then(result => { 
-            if (result.isConfirmed) { 
-                App.DB.deleteFromCloud('visits', visitId);
-                App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose}`, 'Deleted from Cloud'); 
-                App.UI.toast('Visit deleted from Cloud.', 'success'); 
-                this.render(); 
-            } 
-        }); 
-    },
+    deleteVisit(visitId) { const visit = App.DB.get('visits').find(v => v.id === visitId); Swal.fire({ title: `Delete this visit?`, text: "This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let visits = App.DB.get('visits'); App.DB.set('visits', visits.filter(v => v.id !== visitId)); App.Helpers.logChange('Deleted', 'Visit', `${visit.purpose} for customer ${visit.customerId}`, `Reason: ${result.value}`); App.UI.toast('Visit deleted.', 'success'); this.render(); } }); } ,
     showRoutePlannerModal() {
         const form = document.getElementById('route-planner-form');
         form.reset();
@@ -4276,8 +4461,6 @@ Object.assign(App.Payments, {
         document.getElementById('payment-date').valueAsDate = new Date(); 
         App.UI.openModal('payment-modal'); 
     }, 
-    
-    // --- UPDATED SAVE FUNCTION WITH ALL 3 AMOUNTS ---
     savePayment: function(e) { 
         e.preventDefault(); 
         const f = e.target;
@@ -4289,75 +4472,45 @@ Object.assign(App.Payments, {
             return App.UI.toast('Please enter a valid, positive payment amount.', 'error');
         }
 
-        // --- HERE ARE ALL 3 VARIABLES ---
         const amt2025 = parseFloat(f.elements['payment-amount-2025'].value) || 0;
-        const amt2020 = parseFloat(f.elements['payment-amount-2020'].value) || 0; // Fixed: Included
+        const amt2020 = parseFloat(f.elements['payment-amount-2020'].value) || 0;
         const amt2018 = parseFloat(f.elements['payment-amount-2018'].value) || 0;
 
-        const pd = { 
-            id: `p${Date.now()}`, 
-            customerId: cid, 
-            amount: a, 
-            method: f.elements['payment-method'].value, 
-            date: f.elements['payment-date'].value, 
-            status: f.elements['payment-status'].value, 
-            amount_2020_2025: amt2025, 
-            amount_2019_2020: amt2020, // Fixed: Included
-            amount_lte_2018: amt2018 
-        }; 
+        const pd = { id: `p${Date.now()}`, customerId: cid, amount: a, method: f.elements['payment-method'].value, date: f.elements['payment-date'].value, status: f.elements['payment-status'].value, amount_2020_2025: amt2025, amount_2019_2020: amt2020, amount_lte_2018: amt2018 }; 
         
-        // 1. Save Payment to Cloud
-        App.DB.addToCloud('payments', pd);
-
-        if (pd.status === 'Completed') { 
+        if (pd.status === 'Completed') {
             let visits = App.DB.get('visits');
             const promiseVisitIndex = visits.findIndex(v => v.customerId === cid && v.outcome === 'Promise to Pay' && v.promiseDate);
             if(promiseVisitIndex > -1) {
                 visits[promiseVisitIndex].promiseAmount = null;
                 visits[promiseVisitIndex].promiseDate = null;
-                // Sync Visit update to Cloud
-                App.DB.updateInCloud('visits', visits[promiseVisitIndex]);
+                App.DB.set('visits', visits);
             }
+        }
 
-            // 2. Update Customer Balance in Cloud
+        App.DB.set('payments', [...App.DB.get('payments'), pd]); 
+        if (pd.status === 'Completed') { 
             let customers = App.DB.get('customers'); 
             const customerIndex = customers.findIndex(c => c.accountNo === cid); 
             if (customerIndex !== -1) { 
-                const cust = customers[customerIndex];
-                
-                // Subtract all 3 amounts
-                cust.outstanding -= a;
-                cust.balance_2020_2025 -= amt2025;
-                cust.balance_2019_2020 -= amt2020; // Fixed: Included
-                cust.balance_lte_2018 -= amt2018;
+                customers[customerIndex].outstanding -= a;
+                customers[customerIndex].balance_2020_2025 -= amt2025;
+                customers[customerIndex].balance_2019_2020 -= amt2020;
+                customers[customerIndex].balance_lte_2018 -= amt2018;
 
-                if (cust.outstanding <= 0) { 
-                    cust.outstanding = 0; 
-                    cust.paymentStatus = 'Settlement'; 
+                if (customers[customerIndex].outstanding <= 0) { 
+                    customers[customerIndex].outstanding = 0; 
+                    customers[customerIndex].paymentStatus = 'Settlement'; 
                 } else { 
-                    cust.paymentStatus = 'Negotiation';
+                    customers[customerIndex].paymentStatus = 'Negotiation';
                 } 
-                
-                // SYNC CUSTOMER UPDATE TO CLOUD
-                App.DB.updateInCloud('customers', cust);
+                App.DB.set('customers', customers); 
             } 
-            
-            // 3. Log Activity to Cloud
-            const actLog = {
-                id: `log-${Date.now()}`,
-                consultantId: App.state.currentUser.assignedConsultantId,
-                timestamp: Date.now(),
-                date: new Date().toISOString().slice(0, 10),
-                time: new Date().toLocaleTimeString(),
-                action: 'recorded a payment',
-                details: `(Method: ${pd.method})`,
-                customerId: pd.customerId,
-                amount: pd.amount
-            };
-            App.DB.addToCloud('activityLog', actLog);
+            App.Helpers.logActivity('recorded a payment', `(Method: ${pd.method})`, pd.customerId, pd.amount); 
+            App.Helpers.logChange('Recorded', 'Payment', `${App.Helpers.formatCurrency(pd.amount)} for ${cid}`);
         } 
         
-        App.UI.toast('Payment saved & synced!'); 
+        App.UI.toast('Payment recorded!'); 
         
         if (App.state.paymentFlowOrigin) {
             App.state.paymentFlowOrigin.paymentLogged = true;
@@ -4369,36 +4522,8 @@ Object.assign(App.Payments, {
             if (App.state.activePage === 'customers') App.Customers.render();
         }
     }, 
-    // ---------------------------------------------
-
     showPaymentDetail: function(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); if (!payment) return; const customer = App.DB.get('customers').find(c => c.accountNo === payment.customerId); const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {}); const contentEl = document.getElementById('payment-detail-content'); contentEl.innerHTML = `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr; gap: var(--spacing-6);"><div class="detail-info-card"><div class="label">TRANSACTION ID</div><div class="value">${payment.id}</div></div><div class="detail-info-card"><div class="label">AMOUNT</div><div class="value" style="color: var(--success);">${App.Helpers.formatCurrency(payment.amount)}</div></div><div class="detail-info-card"><div class="label">PAYMENT DATE</div><div class="value">${App.Helpers.formatDate(payment.date)}</div></div><div class="detail-info-card"><div class="label">PAYMENT METHOD</div><div class="value">${payment.method}</div></div><div class="detail-info-card"><div class="label">STATUS</div><div class="value"><span class="status-badge ${payment.status.toLowerCase()}">${payment.status}</span></div></div></div><hr style="border: none; border-top: 1px solid var(--border-color); margin: var(--spacing-6) 0;"><h4 class="card-title mb-4">Customer Information</h4>${customer ? `<div class="detail-info-grid" style="grid-template-columns: 1fr 1fr;"><div class="detail-info-card"><div class="label">COMPANY NAME</div><div class="value">${customer.companyName}</div></div><div class="detail-info-card"><div class="label">ACCOUNT #</div><div class="value">${customer.accountNo}</div></div><div class="detail-info-card"><div class="label">SALES CONSULTANT</div><div class="value">${consultantMap[customer.salesConsultantId] || 'N/A'}</div></div><div class="detail-info-card"><div class="label">CURRENT OUTSTANDING</div><div class="value">${App.Helpers.formatCurrency(customer.outstanding)}</div></div></div>` : '<p>No customer associated with this payment.</p>'}`; App.UI.openModal('payment-detail-modal'); }, 
-    deletePayment(paymentId) { 
-        const payment = App.DB.get('payments').find(p => p.id === paymentId); 
-        Swal.fire({ title: `Delete this payment?`, text: "Balance will be reversed.", showCancelButton: true, confirmButtonText: 'Yes, delete!', confirmButtonColor: 'var(--danger)' }).then(result => { 
-            if (result.isConfirmed) { 
-                // 1. Delete Payment from Cloud
-                App.DB.deleteFromCloud('payments', paymentId);
-
-                // 2. Reverse Customer Balance in Cloud
-                let customers = App.DB.get('customers'); 
-                const customerIndex = customers.findIndex(c => c.accountNo === payment.customerId); 
-                if (customerIndex !== -1) { 
-                    const cust = customers[customerIndex];
-                    cust.outstanding += payment.amount; 
-                    
-                    // Add back the specific amounts if they exist, otherwise just add to outstanding
-                    cust.balance_2020_2025 += (payment.amount_2020_2025 || 0);
-                    cust.balance_2019_2020 += (payment.amount_2019_2020 || 0);
-                    cust.balance_lte_2018 += (payment.amount_lte_2018 || 0);
-
-                    App.DB.updateInCloud('customers', cust);
-                } 
-                
-                App.UI.toast('Payment deleted & balance reversed.', 'success'); 
-                this.render(); 
-            } 
-        }); 
-    } 
+    deletePayment(paymentId) { const payment = App.DB.get('payments').find(p => p.id === paymentId); Swal.fire({ title: `Delete this payment?`, text: "This will add the amount back to the customer's outstanding balance. This action cannot be undone.", input: 'textarea', inputLabel: 'Reason for deletion', inputPlaceholder: 'Enter your reason here...', showCancelButton: true, confirmButtonText: 'Yes, delete it!', confirmButtonColor: 'var(--danger)', background: 'var(--card-bg)', color: 'var(--text-primary)', inputValidator: (value) => { if (!value) { return 'You must provide a reason for deletion!' } } }).then(result => { if (result.isConfirmed && result.value) { let payments = App.DB.get('payments'); let customers = App.DB.get('customers'); const customerIndex = customers.findIndex(c => c.accountNo === payment.customerId); if (customerIndex !== -1) { customers[customerIndex].outstanding += payment.amount; if (customers[customerIndex].outstanding > 0) { customers[customerIndex].paymentStatus = 'Negotiation'; } App.DB.set('customers', customers); } App.DB.set('payments', payments.filter(p => p.id !== paymentId)); App.Helpers.logChange('Deleted', 'Payment', `${App.Helpers.formatCurrency(payment.amount)} for customer ${payment.customerId}`, `Reason: ${result.value}`); App.UI.toast('Payment deleted and balance adjusted.', 'success'); this.render(); if(App.state.activePage === 'dashboard') App.Dashboard.render(); if(App.state.activePage === 'customers') App.Customers.render(); } }); } 
 });
 Object.assign(App.Reports, { 
     charts: {}, 
@@ -5739,6 +5864,7 @@ Object.assign(App.Consultants, {
             const totalOutstanding = assignedCustomers.reduce((sum, c) => sum + c.outstanding, 0); 
             const upcomingVisits = visits.filter(v => v.collectorId === consultant.id && v.status === 'Scheduled' && new Date(v.dateTime) >= new Date()).length;
             
+            // Target vs Actual Logic
             const currentTarget = forecasts.find(f => f.consultantId === consultant.id && f.month === currentMonthStr)?.amount || 0;
             const collectedThisMonth = payments
                 .filter(p => p.status === 'Completed' && p.date.startsWith(currentMonthStr) && assignedCustomerIds.includes(p.customerId))
@@ -5770,10 +5896,14 @@ Object.assign(App.Consultants, {
 
         if (paginatedData.length > 0) { 
             tbody.innerHTML = paginatedData.map(c => {
+                // --- 1. Avatar Logic ---
                 const avatar = App.Helpers.getAvatarHTML(c.name);
+                
+                // --- 2. Micro-Progress Bar Logic ---
                 let progressHTML = '<span style="color:var(--text-secondary); font-size:0.8rem;">No Target</span>';
                 if (c.currentTarget > 0) {
                     const pct = Math.min((c.collectedThisMonth / c.currentTarget) * 100, 100).toFixed(0);
+                    // Color code: Green > 80%, Yellow > 50%, Red < 50%
                     let color = '#dc3545';
                     if(pct >= 80) color = '#10b981';
                     else if(pct >= 50) color = '#ffc107';
@@ -5790,10 +5920,17 @@ Object.assign(App.Consultants, {
                 }
 
                 return `<tr>
-                    <td><div class="consultant-row-wrapper">${avatar}<div style="font-weight:600;">${c.name}</div></div></td>
+                    <td>
+                        <div class="consultant-row-wrapper">
+                            ${avatar}
+                            <div style="font-weight:600;">${c.name}</div>
+                        </div>
+                    </td>
                     <td>${c.noOfCustomers}</td>
                     <td>${App.Helpers.formatCurrency(c.totalOutstanding)}</td>
+                    
                     <td>${progressHTML}</td>
+                    
                     <td>${c.upcomingVisits}</td>
                     <td>
                         <div class="d-flex gap-2">
@@ -5841,38 +5978,7 @@ Object.assign(App.Consultants, {
         }); 
     }, 
     showConsultantForm: function(id = null) { const form = document.getElementById('consultant-form'); form.reset(); if (id) { const consultant = App.DB.get('consultants').find(c => c.id == id); document.getElementById('consultant-modal-title').textContent = 'Edit Consultant'; form.elements['consultant-id-hidden'].value = consultant.id; form.elements['consultantName'].value = consultant.name; form.originalData = {...consultant}; } else { document.getElementById('consultant-modal-title').textContent = 'Add New Consultant'; form.elements['consultant-id-hidden'].value = ''; form.originalData = null; } App.UI.openModal('consultant-modal'); }, 
-    
-    // --- UPDATED SAVE CONSULTANT ---
-    saveConsultant: function(e) { 
-        e.preventDefault(); 
-        const form = e.target; 
-        const id = form.elements['consultant-id-hidden'].value; 
-        const name = form.elements['consultantName'].value.trim(); 
-        if (!name) return App.UI.toast('Consultant name cannot be empty.', 'error'); 
-        
-        let consultants = App.DB.get('consultants'); 
-        
-        if (id) { 
-            const index = consultants.findIndex(c => c.id == id); 
-            const originalName = form.originalData.name; 
-            consultants[index].name = name; 
-            
-            // Cloud Sync
-            App.DB.updateInCloud('consultants', consultants[index]);
-            App.Helpers.logChange('Updated', 'Consultant', `'${originalName}'`, `Renamed to '${name}'`); 
-        } else { 
-            const newConsultant = { id: Date.now(), name }; 
-            
-            // Cloud Sync
-            App.DB.addToCloud('consultants', newConsultant);
-            App.Helpers.logChange('Created', 'Consultant', `'${name}'`); 
-        } 
-        
-        App.UI.closeModal('consultant-modal'); 
-        App.UI.toast(`Consultant ${id ? 'updated' : 'added'}! (Syncing...)`); 
-        this.render(); 
-    }, 
-    
+    saveConsultant: function(e) { e.preventDefault(); const form = e.target; const id = form.elements['consultant-id-hidden'].value; const name = form.elements['consultantName'].value.trim(); if (!name) return App.UI.toast('Consultant name cannot be empty.', 'error'); let consultants = App.DB.get('consultants'); if (id) { const index = consultants.findIndex(c => c.id == id); const originalName = form.originalData.name; consultants[index].name = name; App.Helpers.logChange('Updated', 'Consultant', `'${originalName}'`, `Renamed to '${name}'`); } else { const newId = Date.now(); consultants.push({ id: newId, name }); App.Helpers.logChange('Created', 'Consultant', `'${name}'`); } App.DB.set('consultants', consultants); App.UI.closeModal('consultant-modal'); App.UI.toast(`Consultant ${id ? 'updated' : 'added'}!`); this.render(); }, 
     deleteConsultant: function(consultantId) {
         const customers = App.DB.get('customers');
         const assignedCustomers = customers.filter(c => c.salesConsultantId == consultantId);
@@ -5893,9 +5999,8 @@ Object.assign(App.Consultants, {
             
         } else {
             App.UI.confirm('Are you sure?', `This will permanently delete ${consultantToDelete.name}.`, () => {
-                // Cloud Sync
-                App.DB.deleteFromCloud('consultants', consultantId);
-                
+                const updatedConsultants = allConsultants.filter(c => c.id != consultantId);
+                App.DB.set('consultants', updatedConsultants);
                 App.Helpers.logChange('Deleted', 'Consultant', `'${consultantToDelete.name}'`);
                 App.UI.toast('Consultant deleted.', 'success');
                 this.render();
@@ -5912,16 +6017,15 @@ Object.assign(App.Consultants, {
         customers.forEach(customer => {
             if (customer.salesConsultantId === fromConsultantId) {
                 customer.salesConsultantId = toConsultantId;
-                // Important: We must sync EVERY changed customer to the cloud
-                App.DB.updateInCloud('customers', customer);
             }
         });
+        App.DB.set('customers', customers);
 
-        const fromConsultantName = App.DB.get('consultants').find(c => c.id === fromConsultantId).name;
-        const toConsultantName = App.DB.get('consultants').find(c => c.id === toConsultantId).name;
-        
-        // Cloud Sync: Delete the consultant
-        App.DB.deleteFromCloud('consultants', fromConsultantId);
+        let consultants = App.DB.get('consultants');
+        const fromConsultantName = consultants.find(c => c.id === fromConsultantId).name;
+        const toConsultantName = consultants.find(c => c.id === toConsultantId).name;
+        consultants = consultants.filter(c => c.id !== fromConsultantId);
+        App.DB.set('consultants', consultants);
 
         App.Helpers.logChange('Reassigned and Deleted', 'Consultant', `'${fromConsultantName}'`, `Customers moved to ${toConsultantName}.`);
         App.UI.closeModal('reassign-and-delete-consultant-modal');
@@ -5976,15 +6080,13 @@ Object.assign(App.Consultants, {
             const customerIndex = customers.findIndex(c => c.accountNo === id);
             if (customerIndex > -1) {
                 customers[customerIndex].salesConsultantId = toConsultantId;
-                // Cloud Sync
-                App.DB.updateInCloud('customers', customers[customerIndex]);
             }
         });
-        
+        App.DB.set('customers', customers);
         const details = `Reassigned ${customerIdsToReassign.length} customers from ${fromConsultantName} to ${toConsultantName}`;
         App.Helpers.logChange('Reassigned', 'Customers', details);
         App.UI.closeModal('reassign-customers-modal');
-        App.UI.toast('Customers reassigned successfully! (Syncing...)', 'success');
+        App.UI.toast('Customers reassigned successfully!', 'success');
         this.render();
         if(App.state.activePage === 'customers') App.Customers.render();
     },
@@ -6025,8 +6127,6 @@ Object.assign(App.Consultants, {
             : '<tr><td colspan="6">No targets found.</td></tr>';
         App.UI.animateTableRows(tbody);
     },
-    
-    // --- UPDATED FORECAST SAVE ---
     saveForecast(e) {
         e.preventDefault();
         const form = e.target;
@@ -6056,33 +6156,26 @@ Object.assign(App.Consultants, {
             amount_SalesAbove360Days: amountSales360d,
         };
 
-        if (forecastId) { 
+        if (forecastId) { // Editing existing
             const index = forecasts.findIndex(f => f.id === forecastId);
             if (index > -1) {
-                const updatedForecast = { ...forecasts[index], ...forecastData };
-                
-                // Cloud Sync
-                App.DB.updateInCloud('forecasts', updatedForecast);
+                forecasts[index] = { ...forecasts[index], ...forecastData };
                 App.Helpers.logChange('Updated', 'Target', `for ${month}`, `New amounts set.`);
             }
-        } else { 
+        } else { // Adding new
             const existingIndex = forecasts.findIndex(f => f.consultantId === consultantId && f.month === month);
-            if (existingIndex > -1) {
-                const updatedForecast = { ...forecasts[existingIndex], ...forecastData };
-                
-                // Cloud Sync
-                App.DB.updateInCloud('forecasts', updatedForecast);
+            if (existingIndex > -1) { // If user tries to create a duplicate month, update it instead
+                forecasts[existingIndex] = { ...forecasts[existingIndex], ...forecastData };
                 App.Helpers.logChange('Updated', 'Target', `for ${month}`, `New amounts set.`);
             } else {
                 const newForecast = { id: `f-${Date.now()}`, ...forecastData };
-                
-                // Cloud Sync
-                App.DB.addToCloud('forecasts', newForecast);
+                forecasts.push(newForecast);
                 App.Helpers.logChange('Created', 'Target', `for ${month}`, `Amounts set.`);
             }
         }
         
-        App.UI.toast('Target saved & synced!', 'success');
+        App.DB.set('forecasts', forecasts);
+        App.UI.toast('Target saved!', 'success');
         form.reset();
         document.getElementById('forecast-id-hidden').value = '';
         
@@ -6095,16 +6188,17 @@ Object.assign(App.Consultants, {
         this.renderForecastsForConsultant(consultantId);
         if (App.state.activePage === 'performance') App.Performance.render();
     },
-    
     deleteForecast(forecastId) {
         const forecasts = App.DB.get('forecasts');
         const forecast = forecasts.find(f => f.id === forecastId);
         if (!forecast) return;
         
-        App.UI.confirm('Delete this target?', `Are you sure?`, () => {
-                // Cloud Sync
-                App.DB.deleteFromCloud('forecasts', forecastId);
-                
+        App.UI.confirm(
+            'Delete this target?', 
+            `Are you sure you want to delete the target for ${forecast.month}?`, 
+            () => {
+                const updatedForecasts = forecasts.filter(f => f.id !== forecastId);
+                App.DB.set('forecasts', updatedForecasts);
                 App.Helpers.logChange('Deleted', 'Target', `for ${forecast.month}`);
                 App.UI.toast('Target deleted.', 'success');
                 this.renderForecastsForConsultant(forecast.consultantId);
@@ -6193,8 +6287,6 @@ Object.assign(App.Users, {
         document.getElementById('assigned-consultant-group').style.display = form.elements['role'].value === 'user' ? 'block' : 'none'; 
         App.UI.openModal('user-modal'); 
     }, 
-    
-    // --- UPDATED SAVE FUNCTION ---
     saveUser: function(e) { 
         e.preventDefault(); 
         const form = e.target; 
@@ -6208,154 +6300,32 @@ Object.assign(App.Users, {
             department: form.elements['department'].value.trim(),
             assignedConsultantId: form.elements['role'].value === 'user' ? parseInt(form.elements['assignedConsultantId'].value) || null : null 
         }; 
-        
         if (!id && !newPassword) return App.UI.toast('Password is required for new users.', 'error');
         if (!userData.username || !userData.fullName) return App.UI.toast('Username and Full Name are required.', 'error'); 
-        
         if (id) { 
-            // Update Existing
             const index = users.findIndex(u => u.id == id);
-            if (newPassword) userData.password = btoa(newPassword);
-            
+            if (newPassword) {
+                userData.password = btoa(newPassword);
+            }
             const original = form.originalData;
             const changes = App.Helpers.getObjectChanges(original, {...original, ...userData});
-            const updatedUser = { ...users[index], ...userData };
-            
-            // Cloud Sync
-            App.DB.updateInCloud('users', updatedUser);
+            users[index] = { ...users[index], ...userData };
             App.Helpers.logChange('Updated', 'User', `'${userData.username}'`, changes);
         } else { 
-            // Add New
             if (users.some(u => u.username === userData.username)) { return App.UI.toast('Username already exists.', 'error'); } 
             userData.password = btoa(newPassword);
-            const newUser = { id: Date.now(), ...userData, lastLogin: null };
-            
-            // Cloud Sync
-            App.DB.addToCloud('users', newUser);
+            users.push({ id: Date.now(), ...userData, lastLogin: null }); 
             App.Helpers.logChange('Created', 'User', `'${userData.username}'`);
         } 
-        
+        App.DB.set('users', users); 
         App.UI.closeModal('user-modal'); 
-        App.UI.toast(`User ${id ? 'updated' : 'added'}! (Syncing...)`); 
+        App.UI.toast(`User ${id ? 'updated' : 'added'}!`); 
         this.render(); 
     }, 
-    
-    deleteUser: function(id) { 
-        if (id == App.state.currentUser.id) { return App.UI.toast('You cannot delete your own account.', 'error'); } 
-        App.UI.confirm('Are you sure?', "This will delete the user account.", () => { 
-            const user = App.DB.get('users').find(u => u.id == id);
-            
-            // Cloud Sync
-            App.DB.deleteFromCloud('users', id);
-            
-            App.Helpers.logChange('Deleted', 'User', `'${user.username}'`); 
-            App.UI.toast('User deleted.', 'success'); 
-            this.render(); 
-        }); 
-    } 
+    deleteUser: function(id) { if (id == App.state.currentUser.id) { return App.UI.toast('You cannot delete your own account.', 'error'); } App.UI.confirm('Are you sure?', "This will delete the user account.", () => { let users = App.DB.get('users'); const user = users.find(u => u.id == id); users = users.filter(u => u.id != id); App.DB.set('users', users); App.Helpers.logChange('Deleted', 'User', `'${user.username}'`); App.UI.toast('User deleted.', 'success'); this.render(); }); } 
 });
+Object.assign(App.Notifications, { init() { document.getElementById('notification-bell-btn').addEventListener('click', (e) => { e.stopPropagation(); this.toggleDropdown(); }); document.body.addEventListener('click', (e) => { const bellBtn = document.getElementById('notification-bell-btn'); const dropdown = document.getElementById('notification-dropdown'); if (dropdown && !dropdown.classList.contains('hidden') && !bellBtn.contains(e.target) && !dropdown.contains(e.target)) { dropdown.classList.add('hidden'); } }); }, create(message) { let notifications = App.DB.get('notifications'); const newNotification = { id: `notif_${Date.now()}`, timestamp: Date.now(), message: message, isRead: false }; notifications.unshift(newNotification); App.DB.set('notifications', notifications); if(App.state.currentUser && App.state.currentUser.role === 'admin') this.render(); }, render() { const notifications = App.DB.get('notifications').sort((a, b) => b.timestamp - a.timestamp); const unreadCount = notifications.filter(n => !n.isRead).length; const badge = document.getElementById('notification-badge'); if (unreadCount > 0) { badge.textContent = unreadCount; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); } const list = document.getElementById('notification-list'); list.innerHTML = notifications.length > 0 ? notifications.slice(0, 15).map(n => `<li style="padding: var(--spacing-2) 0; border-bottom: 1px solid var(--border-color); ${!n.isRead ? 'font-weight: 600;' : ''}">${n.message}<div style="font-size: var(--fs-sm); color: var(--text-secondary); font-weight: 400; margin-top: 4px;"><i class="fas fa-clock"></i> ${App.Helpers.timeAgo(n.timestamp)}</div></li>`).join('') : '<li>No new notifications.</li>'; }, toggleDropdown() { const dropdown = document.getElementById('notification-dropdown'); const bellBtn = document.getElementById('notification-bell-btn'); const rect = bellBtn.getBoundingClientRect(); dropdown.style.top = `${rect.bottom + 10}px`; dropdown.style.right = `${window.innerWidth - rect.right}px`; dropdown.classList.toggle('hidden'); if(!dropdown.classList.contains('hidden')) { this.markAllAsRead(); } }, markAllAsRead() { let notifications = App.DB.get('notifications'); if (notifications.some(n => !n.isRead)) { setTimeout(() => { const updatedNotifications = notifications.map(n => ({ ...n, isRead: true })); App.DB.set('notifications', updatedNotifications); this.render(); }, 1500); } } });
 
-Object.assign(App.Notifications, {
-    init() {
-        // 1. Setup Listeners
-        const bellBtn = document.getElementById('notification-bell-btn');
-        if (bellBtn) {
-            bellBtn.addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                this.toggleDropdown(); 
-            });
-        }
-        
-        document.body.addEventListener('click', (e) => { 
-            const dropdown = document.getElementById('notification-dropdown'); 
-            const btn = document.getElementById('notification-bell-btn'); 
-            if (dropdown && !dropdown.classList.contains('hidden') && !btn.contains(e.target) && !dropdown.contains(e.target)) { 
-                dropdown.classList.add('hidden'); 
-            } 
-        });
-
-        // 2. Render on Init (This was missing!)
-        // Ensure Admin sees badges immediately upon login/refresh
-        if (App.state.currentUser && App.state.currentUser.role === 'admin') {
-            this.render();
-        }
-    },
-
-    create(message) {
-        let notifications = App.DB.get('notifications');
-        const newNotification = { 
-            id: `notif_${Date.now()}`, 
-            timestamp: Date.now(), 
-            message: message, 
-            isRead: false 
-        };
-        notifications.unshift(newNotification);
-        App.DB.set('notifications', notifications);
-        
-        // Update UI immediately if Admin is logged in
-        if(App.state.currentUser && App.state.currentUser.role === 'admin') {
-            this.render();
-            // Optional: Show a toast for the Admin immediately
-            App.UI.toast('New Notification: ' + message, 'info');
-        }
-    },
-
-    render() {
-        const notifications = App.DB.get('notifications').sort((a, b) => b.timestamp - a.timestamp);
-        const unreadCount = notifications.filter(n => !n.isRead).length;
-        const badge = document.getElementById('notification-badge');
-        const list = document.getElementById('notification-list');
-        
-        if (badge) {
-            if (unreadCount > 0) {
-                badge.textContent = unreadCount;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-
-        if (list) {
-            list.innerHTML = notifications.length > 0 
-                ? notifications.slice(0, 15).map(n => `
-                    <li style="padding: var(--spacing-2) 0; border-bottom: 1px solid var(--border-color); ${!n.isRead ? 'background: rgba(226, 0, 15, 0.05);' : ''}">
-                        <div style="${!n.isRead ? 'font-weight: 700; color: var(--primary);' : ''}">${n.message}</div>
-                        <div style="font-size: var(--fs-sm); color: var(--text-secondary); margin-top: 4px;">
-                            <i class="fas fa-clock"></i> ${App.Helpers.timeAgo(n.timestamp)}
-                        </div>
-                    </li>`).join('') 
-                : '<li style="padding: 1rem; text-align: center; color: var(--text-secondary);">No notifications.</li>';
-        }
-    },
-
-    toggleDropdown() {
-        const dropdown = document.getElementById('notification-dropdown');
-        const bellBtn = document.getElementById('notification-bell-btn');
-        if (!dropdown || !bellBtn) return;
-
-        // Position correctly
-        const rect = bellBtn.getBoundingClientRect();
-        dropdown.style.top = `${rect.bottom + 10}px`;
-        dropdown.style.right = '20px'; // Fixed right position to prevent overflow
-        dropdown.classList.toggle('hidden');
-        
-        if(!dropdown.classList.contains('hidden')) {
-            this.markAllAsRead();
-        }
-    },
-
-    markAllAsRead() {
-        let notifications = App.DB.get('notifications');
-        if (notifications.some(n => !n.isRead)) {
-            // Delay slightly to let user see "Unread" state (bold text)
-            setTimeout(() => {
-                const updatedNotifications = notifications.map(n => ({ ...n, isRead: true }));
-                App.DB.set('notifications', updatedNotifications);
-                this.render();
-            }, 2000);
-        }
-    }
-});
 Object.assign(App.CommandPalette, {
     selectedIndex: 0,
     results: [],
