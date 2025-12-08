@@ -936,7 +936,7 @@ const App = {
     async init() { 
         this.UI.hydrate(); 
         
-        // Connect to Google Sheet before doing anything else
+        // Connect to Google Sheet
         await this.DB.initialize(); 
         
         const now = new Date();
@@ -955,6 +955,15 @@ const App = {
         if(this.ContextMenu) this.ContextMenu.init(); 
         if(this.FAB) this.FAB.init();
         this.UI.applyTheme(); 
+
+        // [SAFETY] Prevent accidental close if syncing
+        window.addEventListener('beforeunload', (e) => {
+            if (App.DB.pendingSyncs > 0) {
+                // This triggers the browser's native "Leave site?" warning
+                e.preventDefault();
+                e.returnValue = ''; 
+            }
+        });
     },
     Auth: {}, DB: {}, UI: {}, Dashboard: {}, Customers: {}, Visits: {}, Payments: {}, Reports: {}, Analytics: {}, Consultants: {}, Users: {}, Notifications: {}, CommandPalette: {}, Helpers: {}, ChangeLog: {}, Import: {}, Settings: {}, Performance: {}, MyDay: {}, Geo: {}, Offline: {}, FAB: {}, ContextMenu: {} 
 };
@@ -1032,82 +1041,74 @@ Object.assign(App.Auth, {
 Object.assign(App.DB, { 
     apiUrl: 'https://script.google.com/macros/s/AKfycbwyANA2bFw8DdwMu0wiCYxPb20f06nQ4JvAhjSRmLSucBj6iAuyPa94kti_idakHd25/exec',
     cache: {},
+    pendingSyncs: 0, // Track active uploads
 
     async initialize() {
-        // Use a simple UI helper defined below to show loading status
         App.UI.toggleLoading(true, "Connecting to Cloud Database...");
-        
         try {
-            // 1. Fetch all data from Google Sheets
             const response = await fetch(this.apiUrl);
             const cloudData = await response.json();
             
-            // 2. Populate local cache
             this.cache = cloudData;
             
-            // 3. Ensure defaults if sheets are empty
+            // Ensure defaults
             const tables = ['consultants', 'users', 'customers', 'visits', 'payments', 'activityLog', 'notifications', 'changeLog', 'forecasts', 'customerComments', 'customerForecasts'];
-            tables.forEach(key => {
-                if (!this.cache[key]) this.cache[key] = [];
-            });
+            tables.forEach(key => { if (!this.cache[key]) this.cache[key] = []; });
 
-            // 4. Initialize Settings
+            // Restore settings
             if (!localStorage.getItem('customerTableColumns')) localStorage.setItem('customerTableColumns', JSON.stringify(App.state.customerTableColumns));
             else App.state.customerTableColumns = JSON.parse(localStorage.getItem('customerTableColumns'));
             
-            // 5. Default Admin Check (only if users sheet is empty)
+            // Default Admin
             if (this.cache['users'].length === 0) {
-                console.log("No users found. Creating default admin...");
-                const defaultAdmin = { 
-                    id: 1, username: 'admin', fullName: 'Admin User', 
-                    password: btoa('admin123'), role: 'admin', 
-                    department: 'Administration', lastLogin: null, assignedConsultantId: null 
-                };
+                const defaultAdmin = { id: 1, username: 'admin', fullName: 'Admin User', password: btoa('admin123'), role: 'admin', department: 'Administration', lastLogin: null, assignedConsultantId: null };
                 this.cache['users'] = [defaultAdmin];
                 this.set('users', this.cache['users']); 
             }
 
             this.runMigrations();
             App.UI.toggleLoading(false);
-            console.log("Cloud DB Initialized.");
+            App.UI.updateCloudStatus('saved'); // Show initial status
 
         } catch (error) {
             console.error("DB Connection Failed:", error);
             App.UI.toggleLoading(false);
-            Swal.fire({
-                title: 'Connection Error',
-                text: 'Could not connect to Google Database. Check your internet connection.',
-                icon: 'error'
-            });
+            Swal.fire({ title: 'Connection Error', text: 'Could not connect to Google Database. Check internet.', icon: 'error' });
         }
     }, 
 
-    get(key) {
-        return this.cache[key] || [];
-    },
+    get(key) { return this.cache[key] || []; },
 
     set(key, data) {
-        // 1. Optimistic UI: Update Cache Immediately
+        // 1. Optimistic Update (Instant)
         this.cache[key] = data;
         
-        // 2. Sync to Cloud in Background
+        // 2. Set Status to "Syncing"
+        this.pendingSyncs++;
+        App.UI.updateCloudStatus('syncing');
+
+        // 3. Sync to Cloud
         fetch(this.apiUrl, {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                table: key,
-                data: data
-            })
-        }).catch(err => console.warn(`Failed to sync ${key} to cloud:`, err));
+            body: JSON.stringify({ table: key, data: data })
+        })
+        .then(() => {
+            // Decrement pending count safely
+            this.pendingSyncs = Math.max(0, this.pendingSyncs - 1);
+            if (this.pendingSyncs === 0) App.UI.updateCloudStatus('saved');
+        })
+        .catch(err => {
+            console.warn(`Failed to sync ${key}:`, err);
+            this.pendingSyncs = Math.max(0, this.pendingSyncs - 1);
+            App.UI.updateCloudStatus('error');
+        });
     },
 
     runMigrations() {
         const dataModelVersion = parseInt(localStorage.getItem('dataModelVersion') || '1');
-        // Simple check to ensure data integrity on client side
         let updated = false;
-        
-        // Example: Ensure customers have tags array
         let customers = this.get('customers');
         customers.forEach(c => {
             if (!c.tags) { c.tags = []; updated = true; }
@@ -1121,7 +1122,6 @@ Object.assign(App.DB, {
                 c.latitude = coords.lat; c.longitude = coords.lng; updated = true;
             }
         });
-        
         if(updated) this.set('customers', customers);
     }
 });
@@ -1994,8 +1994,49 @@ Object.assign(App.UI, {
             renderer.renderListView();
         }
     },
+	
+	updateCloudStatus(status) {
+        // Create the element if it doesn't exist
+        let statusEl = document.getElementById('cloud-sync-status');
+        if (!statusEl) {
+            const header = document.querySelector('.main-header .d-flex.gap-4');
+            if (header) {
+                statusEl = document.createElement('div');
+                statusEl.id = 'cloud-sync-status';
+                statusEl.style.fontSize = '0.85rem';
+                statusEl.style.fontWeight = '600';
+                statusEl.style.marginRight = '10px';
+                statusEl.style.padding = '4px 10px';
+                statusEl.style.borderRadius = '20px';
+                statusEl.style.transition = 'all 0.3s ease';
+                header.prepend(statusEl);
+            }
+        }
+
+        if (!statusEl) return;
+
+        if (status === 'syncing') {
+            statusEl.innerHTML = '<i class="fas fa-sync fa-spin"></i> Saving...';
+            statusEl.style.color = '#0d6efd'; // Blue
+            statusEl.style.backgroundColor = 'rgba(13, 110, 253, 0.1)';
+        } else if (status === 'saved') {
+            statusEl.innerHTML = '<i class="fas fa-check"></i> Saved';
+            statusEl.style.color = '#198754'; // Green
+            statusEl.style.backgroundColor = 'rgba(25, 135, 84, 0.1)';
+            // Fade out the "Saved" text after 3 seconds
+            setTimeout(() => {
+                if (App.DB.pendingSyncs === 0) statusEl.innerHTML = '';
+                statusEl.style.backgroundColor = 'transparent';
+            }, 3000);
+        } else if (status === 'error') {
+            statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Sync Error';
+            statusEl.style.color = '#dc3545'; // Red
+            statusEl.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+        }
+    },
+	
 	// Add this inside Object.assign(App.UI, { ... })
-toggleLoading(show, message = "Loading...") {
+	toggleLoading(show, message = "Loading...") {
     const overlay = document.getElementById('loading-overlay');
     if (show) {
         overlay.style.display = 'flex';
@@ -2013,7 +2054,7 @@ toggleLoading(show, message = "Loading...") {
     } else {
         overlay.style.display = 'none';
     }
-},
+	},
     changeRowsPerPage(pageKey, value) {
         App.state.pagination[pageKey].rowsPerPage = parseInt(value, 10);
         App.state.pagination[pageKey].currentPage = 1;
