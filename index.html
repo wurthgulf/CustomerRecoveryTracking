@@ -933,10 +933,11 @@ const App = {
             salesConsultantId: true, paymentStatus: true, email: false, mobile: false,
         }
     },
-    // --- STEP 2 IS INCLUDED HERE (The init function) ---
-    init() { 
+    async init() { 
         this.UI.hydrate(); 
-        this.DB.initialize(); 
+        
+        // Connect to Google Sheet before doing anything else
+        await this.DB.initialize(); 
         
         const now = new Date();
         this.state.dashboardTimeFrame = {
@@ -951,16 +952,13 @@ const App = {
         this.Import.init(); 
         this.Offline.init();
         
-        // --- THIS IS THE NEW LINE THAT STARTS THE MENU ---
         if(this.ContextMenu) this.ContextMenu.init(); 
         if(this.FAB) this.FAB.init();
         this.UI.applyTheme(); 
     },
-    Auth: {}, DB: {}, UI: {}, Dashboard: {}, Customers: {}, Visits: {}, Payments: {}, Reports: {}, Analytics: {}, Consultants: {}, Users: {}, Notifications: {}, CommandPalette: {}, Helpers: {}, ChangeLog: {}, Import: {}, Settings: {}, Performance: {}, MyDay: {}, Geo: {}, Offline: {}, FAB: {},
-    
-    // --- THIS IS THE MISSING MODULE DEFINITION ---
-    ContextMenu: {} 
+    Auth: {}, DB: {}, UI: {}, Dashboard: {}, Customers: {}, Visits: {}, Payments: {}, Reports: {}, Analytics: {}, Consultants: {}, Users: {}, Notifications: {}, CommandPalette: {}, Helpers: {}, ChangeLog: {}, Import: {}, Settings: {}, Performance: {}, MyDay: {}, Geo: {}, Offline: {}, FAB: {}, ContextMenu: {} 
 };
+
 Object.assign(App.Auth, { 
     login(u, p) { 
         const users = App.DB.get('users');
@@ -1030,242 +1028,104 @@ Object.assign(App.Auth, {
         resetTimer(); // Start immediately
     }
 });
-Object.assign(App.DB, { 
-    initialize() {
-        if (!localStorage.getItem('consultants')) localStorage.setItem('consultants', JSON.stringify([]));
-        if (!localStorage.getItem('users')) localStorage.setItem('users', JSON.stringify([]));
-        if (!localStorage.getItem('customers')) localStorage.setItem('customers', JSON.stringify([]));
-        if (!localStorage.getItem('visits')) localStorage.setItem('visits', JSON.stringify([]));
-        if (!localStorage.getItem('payments')) localStorage.setItem('payments', JSON.stringify([]));
-        if (!localStorage.getItem('activityLog')) localStorage.setItem('activityLog', JSON.stringify([]));
-        if (!localStorage.getItem('notifications')) localStorage.setItem('notifications', JSON.stringify([]));
-        if (!localStorage.getItem('changeLog')) localStorage.setItem('changeLog', JSON.stringify([]));
-        if (!localStorage.getItem('forecasts')) localStorage.setItem('forecasts', JSON.stringify([]));
-        if (!localStorage.getItem('customerComments')) localStorage.setItem('customerComments', JSON.stringify([]));
-        if (!localStorage.getItem('customerForecasts')) localStorage.setItem('customerForecasts', JSON.stringify([]));
 
-        // Initialize customer table column settings
-        if (!localStorage.getItem('customerTableColumns')) localStorage.setItem('customerTableColumns', JSON.stringify(App.state.customerTableColumns));
-        else App.state.customerTableColumns = JSON.parse(localStorage.getItem('customerTableColumns'));
-        // Initialize pagination settings
-        const paginationSettings = JSON.parse(localStorage.getItem('paginationSettings'));
-        if (paginationSettings) {
-            // Deep merge the pagination settings to preserve currentPage property
-            Object.keys(paginationSettings).forEach(key => {
-                if (App.state.pagination[key]) {
-                    Object.assign(App.state.pagination[key], paginationSettings[key]);
-                }
+Object.assign(App.DB, { 
+    apiUrl: 'https://script.google.com/macros/s/AKfycbwyANA2bFw8DdwMu0wiCYxPb20f06nQ4JvAhjSRmLSucBj6iAuyPa94kti_idakHd25/exec',
+    cache: {},
+
+    async initialize() {
+        // Use a simple UI helper defined below to show loading status
+        App.UI.toggleLoading(true, "Connecting to Cloud Database...");
+        
+        try {
+            // 1. Fetch all data from Google Sheets
+            const response = await fetch(this.apiUrl);
+            const cloudData = await response.json();
+            
+            // 2. Populate local cache
+            this.cache = cloudData;
+            
+            // 3. Ensure defaults if sheets are empty
+            const tables = ['consultants', 'users', 'customers', 'visits', 'payments', 'activityLog', 'notifications', 'changeLog', 'forecasts', 'customerComments', 'customerForecasts'];
+            tables.forEach(key => {
+                if (!this.cache[key]) this.cache[key] = [];
+            });
+
+            // 4. Initialize Settings
+            if (!localStorage.getItem('customerTableColumns')) localStorage.setItem('customerTableColumns', JSON.stringify(App.state.customerTableColumns));
+            else App.state.customerTableColumns = JSON.parse(localStorage.getItem('customerTableColumns'));
+            
+            // 5. Default Admin Check (only if users sheet is empty)
+            if (this.cache['users'].length === 0) {
+                console.log("No users found. Creating default admin...");
+                const defaultAdmin = { 
+                    id: 1, username: 'admin', fullName: 'Admin User', 
+                    password: btoa('admin123'), role: 'admin', 
+                    department: 'Administration', lastLogin: null, assignedConsultantId: null 
+                };
+                this.cache['users'] = [defaultAdmin];
+                this.set('users', this.cache['users']); 
+            }
+
+            this.runMigrations();
+            App.UI.toggleLoading(false);
+            console.log("Cloud DB Initialized.");
+
+        } catch (error) {
+            console.error("DB Connection Failed:", error);
+            App.UI.toggleLoading(false);
+            Swal.fire({
+                title: 'Connection Error',
+                text: 'Could not connect to Google Database. Check your internet connection.',
+                icon: 'error'
             });
         }
-
-
-        const users = this.get('users');
-        if (users.length === 0) {
-            console.log("No users found. Creating a default admin account.");
-            const defaultAdmin = { 
-                id: 1, 
-                username: 'admin', 
-                fullName: 'Admin User', 
-                password: btoa('admin123'), // Encode the default password
-                role: 'admin', 
-                department: 'Administration', 
-                lastLogin: null, 
-                assignedConsultantId: null 
-            };
-            this.set('users', [defaultAdmin]);
-            console.log("Default admin created. Username: admin, Password: admin123");
-        }
-
-        this.runMigrations();
     }, 
+
+    get(key) {
+        return this.cache[key] || [];
+    },
+
+    set(key, data) {
+        // 1. Optimistic UI: Update Cache Immediately
+        this.cache[key] = data;
+        
+        // 2. Sync to Cloud in Background
+        fetch(this.apiUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table: key,
+                data: data
+            })
+        }).catch(err => console.warn(`Failed to sync ${key} to cloud:`, err));
+    },
+
     runMigrations() {
         const dataModelVersion = parseInt(localStorage.getItem('dataModelVersion') || '1');
-        if (dataModelVersion < 2) {
-            console.log("Running data migration to v2 (Consultant IDs)...");
-            const consultants = this.get('consultants');
-            const consultantMap = consultants.reduce((map, c) => { map[c.name] = c.id; return map; }, {});
-
-            let customers = this.get('customers');
-            customers.forEach(c => { if (c.salesConsultant && !c.salesConsultantId) c.salesConsultantId = consultantMap[c.salesConsultant]; });
-            this.set('customers', customers);
-
-            let users = this.get('users');
-            users.forEach(u => { if (u.assignedConsultant && !u.assignedConsultantId) u.assignedConsultantId = consultantMap[u.assignedConsultant]; });
-            this.set('users', users);
-
-            let visits = this.get('visits');
-            visits.forEach(v => { if (v.collector && !v.collectorId) v.collectorId = consultantMap[v.collector]; });
-            this.set('visits', visits);
-
-            let activityLog = this.get('activityLog');
-            activityLog.forEach(log => { if (log.consultant && !log.consultantId) log.consultantId = consultantMap[log.consultant]; });
-            this.set('activityLog', activityLog);
-
-            localStorage.setItem('dataModelVersion', '2');
-            console.log("Migration to v2 complete.");
-        }
-        if (dataModelVersion < 3) {
-            console.log("Running data migration to v3 (Encode Passwords)...");
-            let users = this.get('users');
-            let updated = false;
-            users.forEach(user => {
-                try {
-                    atob(user.password);
-                } catch(e) {
-                    user.password = btoa(user.password);
-                    updated = true;
-                }
-            });
-            if (updated) {
-                this.set('users', users);
-                console.log("All existing user passwords have been encoded.");
+        // Simple check to ensure data integrity on client side
+        let updated = false;
+        
+        // Example: Ensure customers have tags array
+        let customers = this.get('customers');
+        customers.forEach(c => {
+            if (!c.tags) { c.tags = []; updated = true; }
+            if (c.email === undefined) { c.email = ''; updated = true; }
+            if (c.mobile === undefined) { c.mobile = ''; updated = true; }
+            if (c.balance_2020_2025 === undefined) { c.balance_2020_2025 = 0; updated = true; }
+            if (c.balance_2019_2020 === undefined) { c.balance_2019_2020 = 0; updated = true; }
+            if (c.balance_lte_2018 === undefined) { c.balance_lte_2018 = c.outstanding || 0; updated = true; }
+            if (c.latitude === undefined) { 
+                const coords = App.Geo.getMockCoordinates(c.accountNo);
+                c.latitude = coords.lat; c.longitude = coords.lng; updated = true;
             }
-            localStorage.setItem('dataModelVersion', '3');
-            console.log("Migration to v3 complete.");
-        }
-        if (dataModelVersion < 4) {
-            console.log("Running data migration to v4 (Customer Tags)...");
-            let customers = this.get('customers');
-            let updated = false;
-            customers.forEach(customer => {
-                if (!customer.tags) {
-                    customer.tags = [];
-                    updated = true;
-                }
-            });
-            if(updated) {
-                this.set('customers', customers);
-                console.log("Added 'tags' array to all customers.");
-            }
-            localStorage.setItem('dataModelVersion', '4');
-            console.log("Migration to v4 complete.");
-        }
-        if (dataModelVersion < 5) {
-            console.log("Running data migration to v5 (Customer Contacts)...");
-            let customers = this.get('customers');
-            let updated = false;
-            customers.forEach(customer => {
-                if (customer.email === undefined) {
-                    customer.email = '';
-                    updated = true;
-                }
-                if (customer.mobile === undefined) {
-                    customer.mobile = '';
-                    updated = true;
-                }
-            });
-            if(updated) {
-                this.set('customers', customers);
-                console.log("Added 'email' and 'mobile' fields to all customers.");
-            }
-            localStorage.setItem('dataModelVersion', '5');
-            console.log("Migration to v5 complete.");
-        }
-        if (dataModelVersion < 6) {
-            console.log("Running data migration to v6 (Detailed Balances)...");
-            let customers = this.get('customers');
-            let updated = false;
-            customers.forEach(customer => {
-                if (customer.balance_2020_2025 === undefined) {
-                    customer.balance_2020_2025 = 0;
-                    updated = true;
-                }
-                if (customer.balance_2019_2020 === undefined) {
-                    customer.balance_2019_2020 = 0;
-                    updated = true;
-                }
-                if (customer.balance_lte_2018 === undefined) {
-                    // To preserve data, if old outstanding exists, move it to the oldest category
-                    customer.balance_lte_2018 = customer.outstanding || 0;
-                    updated = true;
-                }
-            });
-            if (updated) {
-                this.set('customers', customers);
-                console.log("Added detailed balance fields to all customers.");
-            }
-            localStorage.setItem('dataModelVersion', '6');
-            console.log("Migration to v6 complete.");
-        }
-        if (dataModelVersion < 7) {
-            console.log("Running data migration to v7 (Detailed Payments)...");
-            let payments = this.get('payments');
-            let updated = false;
-            payments.forEach(p => {
-                if (p.amount_2020_2025 === undefined) {
-                    p.amount_2020_2025 = 0;
-                    updated = true;
-                }
-                if (p.amount_2019_2020 === undefined) {
-                    p.amount_2019_2020 = 0;
-                    updated = true;
-                }
-                if (p.amount_lte_2018 === undefined) {
-                    p.amount_lte_2018 = 0;
-                    updated = true;
-                }
-            });
-            if (updated) {
-                this.set('payments', payments);
-                console.log("Added detailed payment amount fields to all payments.");
-            }
-            localStorage.setItem('dataModelVersion', '7');
-            console.log("Migration to v7 complete.");
-        }
-         if (dataModelVersion < 8) {
-            console.log("Running data migration to v8 (Customer Monthly Forecasts)...");
-            let customers = this.get('customers');
-            let customerForecasts = this.get('customerForecasts');
-            let updated = false;
-            const now = new Date();
-            const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-
-            customers.forEach(customer => {
-                if (customer.forecastAmount && customer.forecastAmount > 0) {
-                    const existingForecast = customerForecasts.find(f => f.accountNo === customer.accountNo && f.month === currentMonth);
-                    if (!existingForecast) {
-                        customerForecasts.push({
-                            id: `cf-${Date.now()}-${customer.accountNo}`,
-                            accountNo: customer.accountNo,
-                            month: currentMonth,
-                            amount: customer.forecastAmount
-                        });
-                        updated = true;
-                    }
-                }
-            });
-
-            if (updated) {
-                this.set('customerForecasts', customerForecasts);
-                console.log("Migrated legacy customer forecasts to new monthly structure.");
-            }
-            localStorage.setItem('dataModelVersion', '8');
-            console.log("Migration to v8 complete.");
-        }
-        if (dataModelVersion < 9) {
-            console.log("Running data migration to v9 (Geocoding)...");
-            let customers = this.get('customers');
-            let updated = false;
-            customers.forEach(customer => {
-                if (customer.latitude === undefined || customer.longitude === undefined) {
-                    // Simulate geocoding for existing customers
-                    const coords = App.Geo.getMockCoordinates(customer.accountNo);
-                    customer.latitude = coords.lat;
-                    customer.longitude = coords.lng;
-                    updated = true;
-                }
-            });
-             if (updated) {
-                this.set('customers', customers);
-                console.log("Added latitude and longitude to all customers.");
-            }
-            localStorage.setItem('dataModelVersion', '9');
-            console.log("Migration to v9 complete.");
-        }
-    },
-    get: (key) => JSON.parse(localStorage.getItem(key) || '[]'), 
-    set: (key, data) => localStorage.setItem(key, JSON.stringify(data)),
+        });
+        
+        if(updated) this.set('customers', customers);
+    }
 });
+
 Object.assign(App.UI, { 
     intersectionObserver: null,
     hydrate() { 
@@ -2134,6 +1994,26 @@ Object.assign(App.UI, {
             renderer.renderListView();
         }
     },
+	// Add this inside Object.assign(App.UI, { ... })
+toggleLoading(show, message = "Loading...") {
+    const overlay = document.getElementById('loading-overlay');
+    if (show) {
+        overlay.style.display = 'flex';
+        overlay.style.flexDirection = 'column';
+        // Add or update text
+        let textEl = overlay.querySelector('p');
+        if(!textEl) {
+            textEl = document.createElement('p');
+            textEl.style.marginTop = '15px';
+            textEl.style.fontWeight = '600';
+            textEl.style.color = 'var(--primary)';
+            overlay.appendChild(textEl);
+        }
+        textEl.textContent = message;
+    } else {
+        overlay.style.display = 'none';
+    }
+},
     changeRowsPerPage(pageKey, value) {
         App.state.pagination[pageKey].rowsPerPage = parseInt(value, 10);
         App.state.pagination[pageKey].currentPage = 1;
