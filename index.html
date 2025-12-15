@@ -6485,86 +6485,377 @@ Object.assign(App.ChangeLog, {
         App.UI.openModal('changelog-detail-modal');
     }
 });
+
 Object.assign(App.Import, { 
+    isProcessing: false,
+
     init: function() { 
-        const dropZone = document.getElementById('csv-drop-zone'); const fileInput = document.getElementById('csv-file-input'); const sampleLink = document.getElementById('download-sample-csv-link'); 
-        dropZone.addEventListener('click', () => fileInput.click()); fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0])); 
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }); dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover')); 
-        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) { this.handleFileSelect(e.dataTransfer.files[0]); } }); 
-        sampleLink.addEventListener('click', (e) => { e.preventDefault(); this.downloadSampleCSV(); }); 
+        const dropZone = document.getElementById('csv-drop-zone'); 
+        const fileInput = document.getElementById('csv-file-input'); 
+        const sampleLink = document.getElementById('download-sample-csv-link'); 
+        
+        // 1. Inject Progress UI
+        const modalContent = document.querySelector('#import-csv-modal .modal-content');
+        if (modalContent && !document.getElementById('import-progress-container')) {
+            const progressHTML = `
+                <div id="import-progress-container" class="hidden" style="margin: var(--spacing-4) 0; padding: 15px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span id="import-status-text" style="font-size: var(--fs-sm); font-weight:600; color:var(--primary);">Ready</span>
+                        <span id="import-progress-text" style="font-size: var(--fs-sm);">0%</span>
+                    </div>
+                    <div class="progress-bar" style="height: 12px; background-color: #e9ecef; border-radius: 6px; overflow: hidden; margin-bottom: 10px;">
+                        <div id="import-progress-bar" class="progress-bar-inner" style="width: 0%; transition: width 0.2s; background-color: var(--primary);"></div>
+                    </div>
+                    <div id="import-error-log" style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); max-height: 120px; overflow-y: auto; display: block; background: white; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">waiting for file...</div>
+                </div>`;
+            const footer = modalContent.querySelector('.modal-footer');
+            if(footer) footer.insertAdjacentHTML('beforebegin', progressHTML);
+        }
+
+        // 2. Setup Listeners
+        if (dropZone) {
+            // Remove old listeners by replacing node
+            const newDrop = dropZone.cloneNode(true);
+            dropZone.parentNode.replaceChild(newDrop, dropZone);
+            
+            newDrop.onclick = () => { if(fileInput) fileInput.click(); };
+            newDrop.ondragover = (e) => { e.preventDefault(); newDrop.classList.add('dragover'); };
+            newDrop.ondragleave = () => newDrop.classList.remove('dragover');
+            newDrop.ondrop = (e) => { e.preventDefault(); newDrop.classList.remove('dragover'); if(e.dataTransfer.files.length) this.handleFileSelect(e.dataTransfer.files[0]); };
+        }
+        
+        if (fileInput) {
+            fileInput.value = '';
+            fileInput.onchange = (e) => this.handleFileSelect(e.target.files[0]);
+        }
+
+        if (sampleLink) {
+            const newLink = sampleLink.cloneNode(true);
+            sampleLink.parentNode.replaceChild(newLink, sampleLink);
+            newLink.onclick = (e) => { e.preventDefault(); this.downloadSampleCSV(); };
+        }
     }, 
+    
     handleFileSelect: function(file) {
         if (!file) return;
-        const isCSVType = file.type === 'text/csv'; const isCSVExtension = file.name.toLowerCase().endsWith('.csv');
-        if (!(isCSVType || isCSVExtension)) { App.UI.toast('Please select a valid CSV file.', 'error'); return; }
+        
+        // Reset UI
+        const container = document.getElementById('import-progress-container');
+        if(container) container.classList.remove('hidden');
+        this.log("Starting import...", true);
+        this.updateProgress(0, "Reading File...");
+
+        if (!file.name.toLowerCase().endsWith('.csv')) { 
+            this.log("Error: Invalid file type. Select CSV.");
+            return; 
+        }
+        
         document.getElementById('csv-filename').textContent = file.name;
-        const reader = new FileReader(); reader.onload = (event) => { this.processCSV(event.target.result); }; reader.readAsText(file);
+        this.isProcessing = true;
+
+        const reader = new FileReader(); 
+        
+        reader.onerror = () => {
+            this.log("Error: Failed to read file.");
+            this.isProcessing = false;
+        };
+
+        reader.onload = (event) => { 
+            setTimeout(() => {
+                try {
+                    this.processCSV(event.target.result);
+                } catch (e) {
+                    console.error("Crash:", e);
+                    this.log("Critical Error: " + e.message);
+                    this.isProcessing = false;
+                }
+            }, 100);
+        }; 
+        
+        reader.readAsText(file);
+        
+        const fileInput = document.getElementById('csv-file-input'); 
+        if(fileInput) fileInput.value = '';
     },
-    processCSV: function(csvText) {
-        const rows = csvText.split(/\r?\n/).filter(row => row.trim() !== '');
-        if (rows.length < 2) { App.UI.toast('CSV file is empty or has no data rows.', 'error'); return; }
 
-        let headerRow = rows.shift().replace(/^\uFEFF/, '');
-        const delimiter = headerRow.includes(';') ? ';' : ',';
-        const originalHeaders = headerRow.split(delimiter);
-        const cleanedHeaders = originalHeaders.map(h => h.trim().replace(/^"|"$/g, '').toLowerCase().replace(/[^a-z0-9]/gi, ''));
-
-        const expectedHeaders = ['accountnumber', 'companyname', 'email', 'mobile', 'emirate', 'area', 'status', 'paymentstatus', 'initialdebt', 'salesconsultant', 'customerstatus', 'debtsince', 'balance20202025', 'balance20192020', 'balancelte2018', 'latitude', 'longitude'];
-        const headerMap = {};
-        expectedHeaders.forEach(eh => { const index = cleanedHeaders.findIndex(ch => ch === eh); if (index !== -1) headerMap[eh] = index; });
+    updateProgress(percent, statusText) {
+        const bar = document.getElementById('import-progress-bar');
+        const text = document.getElementById('import-progress-text');
+        const status = document.getElementById('import-status-text');
         
-        if (!headerMap.hasOwnProperty('accountnumber') || !headerMap.hasOwnProperty('companyname')) { App.UI.toast('CSV must contain "accountNumber" and "companyName" headers.', 'error'); return; }
-        
-        let existingCustomers = App.DB.get('customers'); const existingAccountNos = new Set(existingCustomers.map(c => c.accountNo.toLowerCase()));
-        let newCustomers = []; let skippedCount = 0; let consultants = App.DB.get('consultants'); let newConsultantNames = new Set();
-        
-        rows.forEach(row => {
-            const cells = row.split(delimiter);
-            const getCellValue = (key) => { const index = headerMap[key]; if (index !== undefined && cells[index] !== undefined) { return cells[index].trim().replace(/^"|"$/g, ''); } return undefined; };
-            const accountNo = getCellValue('accountnumber');
-            if (!accountNo || existingAccountNos.has(accountNo.toLowerCase())) { skippedCount++; return; }
-            const salesConsultantName = getCellValue('salesconsultant') || 'Unassigned';
-            if (salesConsultantName !== 'Unassigned' && !consultants.some(c => c.name.toLowerCase() === salesConsultantName.toLowerCase())) { newConsultantNames.add(salesConsultantName); }
-            newCustomers.push({ rowData: cells, consultantName: salesConsultantName, getCellValue });
-            existingAccountNos.add(accountNo.toLowerCase());
-        });
+        if (bar) bar.style.width = `${percent}%`;
+        if (text) text.textContent = `${Math.floor(percent)}%`;
+        if (status && statusText) status.textContent = statusText;
+    },
 
-        let newConsultantCount = 0;
-        if (newConsultantNames.size > 0) { newConsultantNames.forEach(name => { const newId = Date.now() + newConsultantCount; consultants.push({ id: newId, name: name }); App.Helpers.logChange('Created', 'Consultant', `'${name}'`, 'Auto-created via CSV import.'); newConsultantCount++; }); App.DB.set('consultants', consultants); }
+    log(msg, clear = false) {
+        const log = document.getElementById('import-error-log');
+        if (log) {
+            if (clear) log.innerHTML = '';
+            log.innerHTML += `<div style="border-bottom:1px solid #f0f0f0; padding:2px 0;">${msg}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+    },
 
-        const finalCustomers = newCustomers.map(item => {
-            const { getCellValue } = item;
-            const consultant = consultants.find(c => c.name.toLowerCase() === item.consultantName.toLowerCase());
-            const rawDebtSince = getCellValue('debtsince'); const debtSince = App.Helpers.parseCSVDate(rawDebtSince);
-            const bal1 = parseFloat(getCellValue('balance20202025')) || 0; const bal2 = parseFloat(getCellValue('balance20192020')) || 0; const bal3 = parseFloat(getCellValue('balancelte2018')) || 0;
-            const outstanding = bal1 + bal2 + bal3;
+    // --- 1. PARSER: Handles Quoted Commas Correctly ---
+    parseLine(text, delimiter = ',') {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
             
-            // --- NEW: GPS Logic ---
-            let lat = parseFloat(getCellValue('latitude'));
-            let lng = parseFloat(getCellValue('longitude'));
-            
-            if (isNaN(lat) || isNaN(lng)) {
-                const coords = App.Geo.getMockCoordinates(getCellValue('accountnumber'));
-                lat = coords.lat;
-                lng = coords.lng;
+            if (char === '"') {
+                if (inQuotes && text[i+1] === '"') {
+                    current += '"'; i++; // Handle escaped quote
+                } else {
+                    inQuotes = !inQuotes; // Toggle quote mode
+                }
+            } else if (char === delimiter && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += char;
             }
-            // ----------------------
+        }
+        result.push(current.trim());
+        return result;
+    },
 
-            return {
-                accountNo: getCellValue('accountnumber'), companyName: getCellValue('companyname') || 'N/A', email: getCellValue('email') || '', mobile: getCellValue('mobile') || '', emirate: getCellValue('emirate') || 'Dubai', area: getCellValue('area') || 'N/A', latitude: lat, longitude: lng, status: getCellValue('status') || 'Active', paymentStatus: getCellValue('paymentstatus') || 'Negotiation', initialDebt: parseFloat(getCellValue('initialdebt')) || outstanding, outstanding: outstanding, balance_2020_2025: bal1, balance_2019_2020: bal2, balance_lte_2018: bal3, salesConsultantId: consultant ? consultant.id : null, customerStatus: getCellValue('customerstatus') || 'Collectors', agingCategory: App.Helpers.calculateAgingCategory(debtSince), debtSince: debtSince, tags: []
-            };
+    // --- 2. CLEANER: Handles Currency Strings ---
+    cleanNum(val) {
+        if (!val) return 0;
+        // Removes anything that isn't a digit, dot, or minus sign
+        // "199,859.49" -> "199859.49"
+        const clean = String(val).replace(/[^0-9.-]/g, '');
+        const num = parseFloat(clean);
+        return isNaN(num) ? 0 : num;
+    },
+
+    parseDate(dateStr) {
+        if (!dateStr) return new Date().toISOString().slice(0, 10);
+        dateStr = String(dateStr).trim().replace(/['"]/g, '');
+        if (/^\d{5}$/.test(dateStr)) {
+            return new Date(Math.round((dateStr - 25569)*86400*1000)).toISOString().slice(0, 10);
+        }
+        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
+        const parts = dateStr.split(/[/|-]/);
+        if (parts.length === 3) {
+            return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        }
+        return new Date().toISOString().slice(0, 10);
+    },
+
+    processCSV: function(csvText) {
+        if (!csvText || csvText.trim().length === 0) {
+            this.log('Error: File is empty.');
+            this.isProcessing = false;
+            return;
+        }
+
+        const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
+        this.log(`Read ${lines.length} lines.`);
+
+        // 1. Detect Delimiter
+        const headerLine = lines[0];
+        const delimiter = (headerLine.match(/;/g) || []).length > (headerLine.match(/,/g) || []).length ? ';' : ',';
+        this.log(`Delimiter detected: [ ${delimiter} ]`);
+
+        // 2. Map Headers
+        const headers = this.parseLine(lines.shift(), delimiter).map(h => h.toLowerCase().replace(/[^a-z0-9]/gi, ''));
+        const map = {};
+        
+        // Known columns
+        const keys = ['accountnumber', 'companyname', 'email', 'mobile', 'emirate', 'area', 'status', 'paymentstatus', 'initialdebt', 'salesconsultant', 'customerstatus', 'debtsince', 'balance20202025', 'balance20192020', 'balancelte2018', 'latitude', 'longitude'];
+        keys.forEach(k => {
+            const idx = headers.indexOf(k);
+            if (idx > -1) map[k] = idx;
         });
 
-        if (finalCustomers.length > 0) { App.DB.set('customers', [...existingCustomers, ...finalCustomers]); let feedback = `Import successful! Added ${finalCustomers.length} new customers.`; if (newConsultantCount > 0) { feedback += ` Added ${newConsultantCount} new consultants.`; } App.UI.toast(feedback, 'success'); if (skippedCount > 0) { App.UI.toast(`${skippedCount} rows were skipped (duplicates or missing account #).`, 'warning'); } } else { App.UI.toast('No new customers to import.', 'info'); }
-        App.UI.closeModal('import-csv-modal'); App.Customers.render(); if(App.state.activePage === 'consultants') App.Consultants.render();
-    }, 
+        // Validation
+        if (map['accountnumber'] === undefined) {
+            this.log(`Error: Missing 'accountNumber' column.`);
+            this.isProcessing = false;
+            return;
+        }
+        if (map['initialdebt'] !== undefined) {
+            this.log(`Found 'initialDebt' column (Index ${map['initialdebt']}).`);
+        } else {
+            this.log(`Warning: 'initialDebt' column missing. Will calculate.`);
+        }
+
+        // 3. Prepare Data
+        let existingCustomers = [];
+        try { existingCustomers = App.DB.get('customers') || []; } catch(e) {}
+        const existingIds = new Set(existingCustomers.map(c => String(c.accountNo).toLowerCase()));
+        
+        let newCustomers = [];
+        let skipped = 0;
+        let consultants = App.DB.get('consultants') || [];
+        let newConsultants = new Set();
+
+        // 4. Chunk Processing
+        const total = lines.length;
+        const chunkSize = 50;
+        let idx = 0;
+
+        const processChunk = () => {
+            const end = Math.min(idx + chunkSize, total);
+            
+            for (let i = idx; i < end; i++) {
+                try {
+                    const rowText = lines[i];
+                    if(!rowText) continue;
+
+                    const row = this.parseLine(rowText, delimiter);
+                    const get = (k) => map[k] !== undefined ? row[map[k]] : '';
+                    
+                    const accNo = get('accountnumber');
+                    if (!accNo || existingIds.has(String(accNo).toLowerCase())) { 
+                        skipped++; 
+                        continue; 
+                    }
+
+                    // Consultant
+                    const consName = get('salesconsultant') || 'Unassigned';
+                    if (consName && consName !== 'Unassigned') newConsultants.add(consName);
+
+                    // Numbers - Clean "199,859.49"
+                    const bal1 = this.cleanNum(get('balance20202025'));
+                    const bal2 = this.cleanNum(get('balance20192020'));
+                    const bal3 = this.cleanNum(get('balancelte2018'));
+                    let initDebt = this.cleanNum(get('initialdebt'));
+                    
+                    const outstanding = bal1 + bal2 + bal3;
+                    // If initial debt is 0, assume it equals current outstanding
+                    if (initDebt === 0 && outstanding > 0) initDebt = outstanding;
+
+                    // Mock GPS if missing
+                    let lat = this.cleanNum(get('latitude'));
+                    let lng = this.cleanNum(get('longitude'));
+                    if (lat === 0 && lng === 0) {
+                        // Mock
+                        let hash = 0;
+                        for (let j = 0; j < accNo.length; j++) hash = accNo.charCodeAt(j) + ((hash << 5) - hash);
+                        lat = 25.2048 + ((hash % 1000) / 10000);
+                        lng = 55.2708 + (((hash / 1000) % 1000) / 10000);
+                    }
+
+                    newCustomers.push({
+                        accountNo: accNo,
+                        companyName: get('companyname'),
+                        email: get('email'),
+                        mobile: get('mobile'),
+                        emirate: get('emirate') || 'Dubai',
+                        area: get('area') || 'N/A',
+                        status: get('status') || 'Active',
+                        paymentStatus: get('paymentstatus') || 'Negotiation',
+                        customerStatus: get('customerstatus') || 'Collectors',
+                        debtSince: this.parseDate(get('debtsince')),
+                        initialDebt: initDebt,
+                        outstanding: outstanding,
+                        balance_2020_2025: bal1,
+                        balance_2019_2020: bal2,
+                        balance_lte_2018: bal3,
+                        latitude: lat,
+                        longitude: lng,
+                        tempConsultant: consName, 
+                        tags: []
+                    });
+                    existingIds.add(String(accNo).toLowerCase());
+
+                } catch (err) {
+                    this.log(`Row ${i+1} skipped: ${err.message}`);
+                }
+            }
+
+            idx = end;
+            const pct = Math.floor((idx / total) * 90);
+            this.updateProgress(pct, `Processed ${idx}/${total} rows...`);
+
+            if (idx < total) {
+                setTimeout(processChunk, 10);
+            } else {
+                this.finalizeImport(newCustomers, newConsultants, skipped, consultants, existingCustomers);
+            }
+        };
+
+        processChunk();
+    },
+
+    finalizeImport: function(newCustomers, newConsultantsNames, skipped, consultants, existingCustomers) {
+        try {
+            this.log("Finalizing data...");
+            this.updateProgress(95, "Syncing Consultants...");
+            
+            let consUpdated = false;
+            newConsultantsNames.forEach(name => {
+                if (!consultants.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                    consultants.push({ id: Date.now() + Math.floor(Math.random()*1000), name: name });
+                    consUpdated = true;
+                }
+            });
+            
+            const finalData = newCustomers.map(c => {
+                const match = consultants.find(con => con.name.toLowerCase() === c.tempConsultant.toLowerCase());
+                c.salesConsultantId = match ? match.id : null;
+                delete c.tempConsultant;
+                // Aging
+                try {
+                    const days = Math.floor((new Date() - new Date(c.debtSince))/(1000*60*60*24));
+                    c.agingCategory = days > 180 ? '180+ Days' : days > 90 ? '91-180 Days' : days > 60 ? '61-90 Days' : days > 30 ? '31-60 Days' : 'Current (0-30 Days)';
+                } catch(e) { c.agingCategory = 'Current (0-30 Days)'; }
+                return c;
+            });
+
+            if (finalData.length > 0) {
+                this.updateProgress(98, "Saving to Cloud DB...");
+                
+                if(consUpdated) App.DB.set('consultants', consultants);
+
+                const allData = [...existingCustomers, ...finalData];
+                App.DB.set('customers', allData);
+                
+                this.updateProgress(100, "Complete");
+                this.log(`Successfully added ${finalData.length} customers.`);
+                
+                setTimeout(() => {
+                    this.isProcessing = false;
+                    App.UI.toast(`Success! Added ${finalData.length} records.`, 'success');
+                    App.UI.closeModal('import-csv-modal');
+                    App.Customers.render();
+                }, 1000);
+            } else { 
+                this.updateProgress(100, "Done");
+                this.isProcessing = false;
+                if (skipped > 0) {
+                    this.log(`Skipped ${skipped} duplicates. No new data.`);
+                    App.UI.toast(`Finished. ${skipped} duplicates skipped.`, 'warning');
+                } else {
+                    this.log("Error: No valid data found in file.");
+                    App.UI.toast('No valid data imported.', 'warning');
+                }
+            }
+
+        } catch (e) {
+            console.error(e);
+            this.log("Save Failed: " + e.message);
+            this.isProcessing = false;
+        }
+    },
+    
     downloadSampleCSV: function() { 
         const headers = "accountNumber,companyName,email,mobile,emirate,area,status,paymentStatus,initialDebt,salesConsultant,customerStatus,debtSince,balance2020_2025,balance2019_2020,balance_lte_2018,latitude,longitude"; 
-        const exampleRow = "DXB-123,Sample Trading LLC,contact@sample.com,+971501234567,Dubai,Al Quoz,Active,Negotiation,84093,John Doe,Sales (Above 3 Months),2023-01-15,12500,50000,21593,25.1234,55.4321"; 
+        const exampleRow = "DXB-123,Sample Trading LLC,contact@sample.com,+971501234567,Dubai,Al Quoz,Active,Negotiation,\"199,859.49\",Mohammad Ashraf,Sales (Above 3 Months),2023-01-15,10000,50000,139859.49,25.1234,55.4321"; 
         const csvContent = headers + "\n" + exampleRow; 
         const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); 
-        const link = document.createElement("a"); const url = URL.createObjectURL(blob); 
-        link.setAttribute("href", url); link.setAttribute("download", "customer_import_template.csv"); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); 
+        const link = document.createElement("a"); 
+        link.href = URL.createObjectURL(blob); 
+        link.download = "customer_import_template.csv"; 
+        document.body.appendChild(link); 
+        link.click(); 
+        document.body.removeChild(link); 
     } 
 });
 
