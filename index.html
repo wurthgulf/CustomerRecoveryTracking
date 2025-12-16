@@ -626,7 +626,7 @@
 	/* Floating Action Button (FAB) */
     .fab-container {
         position: fixed;
-        bottom: 30px;
+        bottom: 90px;
         right: 30px;
         z-index: 1000;
         display: flex;
@@ -933,36 +933,41 @@ const App = {
             salesConsultantId: true, paymentStatus: true, email: false, mobile: false,
         }
     },
+    
+    // --- FIXED INIT SEQUENCE ---
     async init() { 
+        console.log("App Starting...");
+        
+        // 1. Draw UI & Enable Buttons IMMEDIATELY
         this.UI.hydrate(); 
+        this.UI.setupEventListeners(); 
         
-        // Connect to Google Sheet
-        await this.DB.initialize(); 
+        // 2. Initialize Helpers
+        this.CommandPalette.init(); 
+        this.Notifications.init(); 
+        this.Import.init(); 
+        this.Offline.init();
+        if(this.ContextMenu) this.ContextMenu.init(); 
+        if(this.FAB) this.FAB.init();
+        this.UI.applyTheme(); 
+
+        // 3. Connect to Database (Async)
+        // We do NOT await this anymore so the UI stays responsive
+        this.DB.initialize().then(() => {
+            console.log("DB Connected.");
+        });
         
+        // 4. Session Check
         const now = new Date();
         this.state.dashboardTimeFrame = {
             year: now.getFullYear(),
             month: (now.getMonth() + 1).toString().padStart(2, '0')
         };
-        
         this.Auth.checkSession(); 
-        this.UI.setupEventListeners(); 
-        this.CommandPalette.init(); 
-        this.Notifications.init(); 
-        this.Import.init(); 
-        this.Offline.init();
-        
-        if(this.ContextMenu) this.ContextMenu.init(); 
-        if(this.FAB) this.FAB.init();
-        this.UI.applyTheme(); 
 
-        // [SAFETY] Prevent accidental close if syncing
+        // 5. Safety
         window.addEventListener('beforeunload', (e) => {
-            if (App.DB.pendingSyncs > 0) {
-                // This triggers the browser's native "Leave site?" warning
-                e.preventDefault();
-                e.returnValue = ''; 
-            }
+            if (App.DB.pendingSyncs > 0) { e.preventDefault(); e.returnValue = ''; }
         });
     },
     Auth: {}, DB: {}, UI: {}, Dashboard: {}, Customers: {}, Visits: {}, Payments: {}, Reports: {}, Analytics: {}, Consultants: {}, Users: {}, Notifications: {}, CommandPalette: {}, Helpers: {}, ChangeLog: {}, Import: {}, Settings: {}, Performance: {}, MyDay: {}, Geo: {}, Offline: {}, FAB: {}, ContextMenu: {} 
@@ -1038,8 +1043,8 @@ Object.assign(App.Auth, {
     }
 });
 
+// --- REPLACE ENTIRE APP.DB SECTION WITH THIS ---
 Object.assign(App.DB, { 
-    // Your Google Script URL
     apiUrl: 'https://script.google.com/macros/s/AKfycbwyANA2bFw8DdwMu0wiCYxPb20f06nQ4JvAhjSRmLSucBj6iAuyPa94kti_idakHd25/exec',
     cache: {},
     pendingSyncs: 0,
@@ -1048,114 +1053,92 @@ Object.assign(App.DB, {
         App.UI.toggleLoading(true, "Syncing Data...");
         
         try {
-            // 1. Simple Fetch (Like your old code that worked)
+            // Force fresh fetch
             const response = await fetch(this.apiUrl + '?t=' + Date.now());
             const cloudData = await response.json();
             
-            // 2. Initialize Cache
             this.cache = {};
             const tables = ['consultants', 'users', 'customers', 'visits', 'payments', 'activityLog', 'notifications', 'changeLog', 'forecasts', 'customerComments', 'customerForecasts'];
             
-            // 3. THE FIX: Handle both "JSON String" and "Array" formats
             tables.forEach(table => {
                 let raw = cloudData[table];
-
-                // If data comes as a string (from the new script), parse it
-                if (typeof raw === 'string') {
-                    try { raw = JSON.parse(raw); } catch(e) { raw = []; }
-                }
-                
-                // Safety check
+                if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch(e) { raw = []; } }
                 if (!Array.isArray(raw)) raw = [];
 
                 if (table === 'customers') {
-                    // Fix capitalization issues (accountnumber vs accountNo)
+                    // Normalize every row to fix missing columns AND FORCE STRING IDs
                     this.cache[table] = raw.map(row => this.normalizeCustomer(row));
                 } else {
                     this.cache[table] = raw;
                 }
             });
 
-            // 4. Default Admin Check
-            if (this.cache['users'].length === 0) {
+            if (!this.cache['users'] || this.cache['users'].length === 0) {
                 const defaultAdmin = { id: 1, username: 'admin', fullName: 'Admin User', password: btoa('admin123'), role: 'admin', department: 'Administration', lastLogin: null, assignedConsultantId: null };
                 this.cache['users'] = [defaultAdmin];
                 this.set('users', this.cache['users']); 
             }
 
-            // 5. Update UI
             App.UI.toggleLoading(false);
             App.UI.updateCloudStatus('saved');
             
-            // 6. Force Refresh
-            const page = App.state.activePage;
-            if (App[page.charAt(0).toUpperCase() + page.slice(1)]) {
-                App[page.charAt(0).toUpperCase() + page.slice(1)].render();
+            if (App.state.activePage) {
+                const pageMod = App[App.state.activePage.charAt(0).toUpperCase() + App.state.activePage.slice(1)];
+                if (pageMod && pageMod.render) pageMod.render();
             }
 
         } catch (error) {
             console.error("DB Error:", error);
             App.UI.toggleLoading(false);
-            // Fallback to local cache if offline, or show error
-            if (Object.keys(this.cache).length === 0) {
-                Swal.fire({ title: 'Connection Failed', text: 'Could not load data. Check internet.', icon: 'error' });
-            }
+            App.UI.updateCloudStatus('error');
         }
     }, 
 
-    // --- HELPER: Fixes Capitalization & Types ---
+    // --- SMART NORMALIZER (Fixed for String IDs) ---
     normalizeCustomer(row) {
-        const c = {};
+        if (!row) return {};
         
-        // Helper to find key case-insensitively
-        const getVal = (target) => {
-            if (row[target] !== undefined) return row[target];
-            const key = Object.keys(row).find(k => k.toLowerCase().replace(/[^a-z0-9]/g,'') === target.toLowerCase());
-            return key ? row[key] : undefined;
+        // This function hunts for the value using fuzzy matching
+        const find = (targets) => {
+            const keys = Object.keys(row);
+            for (let t of targets) {
+                if (row[t] !== undefined) return row[t];
+                const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g,'') === t.toLowerCase().replace(/[^a-z0-9]/g,''));
+                if (match) return row[match];
+            }
+            return undefined;
         };
 
-        c.accountNo = getVal('accountNo') || getVal('accountNumber') || 'UNKNOWN';
-        c.companyName = getVal('companyName') || 'Unknown';
-        c.email = getVal('email') || '';
-        c.mobile = getVal('mobile') || '';
-        c.emirate = getVal('emirate') || 'Dubai';
-        c.area = getVal('area') || '';
-        c.status = getVal('status') || 'Active';
-        c.paymentStatus = getVal('paymentStatus') || 'Negotiation';
-        c.salesConsultantId = getVal('salesConsultantId'); 
-        
-        // Safe Number Parsing
         const pNum = (v) => {
             if (typeof v === 'number') return v;
-            return parseFloat(String(v || 0).replace(/,/g, '')) || 0;
+            return parseFloat(String(v || 0).replace(/[^0-9.-]/g, '')) || 0;
         };
 
-        c.initialDebt = pNum(getVal('initialDebt'));
-        c.outstanding = pNum(getVal('outstanding'));
-        c.balance_2020_2025 = pNum(getVal('balance_2020_2025') || getVal('balance20202025'));
-        c.balance_2019_2020 = pNum(getVal('balance_2019_2020') || getVal('balance20192020'));
-        c.balance_lte_2018 = pNum(getVal('balance_lte_2018') || getVal('balancelte2018'));
-        
-        // GPS
-        c.latitude = pNum(getVal('latitude'));
-        c.longitude = pNum(getVal('longitude'));
-        if (c.latitude === 0) {
-            const mock = App.Geo.getMockCoordinates(c.accountNo);
-            c.latitude = mock.lat; c.longitude = mock.lng;
-        }
-
-        c.debtSince = getVal('debtSince') || new Date().toISOString().slice(0, 10);
-        c.customerStatus = getVal('customerStatus') || 'Collectors';
-        c.agingCategory = App.Helpers.calculateAgingCategory(c.debtSince);
-        
-        // Tags (Handle JSON string or Array)
-        let tags = getVal('tags');
-        if (typeof tags === 'string') {
-            try { tags = JSON.parse(tags); } catch(e) { tags = []; }
-        }
-        c.tags = Array.isArray(tags) ? tags : [];
-
-        return c;
+        return {
+            // FIX: Force String() here to ensure Action Buttons work
+            accountNo: String(find(['accountNo', 'accountNumber', 'Account Number']) || 'UNKNOWN'),
+            companyName: find(['companyName', 'Company Name']) || 'Unknown',
+            email: find(['email']) || '',
+            mobile: find(['mobile']) || '',
+            emirate: find(['emirate']) || 'Dubai',
+            area: find(['area']) || '',
+            status: find(['status']) || 'Active',
+            paymentStatus: find(['paymentStatus', 'Payment Status']) || 'Negotiation',
+            salesConsultantId: find(['salesConsultantId', 'salesConsultant']),
+            
+            initialDebt: pNum(find(['initialDebt', 'Initial Debt'])),
+            outstanding: pNum(find(['outstanding', 'Outstanding'])),
+            balance_2020_2025: pNum(find(['balance_2020_2025', 'balance20202025', 'balance2020_2025'])),
+            balance_2019_2020: pNum(find(['balance_2019_2020', 'balance20192020', 'balance2019_2020'])),
+            balance_lte_2018: pNum(find(['balance_lte_2018', 'balancelte2018', 'balance_lte2018'])),
+            
+            latitude: pNum(find(['latitude'])),
+            longitude: pNum(find(['longitude'])),
+            debtSince: find(['debtSince']) || new Date().toISOString().slice(0, 10),
+            customerStatus: find(['customerStatus']) || 'Collectors',
+            agingCategory: App.Helpers.calculateAgingCategory(find(['debtSince'])),
+            tags: [] 
+        };
     },
 
     get(key) { return this.cache[key] || []; },
@@ -1164,13 +1147,7 @@ Object.assign(App.DB, {
         this.cache[key] = data;
         this.pendingSyncs++;
         App.UI.updateCloudStatus('syncing');
-
-        fetch(this.apiUrl, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ table: key, data: data })
-        })
+        fetch(this.apiUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: key, data: data }) })
         .then(() => {
             this.pendingSyncs = Math.max(0, this.pendingSyncs - 1);
             if (this.pendingSyncs === 0) App.UI.updateCloudStatus('saved');
@@ -1181,7 +1158,6 @@ Object.assign(App.DB, {
             App.UI.updateCloudStatus('error');
         });
     },
-
     runMigrations() {}
 });
 
@@ -1664,7 +1640,29 @@ Object.assign(App.UI, {
         document.getElementById('bulk-update-customers-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 class="card-title">Bulk Customer Update</h3><button class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">&times;</button></div><p id="bulk-update-count-msg" class="text-secondary"></p><form id="bulk-update-form"><div class="form-group"><label for="bulk-update-consultant">Assign to Consultant (Optional)</label><select id="bulk-update-consultant" class="form-control"><option value="">-- Do Not Change --</option></select></div><div class="form-group"><label for="bulk-update-status">Set Account Status (Optional)</label><select id="bulk-update-status" class="form-control"><option value="">-- Do Not Change --</option><option>Active</option><option>Inactive</option></select></div><div class="form-group"><label for="bulk-update-payment-status">Set Payment Status (Optional)</label><select id="bulk-update-payment-status" class="form-control"><option value="">-- Do Not Change --</option><option>Negotiation</option><option>Settlement</option><option>Legal</option><option>Write-Off</option></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('bulk-update-customers-modal')">Cancel</button><button type="submit" class="btn btn-warning">Apply Bulk Update</button></div></form></div>`;
         document.getElementById('changelog-detail-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Change Log Detail</h3><button class="btn btn-outline" onclick="App.UI.closeModal('changelog-detail-modal')">&times;</button></div><div id="changelog-detail-content"></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('changelog-detail-modal')">Close</button></div></div>`;
         document.getElementById('route-planner-modal').innerHTML = `<div class="modal-content" style="max-width: 600px;"><div class="modal-header"><h3 class="card-title">Plan Daily Route</h3><button class="btn btn-outline" onclick="App.UI.closeModal('route-planner-modal')">&times;</button></div><form id="route-planner-form"><div class="form-group"><label for="route-date">Select Date for Route</label><input type="date" id="route-date" class="form-control"></div><div class="form-group"><label>Select Customers to Visit</label><div id="route-customer-list" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); padding: var(--spacing-4); border-radius: 8px;"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('route-planner-modal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-route"></i> Generate Route</button></div></form></div>`;
+		this.renderLogin(); // Helper to keep init clean
     }, 
+    
+    // Helper to render login (if you wiped hydrate, put your HTML back here)
+    renderLogin() {
+        if(document.getElementById('login-page').innerHTML === '') {
+             document.getElementById('login-page').innerHTML = `
+            <ul class="background-bubbles"><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li></ul>
+            <div class="login-card">
+                <div class="logo"><img src="https://i.ibb.co/pvvsMy1X/Wurth-Gulf-CMYK-PNG-01.png" alt="Wuerth Gulf Logo"></div>
+                <h2 style="font-weight: 500; color: var(--text-secondary); margin-bottom: var(--spacing-6);">Customer Recovery App</h2>
+                <p id="login-error">Invalid credentials.</p>
+                <form id="login-form">
+                    <div class="form-group"><label>Username</label><div class="input-wrapper"><i class="fas fa-user"></i><input type="text" id="username" class="form-control" required></div></div>
+                    <div class="form-group"><label>Password</label><div class="input-wrapper"><i class="fas fa-lock"></i><input type="password" id="password" class="form-control" required></div></div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+                </form>
+            </div>`; 
+            // ... Plus the rest of your app HTML structure ...
+            // IMPORTANT: If you already have the HTML structure in your file, 
+            // you don't need to change hydrate(). Just update the functions below:
+        }
+    },
     setupEventListeners() { 
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.getElementById('sidebar-overlay');
@@ -3421,6 +3419,7 @@ Object.assign(App.MyDay, {
 });
 
 
+// --- REPLACE ENTIRE APP.CUSTOMERS SECTION WITH THIS ---
 Object.assign(App.Customers, { 
     viewMode: 'list', quill: null, 
 
@@ -3439,6 +3438,8 @@ Object.assign(App.Customers, {
         document.getElementById('customer-forecast-form').addEventListener('submit', (e) => this.saveCustomerForecast(e)); 
         const thead = document.querySelector('#customers-page .data-table thead');
         if(thead) thead.addEventListener('click', (e) => { const th = e.target.closest('th'); if (th && th.dataset.sort) App.UI.handleTableSort('customers', th.dataset.sort); }); 
+        
+        // Use debounce for search input
         const debouncedRender = App.Helpers.debounce(() => {App.state.pagination.customers.currentPage = 1; this.render()}, 300); 
         document.getElementById('customer-search').addEventListener('input', debouncedRender); 
         document.getElementById('customer-tag-filter').addEventListener('input', debouncedRender); 
@@ -3485,6 +3486,7 @@ Object.assign(App.Customers, {
         }); 
     }, 
 
+    // --- UPDATED: Super Robust Filter Logic ---
     getCurrentFilteredData: function() {
         const { value: search } = document.getElementById('customer-search'); 
         const { value: tagFilter } = document.getElementById('customer-tag-filter'); 
@@ -3492,13 +3494,39 @@ Object.assign(App.Customers, {
         const { value: statusFilter } = document.getElementById('customer-status-filter'); 
         const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
         let customers = App.Helpers.getScopedData('customers');
+        
         customers = customers.filter(c => {
-            const searchMatch = (c.companyName.toLowerCase().includes(search.toLowerCase()) || c.accountNo.toLowerCase().includes(search.toLowerCase()) || (consultantMap[c.salesConsultantId] || '').toLowerCase().includes(search.toLowerCase()));
+            // 1. Safe Search
+            const searchMatch = (
+                String(c.companyName || '').toLowerCase().includes(search.toLowerCase()) || 
+                String(c.accountNo || '').toLowerCase().includes(search.toLowerCase()) || 
+                String(consultantMap[c.salesConsultantId] || '').toLowerCase().includes(search.toLowerCase())
+            );
+
+            // 2. Tag Filter
             const tagMatch = !tagFilter || (c.tags && c.tags.some(tag => tag.toLowerCase().includes(tagFilter.toLowerCase())));
+
+            // 3. Account Status
             const accountStatusMatch = (accountStatusFilter === 'all' || c.status === accountStatusFilter);
-            const statusMatch = (statusFilter === 'all' || c.customerStatus === statusFilter);
+
+            // 4. Customer Status Filter (FIXED)
+            let statusMatch = true;
+            if (statusFilter !== 'all') {
+                // This function removes: Spaces, Brackets (), and words "days"/"months"
+                const normalize = (s) => String(s || '').toLowerCase()
+                    .replace(/[\s\(\)]/g, '')       // Remove spaces and brackets
+                    .replace(/days?|months?/g, ''); // Remove 'day', 'days', 'month', 'months'
+
+                const dbStatus = normalize(c.customerStatus);
+                const filterVal = normalize(statusFilter);
+                
+                // Now "Sales(Above 360)" and "Sales (Above 360 Days)" both become "salesabove360"
+                statusMatch = dbStatus === filterVal;
+            }
+
             return searchMatch && tagMatch && accountStatusMatch && statusMatch;
         });
+        
         const { column, order } = App.state.tableSorts.customers; 
         customers.sort((a, b) => {
             let valA = a[column], valB = b[column];
@@ -3576,6 +3604,7 @@ Object.assign(App.Customers, {
                 if (App.state.customerTableColumns.paymentStatus) rowHTML += `<td><span class="status-badge ${c.paymentStatus.toLowerCase().replace(' ', '-')}">${c.paymentStatus}</span></td>`;
                 if (App.state.customerTableColumns.email) rowHTML += `<td>${App.Helpers.highlightMatch(c.email || 'N/A', searchTerm)}</td>`;
                 if (App.state.customerTableColumns.mobile) rowHTML += `<td>${App.Helpers.highlightMatch(c.mobile || 'N/A', searchTerm)}</td>`;
+                
                 rowHTML += `<td class="d-flex gap-2"><button class="btn btn-outline view-customer" data-id="${c.accountNo}" title="View"><i class="fas fa-eye"></i></button><button class="btn btn-outline edit-customer" data-id="${c.accountNo}" title="Edit"><i class="fas fa-edit"></i></button>${App.state.currentUser.role === 'user' ? `<button class="btn btn-outline set-forecast" data-id="${c.accountNo}" title="Set Forecast"><i class="fas fa-bullseye"></i></button>` : ''}${App.state.currentUser.role === 'admin' ? `<button class="btn btn-danger delete-customer" data-id="${c.accountNo}" title="Delete"><i class="fas fa-trash"></i></button>` : ''}</td></tr>`;
                 return rowHTML;
             }).join('');
@@ -6553,355 +6582,154 @@ Object.assign(App.Import, {
         const fileInput = document.getElementById('csv-file-input'); 
         const sampleLink = document.getElementById('download-sample-csv-link'); 
         
-        // 1. Inject Progress UI
         const modalContent = document.querySelector('#import-csv-modal .modal-content');
         if (modalContent && !document.getElementById('import-progress-container')) {
             const progressHTML = `
-                <div id="import-progress-container" class="hidden" style="margin: var(--spacing-4) 0; padding: 15px; background: var(--bg-color); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span id="import-status-text" style="font-size: var(--fs-sm); font-weight:600; color:var(--primary);">Ready</span>
-                        <span id="import-progress-text" style="font-size: var(--fs-sm);">0%</span>
-                    </div>
-                    <div class="progress-bar" style="height: 12px; background-color: #e9ecef; border-radius: 6px; overflow: hidden; margin-bottom: 10px;">
-                        <div id="import-progress-bar" class="progress-bar-inner" style="width: 0%; transition: width 0.2s; background-color: var(--primary);"></div>
-                    </div>
-                    <div id="import-error-log" style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); max-height: 120px; overflow-y: auto; display: block; background: white; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">waiting for file...</div>
+                <div id="import-progress-container" class="hidden" style="margin: var(--spacing-4) 0; padding: 15px; background: var(--bg-color); border-radius: 8px;">
+                    <div class="d-flex justify-content-between mb-2"><span id="import-status-text">Ready</span><span id="import-progress-text">0%</span></div>
+                    <div class="progress-bar"><div id="import-progress-bar" class="progress-bar-inner" style="width: 0%"></div></div>
+                    <div id="import-error-log" style="font-size: 0.75rem; color: red; margin-top: 10px; max-height: 100px; overflow-y: auto;"></div>
                 </div>`;
-            const footer = modalContent.querySelector('.modal-footer');
-            if(footer) footer.insertAdjacentHTML('beforebegin', progressHTML);
+            modalContent.querySelector('.modal-footer').insertAdjacentHTML('beforebegin', progressHTML);
         }
 
-        // 2. Setup Listeners
         if (dropZone) {
-            // Remove old listeners by replacing node
             const newDrop = dropZone.cloneNode(true);
             dropZone.parentNode.replaceChild(newDrop, dropZone);
-            
-            newDrop.onclick = () => { if(fileInput) fileInput.click(); };
+            newDrop.onclick = () => fileInput.click();
             newDrop.ondragover = (e) => { e.preventDefault(); newDrop.classList.add('dragover'); };
             newDrop.ondragleave = () => newDrop.classList.remove('dragover');
             newDrop.ondrop = (e) => { e.preventDefault(); newDrop.classList.remove('dragover'); if(e.dataTransfer.files.length) this.handleFileSelect(e.dataTransfer.files[0]); };
         }
         
-        if (fileInput) {
-            fileInput.value = '';
-            fileInput.onchange = (e) => this.handleFileSelect(e.target.files[0]);
-        }
-
-        if (sampleLink) {
-            const newLink = sampleLink.cloneNode(true);
-            sampleLink.parentNode.replaceChild(newLink, sampleLink);
-            newLink.onclick = (e) => { e.preventDefault(); this.downloadSampleCSV(); };
-        }
+        if (fileInput) fileInput.onchange = (e) => this.handleFileSelect(e.target.files[0]);
+        if (sampleLink) sampleLink.onclick = (e) => { e.preventDefault(); this.downloadSampleCSV(); };
     }, 
     
     handleFileSelect: function(file) {
-        if (!file) return;
-        
-        // Reset UI
-        const container = document.getElementById('import-progress-container');
-        if(container) container.classList.remove('hidden');
-        this.log("Starting import...", true);
-        this.updateProgress(0, "Reading File...");
-
-        if (!file.name.toLowerCase().endsWith('.csv')) { 
-            this.log("Error: Invalid file type. Select CSV.");
-            return; 
-        }
-        
+        if (!file || this.isProcessing) return;
         document.getElementById('csv-filename').textContent = file.name;
-        this.isProcessing = true;
-
+        this.resetUI(); this.updateProgress(5, "Reading..."); this.isProcessing = true;
         const reader = new FileReader(); 
-        
-        reader.onerror = () => {
-            this.log("Error: Failed to read file.");
-            this.isProcessing = false;
-        };
-
-        reader.onload = (event) => { 
-            setTimeout(() => {
-                try {
-                    this.processCSV(event.target.result);
-                } catch (e) {
-                    console.error("Crash:", e);
-                    this.log("Critical Error: " + e.message);
-                    this.isProcessing = false;
-                }
-            }, 100);
-        }; 
-        
+        reader.onload = (e) => setTimeout(() => { try { this.processCSV(e.target.result); } catch (err) { this.log("Crash: " + err.message); this.isProcessing = false; } }, 100);
         reader.readAsText(file);
-        
-        const fileInput = document.getElementById('csv-file-input'); 
-        if(fileInput) fileInput.value = '';
+        document.getElementById('csv-file-input').value = '';
     },
 
-    updateProgress(percent, statusText) {
-        const bar = document.getElementById('import-progress-bar');
-        const text = document.getElementById('import-progress-text');
-        const status = document.getElementById('import-status-text');
-        
-        if (bar) bar.style.width = `${percent}%`;
-        if (text) text.textContent = `${Math.floor(percent)}%`;
-        if (status && statusText) status.textContent = statusText;
+    resetUI() {
+        document.getElementById('import-progress-container').classList.remove('hidden');
+        document.getElementById('import-error-log').innerHTML = '';
+        this.updateProgress(0, "Starting...");
     },
 
-    log(msg, clear = false) {
-        const log = document.getElementById('import-error-log');
-        if (log) {
-            if (clear) log.innerHTML = '';
-            log.innerHTML += `<div style="border-bottom:1px solid #f0f0f0; padding:2px 0;">${msg}</div>`;
-            log.scrollTop = log.scrollHeight;
-        }
+    updateProgress(percent, text) {
+        document.getElementById('import-progress-bar').style.width = `${percent}%`;
+        document.getElementById('import-progress-text').textContent = `${Math.floor(percent)}%`;
+        if(text) document.getElementById('import-status-text').textContent = text;
     },
 
-    // --- 1. PARSER: Handles Quoted Commas Correctly ---
-    parseLine(text, delimiter = ',') {
-        const result = [];
-        let current = '';
-        let inQuotes = false;
-        
+    log(msg) {
+        document.getElementById('import-error-log').innerHTML += `<div>${msg}</div>`;
+    },
+
+    // --- KEY FIX: PARSER ---
+    parseLine(text) {
+        const result = []; let cur = ''; let inQ = false;
         for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            
-            if (char === '"') {
-                if (inQuotes && text[i+1] === '"') {
-                    current += '"'; i++; // Handle escaped quote
-                } else {
-                    inQuotes = !inQuotes; // Toggle quote mode
-                }
-            } else if (char === delimiter && !inQuotes) {
-                result.push(current.trim());
-                current = '';
-            } else {
-                current += char;
-            }
+            const c = text[i];
+            if (c === '"') { if (inQ && text[i+1] === '"') { cur += '"'; i++; } else { inQ = !inQ; } }
+            else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+            else { cur += c; }
         }
-        result.push(current.trim());
+        result.push(cur.trim());
         return result;
     },
 
-    // --- 2. CLEANER: Handles Currency Strings ---
-    cleanNum(val) {
-        if (!val) return 0;
-        // Removes anything that isn't a digit, dot, or minus sign
-        // "199,859.49" -> "199859.49"
-        const clean = String(val).replace(/[^0-9.-]/g, '');
-        const num = parseFloat(clean);
-        return isNaN(num) ? 0 : num;
-    },
-
-    parseDate(dateStr) {
-        if (!dateStr) return new Date().toISOString().slice(0, 10);
-        dateStr = String(dateStr).trim().replace(/['"]/g, '');
-        if (/^\d{5}$/.test(dateStr)) {
-            return new Date(Math.round((dateStr - 25569)*86400*1000)).toISOString().slice(0, 10);
-        }
-        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
-        const parts = dateStr.split(/[/|-]/);
-        if (parts.length === 3) {
-            return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-        }
-        return new Date().toISOString().slice(0, 10);
-    },
-
     processCSV: function(csvText) {
-        if (!csvText || csvText.trim().length === 0) {
-            this.log('Error: File is empty.');
-            this.isProcessing = false;
-            return;
-        }
-
-        const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
-        this.log(`Read ${lines.length} lines.`);
-
-        // 1. Detect Delimiter
-        const headerLine = lines[0];
-        const delimiter = (headerLine.match(/;/g) || []).length > (headerLine.match(/,/g) || []).length ? ';' : ',';
-        this.log(`Delimiter detected: [ ${delimiter} ]`);
-
-        // 2. Map Headers
-        const headers = this.parseLine(lines.shift(), delimiter).map(h => h.toLowerCase().replace(/[^a-z0-9]/gi, ''));
-        const map = {};
+        const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== '');
+        if (lines.length < 2) { this.log("Empty File"); this.isProcessing = false; return; }
         
-        // Known columns
-        const keys = ['accountnumber', 'companyname', 'email', 'mobile', 'emirate', 'area', 'status', 'paymentstatus', 'initialdebt', 'salesconsultant', 'customerstatus', 'debtsince', 'balance20202025', 'balance20192020', 'balancelte2018', 'latitude', 'longitude'];
-        keys.forEach(k => {
-            const idx = headers.indexOf(k);
-            if (idx > -1) map[k] = idx;
+        const headers = this.parseLine(lines.shift()).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const map = {};
+        ['accountnumber', 'companyname', 'initialdebt', 'salesconsultant', 'balance20202025', 'balance20192020', 'balancelte2018', 'latitude', 'longitude'].forEach(k => {
+            const idx = headers.indexOf(k); if(idx > -1) map[k] = idx;
         });
 
-        // Validation
-        if (map['accountnumber'] === undefined) {
-            this.log(`Error: Missing 'accountNumber' column.`);
-            this.isProcessing = false;
-            return;
-        }
-        if (map['initialdebt'] !== undefined) {
-            this.log(`Found 'initialDebt' column (Index ${map['initialdebt']}).`);
-        } else {
-            this.log(`Warning: 'initialDebt' column missing. Will calculate.`);
-        }
+        if (map['accountnumber'] === undefined) { this.log("Missing accountNumber"); this.isProcessing = false; return; }
 
-        // 3. Prepare Data
-        let existingCustomers = [];
-        try { existingCustomers = App.DB.get('customers') || []; } catch(e) {}
-        const existingIds = new Set(existingCustomers.map(c => String(c.accountNo).toLowerCase()));
-        
-        let newCustomers = [];
-        let skipped = 0;
+        let customers = [];
         let consultants = App.DB.get('consultants') || [];
-        let newConsultants = new Set();
+        let newCons = new Set();
+        let existingIds = new Set((App.DB.get('customers') || []).map(c => String(c.accountNo).toLowerCase()));
 
-        // 4. Chunk Processing
         const total = lines.length;
-        const chunkSize = 50;
+        const chunk = 50;
         let idx = 0;
 
         const processChunk = () => {
-            const end = Math.min(idx + chunkSize, total);
-            
+            const end = Math.min(idx + chunk, total);
             for (let i = idx; i < end; i++) {
                 try {
-                    const rowText = lines[i];
-                    if(!rowText) continue;
-
-                    const row = this.parseLine(rowText, delimiter);
+                    const row = this.parseLine(lines[i]);
                     const get = (k) => map[k] !== undefined ? row[map[k]] : '';
-                    
-                    const accNo = get('accountnumber');
-                    if (!accNo || existingIds.has(String(accNo).toLowerCase())) { 
-                        skipped++; 
-                        continue; 
-                    }
+                    const acc = get('accountnumber');
+                    if(!acc || existingIds.has(String(acc).toLowerCase())) continue;
 
-                    // Consultant
-                    const consName = get('salesconsultant') || 'Unassigned';
-                    if (consName && consName !== 'Unassigned') newConsultants.add(consName);
+                    const cons = get('salesconsultant');
+                    if(cons) newCons.add(cons);
 
-                    // Numbers - Clean "199,859.49"
-                    const bal1 = this.cleanNum(get('balance20202025'));
-                    const bal2 = this.cleanNum(get('balance20192020'));
-                    const bal3 = this.cleanNum(get('balancelte2018'));
-                    let initDebt = this.cleanNum(get('initialdebt'));
-                    
-                    const outstanding = bal1 + bal2 + bal3;
-                    // If initial debt is 0, assume it equals current outstanding
-                    if (initDebt === 0 && outstanding > 0) initDebt = outstanding;
+                    const cleanNum = (v) => parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0;
 
-                    // Mock GPS if missing
-                    let lat = this.cleanNum(get('latitude'));
-                    let lng = this.cleanNum(get('longitude'));
-                    if (lat === 0 && lng === 0) {
-                        // Mock
-                        let hash = 0;
-                        for (let j = 0; j < accNo.length; j++) hash = accNo.charCodeAt(j) + ((hash << 5) - hash);
-                        lat = 25.2048 + ((hash % 1000) / 10000);
-                        lng = 55.2708 + (((hash / 1000) % 1000) / 10000);
-                    }
-
-                    newCustomers.push({
-                        accountNo: accNo,
+                    customers.push({
+                        accountNo: acc,
                         companyName: get('companyname'),
-                        email: get('email'),
-                        mobile: get('mobile'),
-                        emirate: get('emirate') || 'Dubai',
-                        area: get('area') || 'N/A',
-                        status: get('status') || 'Active',
-                        paymentStatus: get('paymentstatus') || 'Negotiation',
-                        customerStatus: get('customerstatus') || 'Collectors',
-                        debtSince: this.parseDate(get('debtsince')),
-                        initialDebt: initDebt,
-                        outstanding: outstanding,
-                        balance_2020_2025: bal1,
-                        balance_2019_2020: bal2,
-                        balance_lte_2018: bal3,
-                        latitude: lat,
-                        longitude: lng,
-                        tempConsultant: consName, 
+                        salesConsultantId: null, // Link later
+                        tempConsultant: cons,
+                        initialDebt: cleanNum(get('initialdebt')),
+                        balance_2020_2025: cleanNum(get('balance20202025')),
+                        balance_2019_2020: cleanNum(get('balance20192020')),
+                        balance_lte_2018: cleanNum(get('balancelte2018')),
+                        outstanding: cleanNum(get('initialdebt')) || cleanNum(get('balance20202025')) + cleanNum(get('balance20192020')) + cleanNum(get('balancelte2018')),
+                        status: 'Active',
+                        paymentStatus: 'Negotiation',
                         tags: []
                     });
-                    existingIds.add(String(accNo).toLowerCase());
-
-                } catch (err) {
-                    this.log(`Row ${i+1} skipped: ${err.message}`);
-                }
+                    existingIds.add(String(acc).toLowerCase());
+                } catch(e) {}
             }
-
             idx = end;
-            const pct = Math.floor((idx / total) * 90);
-            this.updateProgress(pct, `Processed ${idx}/${total} rows...`);
-
-            if (idx < total) {
-                setTimeout(processChunk, 10);
-            } else {
-                this.finalizeImport(newCustomers, newConsultants, skipped, consultants, existingCustomers);
-            }
+            this.updateProgress(Math.floor((idx/total)*90), `Processing ${idx}/${total}`);
+            
+            if(idx < total) setTimeout(processChunk, 10);
+            else this.finalize(customers, newCons, consultants);
         };
-
         processChunk();
     },
 
-    finalizeImport: function(newCustomers, newConsultantsNames, skipped, consultants, existingCustomers) {
-        try {
-            this.log("Finalizing data...");
-            this.updateProgress(95, "Syncing Consultants...");
-            
-            let consUpdated = false;
-            newConsultantsNames.forEach(name => {
-                if (!consultants.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-                    consultants.push({ id: Date.now() + Math.floor(Math.random()*1000), name: name });
-                    consUpdated = true;
-                }
-            });
-            
-            const finalData = newCustomers.map(c => {
-                const match = consultants.find(con => con.name.toLowerCase() === c.tempConsultant.toLowerCase());
-                c.salesConsultantId = match ? match.id : null;
-                delete c.tempConsultant;
-                // Aging
-                try {
-                    const days = Math.floor((new Date() - new Date(c.debtSince))/(1000*60*60*24));
-                    c.agingCategory = days > 180 ? '180+ Days' : days > 90 ? '91-180 Days' : days > 60 ? '61-90 Days' : days > 30 ? '31-60 Days' : 'Current (0-30 Days)';
-                } catch(e) { c.agingCategory = 'Current (0-30 Days)'; }
-                return c;
-            });
-
-            if (finalData.length > 0) {
-                this.updateProgress(98, "Saving to Cloud DB...");
-                
-                if(consUpdated) App.DB.set('consultants', consultants);
-
-                const allData = [...existingCustomers, ...finalData];
-                App.DB.set('customers', allData);
-                
-                this.updateProgress(100, "Complete");
-                this.log(`Successfully added ${finalData.length} customers.`);
-                
-                setTimeout(() => {
-                    this.isProcessing = false;
-                    App.UI.toast(`Success! Added ${finalData.length} records.`, 'success');
-                    App.UI.closeModal('import-csv-modal');
-                    App.Customers.render();
-                }, 1000);
-            } else { 
-                this.updateProgress(100, "Done");
-                this.isProcessing = false;
-                if (skipped > 0) {
-                    this.log(`Skipped ${skipped} duplicates. No new data.`);
-                    App.UI.toast(`Finished. ${skipped} duplicates skipped.`, 'warning');
-                } else {
-                    this.log("Error: No valid data found in file.");
-                    App.UI.toast('No valid data imported.', 'warning');
-                }
+    finalize(customers, newCons, consultants) {
+        newCons.forEach(n => {
+            if(!consultants.some(c => c.name.toLowerCase() === n.toLowerCase())) {
+                consultants.push({ id: Date.now() + Math.floor(Math.random()*1000), name: n });
             }
+        });
+        App.DB.set('consultants', consultants);
 
-        } catch (e) {
-            console.error(e);
-            this.log("Save Failed: " + e.message);
+        customers.forEach(c => {
+            const m = consultants.find(co => co.name.toLowerCase() === (c.tempConsultant||'').toLowerCase());
+            c.salesConsultantId = m ? m.id : null;
+            delete c.tempConsultant;
+        });
+
+        const all = [...(App.DB.get('customers')||[]), ...customers];
+        App.DB.set('customers', all);
+        
+        this.updateProgress(100, "Done");
+        setTimeout(() => {
             this.isProcessing = false;
-        }
+            App.UI.closeModal('import-csv-modal');
+            App.Customers.render();
+            App.UI.toast(`Added ${customers.length} customers.`);
+        }, 800);
     },
     
     downloadSampleCSV: function() { 
