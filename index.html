@@ -1039,55 +1039,132 @@ Object.assign(App.Auth, {
 });
 
 Object.assign(App.DB, { 
+    // Your Google Script URL
     apiUrl: 'https://script.google.com/macros/s/AKfycbwyANA2bFw8DdwMu0wiCYxPb20f06nQ4JvAhjSRmLSucBj6iAuyPa94kti_idakHd25/exec',
     cache: {},
-    pendingSyncs: 0, // Track active uploads
+    pendingSyncs: 0,
 
     async initialize() {
-        App.UI.toggleLoading(true, "Connecting to Cloud Database...");
+        App.UI.toggleLoading(true, "Syncing Data...");
+        
         try {
-            const response = await fetch(this.apiUrl);
+            // 1. Simple Fetch (Like your old code that worked)
+            const response = await fetch(this.apiUrl + '?t=' + Date.now());
             const cloudData = await response.json();
             
-            this.cache = cloudData;
-            
-            // Ensure defaults
+            // 2. Initialize Cache
+            this.cache = {};
             const tables = ['consultants', 'users', 'customers', 'visits', 'payments', 'activityLog', 'notifications', 'changeLog', 'forecasts', 'customerComments', 'customerForecasts'];
-            tables.forEach(key => { if (!this.cache[key]) this.cache[key] = []; });
-
-            // Restore settings
-            if (!localStorage.getItem('customerTableColumns')) localStorage.setItem('customerTableColumns', JSON.stringify(App.state.customerTableColumns));
-            else App.state.customerTableColumns = JSON.parse(localStorage.getItem('customerTableColumns'));
             
-            // Default Admin
+            // 3. THE FIX: Handle both "JSON String" and "Array" formats
+            tables.forEach(table => {
+                let raw = cloudData[table];
+
+                // If data comes as a string (from the new script), parse it
+                if (typeof raw === 'string') {
+                    try { raw = JSON.parse(raw); } catch(e) { raw = []; }
+                }
+                
+                // Safety check
+                if (!Array.isArray(raw)) raw = [];
+
+                if (table === 'customers') {
+                    // Fix capitalization issues (accountnumber vs accountNo)
+                    this.cache[table] = raw.map(row => this.normalizeCustomer(row));
+                } else {
+                    this.cache[table] = raw;
+                }
+            });
+
+            // 4. Default Admin Check
             if (this.cache['users'].length === 0) {
                 const defaultAdmin = { id: 1, username: 'admin', fullName: 'Admin User', password: btoa('admin123'), role: 'admin', department: 'Administration', lastLogin: null, assignedConsultantId: null };
                 this.cache['users'] = [defaultAdmin];
                 this.set('users', this.cache['users']); 
             }
 
-            this.runMigrations();
+            // 5. Update UI
             App.UI.toggleLoading(false);
-            App.UI.updateCloudStatus('saved'); // Show initial status
+            App.UI.updateCloudStatus('saved');
+            
+            // 6. Force Refresh
+            const page = App.state.activePage;
+            if (App[page.charAt(0).toUpperCase() + page.slice(1)]) {
+                App[page.charAt(0).toUpperCase() + page.slice(1)].render();
+            }
 
         } catch (error) {
-            console.error("DB Connection Failed:", error);
+            console.error("DB Error:", error);
             App.UI.toggleLoading(false);
-            Swal.fire({ title: 'Connection Error', text: 'Could not connect to Google Database. Check internet.', icon: 'error' });
+            // Fallback to local cache if offline, or show error
+            if (Object.keys(this.cache).length === 0) {
+                Swal.fire({ title: 'Connection Failed', text: 'Could not load data. Check internet.', icon: 'error' });
+            }
         }
     }, 
+
+    // --- HELPER: Fixes Capitalization & Types ---
+    normalizeCustomer(row) {
+        const c = {};
+        
+        // Helper to find key case-insensitively
+        const getVal = (target) => {
+            if (row[target] !== undefined) return row[target];
+            const key = Object.keys(row).find(k => k.toLowerCase().replace(/[^a-z0-9]/g,'') === target.toLowerCase());
+            return key ? row[key] : undefined;
+        };
+
+        c.accountNo = getVal('accountNo') || getVal('accountNumber') || 'UNKNOWN';
+        c.companyName = getVal('companyName') || 'Unknown';
+        c.email = getVal('email') || '';
+        c.mobile = getVal('mobile') || '';
+        c.emirate = getVal('emirate') || 'Dubai';
+        c.area = getVal('area') || '';
+        c.status = getVal('status') || 'Active';
+        c.paymentStatus = getVal('paymentStatus') || 'Negotiation';
+        c.salesConsultantId = getVal('salesConsultantId'); 
+        
+        // Safe Number Parsing
+        const pNum = (v) => {
+            if (typeof v === 'number') return v;
+            return parseFloat(String(v || 0).replace(/,/g, '')) || 0;
+        };
+
+        c.initialDebt = pNum(getVal('initialDebt'));
+        c.outstanding = pNum(getVal('outstanding'));
+        c.balance_2020_2025 = pNum(getVal('balance_2020_2025') || getVal('balance20202025'));
+        c.balance_2019_2020 = pNum(getVal('balance_2019_2020') || getVal('balance20192020'));
+        c.balance_lte_2018 = pNum(getVal('balance_lte_2018') || getVal('balancelte2018'));
+        
+        // GPS
+        c.latitude = pNum(getVal('latitude'));
+        c.longitude = pNum(getVal('longitude'));
+        if (c.latitude === 0) {
+            const mock = App.Geo.getMockCoordinates(c.accountNo);
+            c.latitude = mock.lat; c.longitude = mock.lng;
+        }
+
+        c.debtSince = getVal('debtSince') || new Date().toISOString().slice(0, 10);
+        c.customerStatus = getVal('customerStatus') || 'Collectors';
+        c.agingCategory = App.Helpers.calculateAgingCategory(c.debtSince);
+        
+        // Tags (Handle JSON string or Array)
+        let tags = getVal('tags');
+        if (typeof tags === 'string') {
+            try { tags = JSON.parse(tags); } catch(e) { tags = []; }
+        }
+        c.tags = Array.isArray(tags) ? tags : [];
+
+        return c;
+    },
 
     get(key) { return this.cache[key] || []; },
 
     set(key, data) {
-        // 1. Optimistic Update (Instant)
         this.cache[key] = data;
-        
-        // 2. Set Status to "Syncing"
         this.pendingSyncs++;
         App.UI.updateCloudStatus('syncing');
 
-        // 3. Sync to Cloud
         fetch(this.apiUrl, {
             method: 'POST',
             mode: 'no-cors',
@@ -1095,35 +1172,17 @@ Object.assign(App.DB, {
             body: JSON.stringify({ table: key, data: data })
         })
         .then(() => {
-            // Decrement pending count safely
             this.pendingSyncs = Math.max(0, this.pendingSyncs - 1);
             if (this.pendingSyncs === 0) App.UI.updateCloudStatus('saved');
         })
         .catch(err => {
-            console.warn(`Failed to sync ${key}:`, err);
+            console.error(err);
             this.pendingSyncs = Math.max(0, this.pendingSyncs - 1);
             App.UI.updateCloudStatus('error');
         });
     },
 
-    runMigrations() {
-        const dataModelVersion = parseInt(localStorage.getItem('dataModelVersion') || '1');
-        let updated = false;
-        let customers = this.get('customers');
-        customers.forEach(c => {
-            if (!c.tags) { c.tags = []; updated = true; }
-            if (c.email === undefined) { c.email = ''; updated = true; }
-            if (c.mobile === undefined) { c.mobile = ''; updated = true; }
-            if (c.balance_2020_2025 === undefined) { c.balance_2020_2025 = 0; updated = true; }
-            if (c.balance_2019_2020 === undefined) { c.balance_2019_2020 = 0; updated = true; }
-            if (c.balance_lte_2018 === undefined) { c.balance_lte_2018 = c.outstanding || 0; updated = true; }
-            if (c.latitude === undefined) { 
-                const coords = App.Geo.getMockCoordinates(c.accountNo);
-                c.latitude = coords.lat; c.longitude = coords.lng; updated = true;
-            }
-        });
-        if(updated) this.set('customers', customers);
-    }
+    runMigrations() {}
 });
 
 Object.assign(App.UI, { 
