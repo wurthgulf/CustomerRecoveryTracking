@@ -761,6 +761,27 @@
         display: flex;
         align-items: center;
     }
+	
+	/* 1. Force the container holding the dropdown to be on top of everything */
+	.card-header, 
+	.card-tools, 
+	.d-flex.justify-content-between,
+	.toolbar-container {
+		position: relative !important;
+		z-index: 2000 !important; /* Higher than the sticky header */
+		overflow: visible !important;
+	}
+
+	/* 2. Ensure the dropdown itself is high up */
+	.dropdown-menu {
+		z-index: 3000 !important;
+	}
+
+	/* 3. Lower the sticky table header slightly so it sits behind the dropdown */
+	thead.sticky-top th,
+	th.sticky-top {
+		z-index: 100 !important; /* Must be lower than 2000 */
+	}
 
 </style>
 
@@ -1095,15 +1116,16 @@ Object.assign(App.DB, {
     }, 
 
     // --- SMART NORMALIZER (Fixed for String IDs) ---
+    // --- UNIVERSAL FIX: Finds Status in ANY column and ACCEPTS IT ---
     normalizeCustomer(row) {
         if (!row) return {};
         
-        // This function hunts for the value using fuzzy matching
+        // Helper to find value regardless of spaces, underscores, or casing in headers
         const find = (targets) => {
             const keys = Object.keys(row);
             for (let t of targets) {
-                if (row[t] !== undefined) return row[t];
-                const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g,'') === t.toLowerCase().replace(/[^a-z0-9]/g,''));
+                const normalizedTarget = t.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const match = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedTarget);
                 if (match) return row[match];
             }
             return undefined;
@@ -1114,28 +1136,36 @@ Object.assign(App.DB, {
             return parseFloat(String(v || 0).replace(/[^0-9.-]/g, '')) || 0;
         };
 
+        // Priority header check
+        let rawCustStatus = find(['customerStatus', 'Customer Bucket', 'Segment']);
+        let rawAccStatus = find(['status', 'Account Status']) || 'Active';
+
+        // Fix logic: If data is in the wrong column, swap them
+        if (!rawCustStatus && (String(rawAccStatus).includes('Sales') || String(rawAccStatus).includes('Month'))) {
+            rawCustStatus = rawAccStatus;
+            rawAccStatus = 'Active'; 
+        }
+
         return {
-            // FIX: Force String() here to ensure Action Buttons work
-            accountNo: String(find(['accountNo', 'accountNumber', 'Account Number']) || 'UNKNOWN'),
-            companyName: find(['companyName', 'Company Name']) || 'Unknown',
+            accountNo: String(find(['accountNo', 'accountNumber', 'Code']) || 'UNKNOWN'),
+            companyName: find(['companyName', 'Name', 'Customer']) || 'Unknown',
             email: find(['email']) || '',
-            mobile: find(['mobile']) || '',
-            emirate: find(['emirate']) || 'Dubai',
-            area: find(['area']) || '',
-            status: find(['status']) || 'Active',
-            paymentStatus: find(['paymentStatus', 'Payment Status']) || 'Negotiation',
-            salesConsultantId: find(['salesConsultantId', 'salesConsultant']),
-            
-            initialDebt: pNum(find(['initialDebt', 'Initial Debt'])),
-            outstanding: pNum(find(['outstanding', 'Outstanding'])),
-            balance_2020_2025: pNum(find(['balance_2020_2025', 'balance20202025', 'balance2020_2025'])),
-            balance_2019_2020: pNum(find(['balance_2019_2020', 'balance20192020', 'balance2019_2020'])),
-            balance_lte_2018: pNum(find(['balance_lte_2018', 'balancelte2018', 'balance_lte2018'])),
-            
-            latitude: pNum(find(['latitude'])),
-            longitude: pNum(find(['longitude'])),
-            debtSince: find(['debtSince']) || new Date().toISOString().slice(0, 10),
-            customerStatus: find(['customerStatus']) || 'Collectors',
+            mobile: find(['mobile', 'Phone']) || '',
+            emirate: find(['emirate', 'City']) || 'Dubai',
+            area: find(['area', 'Location']) || '',
+            status: rawAccStatus, 
+            paymentStatus: find(['paymentStatus']) || 'Negotiation',
+            salesConsultantId: find(['salesConsultantId', 'salesConsultant', 'Sales Rep']),
+            initialDebt: pNum(find(['initialDebt'])),
+            // Map aging buckets exactly as per your CSV
+            balance_2020_2025: pNum(find(['balance2020_2025', 'balance20202025'])),
+            balance_2019_2020: pNum(find(['balance2019_2020', 'balance20192020'])),
+            balance_lte_2018: pNum(find(['balance_lte_2018', 'balancelte2018'])),
+            outstanding: pNum(find(['outstanding', 'balance', 'Total Due'])),
+            latitude: pNum(find(['latitude', 'lat'])),
+            longitude: pNum(find(['longitude', 'lng'])),
+            debtSince: find(['debtSince', 'Date']) || new Date().toISOString().slice(0, 10),
+            customerStatus: rawCustStatus || 'Collectors', // Final fallback
             agingCategory: App.Helpers.calculateAgingCategory(find(['debtSince'])),
             tags: [] 
         };
@@ -2129,6 +2159,7 @@ Object.assign(App.UI, {
         }
     }
 });
+
 </script>
 <script>
 Object.assign(App.Dashboard, { 
@@ -6610,10 +6641,68 @@ Object.assign(App.Import, {
         if (!file || this.isProcessing) return;
         document.getElementById('csv-filename').textContent = file.name;
         this.resetUI(); this.updateProgress(5, "Reading..."); this.isProcessing = true;
+        
         const reader = new FileReader(); 
-        reader.onload = (e) => setTimeout(() => { try { this.processCSV(e.target.result); } catch (err) { this.log("Crash: " + err.message); this.isProcessing = false; } }, 100);
+        reader.onload = (e) => {
+            const lines = e.target.result.split(/\r\n|\n/);
+            if (lines.length < 2) return;
+
+            // Smart Header Mapping: Removes spaces and underscores for comparison
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+            const getCol = (names) => {
+                for(let n of names) {
+                    let idx = headers.indexOf(n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    if(idx > -1) return idx;
+                }
+                return -1;
+            };
+
+            const colMap = {
+                accountNo: getCol(['accountNumber', 'accountNo']),
+                name: getCol(['companyName', 'name']),
+                custStatus: getCol(['customerStatus', 'bucket']), // This will now correctly find "customerStatus"
+                balance: getCol(['outstanding', 'balance']),
+                bal2025: getCol(['balance2020_2025']),
+                bal2020: getCol(['balance2019_2020']),
+                bal2018: getCol(['balance_lte_2018'])
+            };
+
+            const newCustomers = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Regex to handle commas inside quotes
+                
+                const rawStatus = row[colMap.custStatus]?.replace(/"/g, '').trim();
+                
+                // Construct the object
+                const customer = {
+                    accountNo: row[colMap.accountNo]?.replace(/"/g, ''),
+                    companyName: row[colMap.name]?.replace(/"/g, ''),
+                    customerStatus: rawStatus || 'Collectors' // Force the value from CSV
+                };
+
+                // Apply fuzzy normalization to fill other fields
+                let normalized = App.DB.normalizeCustomer(Object.fromEntries(headers.map((h, j) => [h, row[j]])));
+                
+                // Final hard override to ensure CSV value wins
+                if (rawStatus) normalized.customerStatus = rawStatus;
+
+                newCustomers.push(normalized);
+            }
+
+            if (newCustomers.length > 0) {
+                let current = App.DB.get('customers');
+                newCustomers.forEach(nc => {
+                    const idx = current.findIndex(c => c.accountNo === nc.accountNo);
+                    if (idx > -1) current[idx] = nc; else current.push(nc);
+                });
+                App.DB.set('customers', current);
+                App.UI.toast(`Imported ${newCustomers.length} customers successfully.`);
+                App.UI.closeModal('import-csv-modal');
+                setTimeout(() => location.reload(), 800);
+            }
+        };
         reader.readAsText(file);
-        document.getElementById('csv-file-input').value = '';
     },
 
     resetUI() {
