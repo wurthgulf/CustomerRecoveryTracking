@@ -6640,67 +6640,122 @@ Object.assign(App.Import, {
     handleFileSelect: function(file) {
         if (!file || this.isProcessing) return;
         document.getElementById('csv-filename').textContent = file.name;
-        this.resetUI(); this.updateProgress(5, "Reading..."); this.isProcessing = true;
+        this.resetUI(); 
+        this.updateProgress(5, "Processing..."); 
+        this.isProcessing = true;
         
         const reader = new FileReader(); 
         reader.onload = (e) => {
             const lines = e.target.result.split(/\r\n|\n/);
-            if (lines.length < 2) return;
+            if (lines.length < 2) {
+                this.isProcessing = false;
+                return;
+            }
 
-            // Smart Header Mapping: Removes spaces and underscores for comparison
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
-            const getCol = (names) => {
+            // 1. Map Headers (Standardize names by removing spaces and casing)
+            const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+            const getColIdx = (names) => {
                 for(let n of names) {
-                    let idx = headers.indexOf(n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    let idx = rawHeaders.indexOf(n.toLowerCase().replace(/[^a-z0-9]/g, ''));
                     if(idx > -1) return idx;
                 }
                 return -1;
             };
 
             const colMap = {
-                accountNo: getCol(['accountNumber', 'accountNo']),
-                name: getCol(['companyName', 'name']),
-                custStatus: getCol(['customerStatus', 'bucket']), // This will now correctly find "customerStatus"
-                balance: getCol(['outstanding', 'balance']),
-                bal2025: getCol(['balance2020_2025']),
-                bal2020: getCol(['balance2019_2020']),
-                bal2018: getCol(['balance_lte_2018'])
+                accountNo: getColIdx(['accountNumber', 'accountNo']),
+                companyName: getColIdx(['companyName', 'name']),
+                consultantName: getColIdx(['salesConsultant', 'consultant']),
+                custStatus: getColIdx(['customerStatus', 'bucket']),
+                bal2025: getColIdx(['balance2020_2025', '2020-2025']),
+                bal2020: getColIdx(['balance2019_2020', '2019-2020']),
+                bal2018: getColIdx(['balance_lte_2018', '<=2018']),
+                initial: getColIdx(['initialDebt'])
             };
 
+            // 2. Load Existing Data
+            let allConsultants = App.DB.get('consultants');
+            let currentCustomers = App.DB.get('customers');
             const newCustomers = [];
+            let consultantsUpdated = false;
+
+            // Helper to clean numbers like "199,859.49"
+            const parseNum = (val) => {
+                if (!val) return 0;
+                return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
+            };
+
+            // 3. Process Rows
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i].trim()) continue;
-                const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Regex to handle commas inside quotes
+                // Regex handles commas inside quotes correctly
+                const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/"/g, '').trim());
+
+                // Handle Consultant Auto-Creation
+                const rawConsultantName = row[colMap.consultantName] || "Unassigned";
+                let consultant = allConsultants.find(c => c.name.toLowerCase() === rawConsultantName.toLowerCase());
                 
-                const rawStatus = row[colMap.custStatus]?.replace(/"/g, '').trim();
-                
-                // Construct the object
-                const customer = {
-                    accountNo: row[colMap.accountNo]?.replace(/"/g, ''),
-                    companyName: row[colMap.name]?.replace(/"/g, ''),
-                    customerStatus: rawStatus || 'Collectors' // Force the value from CSV
+                if (!consultant && rawConsultantName !== "Unassigned") {
+                    consultant = { id: Date.now() + i, name: rawConsultantName };
+                    allConsultants.push(consultant);
+                    consultantsUpdated = true;
+                }
+
+                const accNo = row[colMap.accountNo];
+                const b25 = parseNum(row[colMap.bal2025]);
+                const b20 = parseNum(row[colMap.bal2020]);
+                const b18 = parseNum(row[colMap.bal2018]);
+
+                const customerObj = {
+                    accountNo: accNo,
+                    companyName: row[colMap.companyName] || 'Unknown',
+                    salesConsultantId: consultant ? consultant.id : null,
+                    customerStatus: row[colMap.custStatus] || 'Collectors',
+                    initialDebt: parseNum(row[colMap.initial]),
+                    balance_2020_2025: b25,
+                    balance_2019_2020: b20,
+                    balance_lte_2018: b18,
+                    outstanding: b25 + b20 + b18, // Auto-calculate total
+                    status: 'Active',
+                    paymentStatus: 'Negotiation',
+                    tags: [],
+                    lastUpdated: new Date().toISOString()
                 };
 
-                // Apply fuzzy normalization to fill other fields
-                let normalized = App.DB.normalizeCustomer(Object.fromEntries(headers.map((h, j) => [h, row[j]])));
-                
-                // Final hard override to ensure CSV value wins
-                if (rawStatus) normalized.customerStatus = rawStatus;
+                // Apply logic for aging category based on debtSince if available
+                const debtSinceIdx = getColIdx(['debtSince']);
+                if (debtSinceIdx > -1) {
+                    customerObj.debtSince = row[debtSinceIdx];
+                    customerObj.agingCategory = App.Helpers.calculateAgingCategory(row[debtSinceIdx]);
+                }
 
-                newCustomers.push(normalized);
+                newCustomers.push(customerObj);
             }
 
-            if (newCustomers.length > 0) {
-                let current = App.DB.get('customers');
-                newCustomers.forEach(nc => {
-                    const idx = current.findIndex(c => c.accountNo === nc.accountNo);
-                    if (idx > -1) current[idx] = nc; else current.push(nc);
-                });
-                App.DB.set('customers', current);
-                App.UI.toast(`Imported ${newCustomers.length} customers successfully.`);
-                App.UI.closeModal('import-csv-modal');
-                setTimeout(() => location.reload(), 800);
-            }
+            // 4. Save and Sync
+            if (consultantsUpdated) App.DB.set('consultants', allConsultants);
+
+            newCustomers.forEach(nc => {
+                const idx = currentCustomers.findIndex(c => c.accountNo === nc.accountNo);
+                if (idx > -1) {
+                    currentCustomers[idx] = { ...currentCustomers[idx], ...nc };
+                } else {
+                    currentCustomers.push(nc);
+                }
+            });
+
+            App.DB.set('customers', currentCustomers);
+            this.updateProgress(100, "Done");
+            
+            App.UI.toast(`Imported ${newCustomers.length} records. New consultants created if any.`);
+            App.UI.closeModal('import-csv-modal');
+            this.isProcessing = false;
+            
+            // Refresh views
+            setTimeout(() => {
+                App.Customers.render();
+                if(App.state.activePage === 'dashboard') App.Dashboard.render();
+            }, 500);
         };
         reader.readAsText(file);
     },
