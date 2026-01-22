@@ -995,20 +995,31 @@ const App = {
 };
 
 Object.assign(App.Auth, { 
-    login(u, p) { 
+    async login(u, p) { 
+        // 1. Force a fresh data pull from the sheet before checking credentials
+        // This ensures we have the correct assignedConsultantId from the Admin
+        App.UI.toggleLoading(true, "Verifying Credentials...");
+        await App.DB.initialize(); 
+        
         const users = App.DB.get('users');
         const encodedP = btoa(p); 
         const userIndex = users.findIndex(user => user.username === u && user.password === encodedP); 
+        
         if (userIndex > -1) { 
             const user = users[userIndex];
             user.lastLogin = Date.now();
+            
+            // Save the updated lastLogin to the cloud while preserving the consultant ID
             App.DB.set('users', users);
+            
             App.state.currentUser = user; 
             sessionStorage.setItem('user', JSON.stringify(App.state.currentUser)); 
             App.UI.showApp(); 
-            this.setupAutoLogout(); // <--- Start the timer on login
+            this.setupAutoLogout();
+            App.UI.toggleLoading(false);
             return true; 
         } 
+        App.UI.toggleLoading(false);
         return false; 
     }, 
     logout() { 
@@ -1698,12 +1709,16 @@ Object.assign(App.UI, {
         const overlay = document.getElementById('sidebar-overlay');
         const hamburger = document.getElementById('hamburger-menu');
 
-        document.getElementById('login-form').addEventListener('submit', (e) => {
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const loginError = document.getElementById('login-error');
             loginError.classList.remove('show');
             const u = e.target.username.value, p = e.target.password.value;
-            if (!App.Auth.login(u, p)) {
+            
+            // Note the added 'await' here
+            const success = await App.Auth.login(u, p);
+            
+            if (!success) {
                 setTimeout(() => loginError.classList.add('show'), 50);
             }
         }); 
@@ -6638,127 +6653,111 @@ Object.assign(App.Import, {
     }, 
     
     handleFileSelect: function(file) {
-        if (!file || this.isProcessing) return;
-        document.getElementById('csv-filename').textContent = file.name;
-        this.resetUI(); 
-        this.updateProgress(5, "Processing..."); 
-        this.isProcessing = true;
+    if (!file || this.isProcessing) return;
+    document.getElementById('csv-filename').textContent = file.name;
+    this.resetUI(); 
+    this.updateProgress(5, "Syncing..."); 
+    this.isProcessing = true;
+    
+    const reader = new FileReader(); 
+    reader.onload = async (e) => {
+        // 1. FORCE a fresh fetch from the server before processing
+        // This ensures we have the LATEST consultant IDs in memory
+        await App.DB.initialize(); 
         
-        const reader = new FileReader(); 
-        reader.onload = (e) => {
-            const lines = e.target.result.split(/\r\n|\n/);
-            if (lines.length < 2) {
-                this.isProcessing = false;
-                return;
+        const lines = e.target.result.split(/\r\n|\n/);
+        const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+        
+        const getColIdx = (names) => {
+            for(let n of names) {
+                let idx = rawHeaders.indexOf(n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                if(idx > -1) return idx;
             }
-
-            // 1. Map Headers (Standardize names by removing spaces and casing)
-            const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
-            const getColIdx = (names) => {
-                for(let n of names) {
-                    let idx = rawHeaders.indexOf(n.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                    if(idx > -1) return idx;
-                }
-                return -1;
-            };
-
-            const colMap = {
-                accountNo: getColIdx(['accountNumber', 'accountNo']),
-                companyName: getColIdx(['companyName', 'name']),
-                consultantName: getColIdx(['salesConsultant', 'consultant']),
-                custStatus: getColIdx(['customerStatus', 'bucket']),
-                bal2025: getColIdx(['balance2020_2025', '2020-2025']),
-                bal2020: getColIdx(['balance2019_2020', '2019-2020']),
-                bal2018: getColIdx(['balance_lte_2018', '<=2018']),
-                initial: getColIdx(['initialDebt'])
-            };
-
-            // 2. Load Existing Data
-            let allConsultants = App.DB.get('consultants');
-            let currentCustomers = App.DB.get('customers');
-            const newCustomers = [];
-            let consultantsUpdated = false;
-
-            // Helper to clean numbers like "199,859.49"
-            const parseNum = (val) => {
-                if (!val) return 0;
-                return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
-            };
-
-            // 3. Process Rows
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                // Regex handles commas inside quotes correctly
-                const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/"/g, '').trim());
-
-                // Handle Consultant Auto-Creation
-                const rawConsultantName = row[colMap.consultantName] || "Unassigned";
-                let consultant = allConsultants.find(c => c.name.toLowerCase() === rawConsultantName.toLowerCase());
-                
-                if (!consultant && rawConsultantName !== "Unassigned") {
-                    consultant = { id: Date.now() + i, name: rawConsultantName };
-                    allConsultants.push(consultant);
-                    consultantsUpdated = true;
-                }
-
-                const accNo = row[colMap.accountNo];
-                const b25 = parseNum(row[colMap.bal2025]);
-                const b20 = parseNum(row[colMap.bal2020]);
-                const b18 = parseNum(row[colMap.bal2018]);
-
-                const customerObj = {
-                    accountNo: accNo,
-                    companyName: row[colMap.companyName] || 'Unknown',
-                    salesConsultantId: consultant ? consultant.id : null,
-                    customerStatus: row[colMap.custStatus] || 'Collectors',
-                    initialDebt: parseNum(row[colMap.initial]),
-                    balance_2020_2025: b25,
-                    balance_2019_2020: b20,
-                    balance_lte_2018: b18,
-                    outstanding: b25 + b20 + b18, // Auto-calculate total
-                    status: 'Active',
-                    paymentStatus: 'Negotiation',
-                    tags: [],
-                    lastUpdated: new Date().toISOString()
-                };
-
-                // Apply logic for aging category based on debtSince if available
-                const debtSinceIdx = getColIdx(['debtSince']);
-                if (debtSinceIdx > -1) {
-                    customerObj.debtSince = row[debtSinceIdx];
-                    customerObj.agingCategory = App.Helpers.calculateAgingCategory(row[debtSinceIdx]);
-                }
-
-                newCustomers.push(customerObj);
-            }
-
-            // 4. Save and Sync
-            if (consultantsUpdated) App.DB.set('consultants', allConsultants);
-
-            newCustomers.forEach(nc => {
-                const idx = currentCustomers.findIndex(c => c.accountNo === nc.accountNo);
-                if (idx > -1) {
-                    currentCustomers[idx] = { ...currentCustomers[idx], ...nc };
-                } else {
-                    currentCustomers.push(nc);
-                }
-            });
-
-            App.DB.set('customers', currentCustomers);
-            this.updateProgress(100, "Done");
-            
-            App.UI.toast(`Imported ${newCustomers.length} records. New consultants created if any.`);
-            App.UI.closeModal('import-csv-modal');
-            this.isProcessing = false;
-            
-            // Refresh views
-            setTimeout(() => {
-                App.Customers.render();
-                if(App.state.activePage === 'dashboard') App.Dashboard.render();
-            }, 500);
+            return -1;
         };
-        reader.readAsText(file);
-    },
+
+        const colMap = {
+            accountNo: getColIdx(['accountNumber', 'accountNo']),
+            companyName: getColIdx(['companyName', 'name']),
+            consultantName: getColIdx(['salesConsultant', 'consultant']),
+            bal2025: getColIdx(['balance2020_2025']),
+            bal2020: getColIdx(['balance2019_2020']),
+            bal18: getColIdx(['balance_lte_2018']),
+            initial: getColIdx(['initialDebt']),
+            custStatus: getColIdx(['customerStatus'])
+        };
+
+        let allConsultants = App.DB.get('consultants');
+        let currentCustomers = App.DB.get('customers');
+        const newCustomers = [];
+        let consultantsUpdated = false;
+
+        const parseNum = (val) => parseFloat(String(val || 0).replace(/[^0-9.-]/g, '')) || 0;
+
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/"/g, '').trim());
+
+            // --- THE CRITICAL FIX: AGGRESSIVE MATCHING ---
+            const rawName = (row[colMap.consultantName] || "Unassigned").trim();
+            
+            // Normalize name: lowercase and remove all double spaces
+            const normalizedImportName = rawName.toLowerCase().replace(/\s+/g, ' ');
+
+            let consultant = allConsultants.find(c => 
+                c.name.trim().toLowerCase().replace(/\s+/g, ' ') === normalizedImportName
+            );
+            
+            if (!consultant && rawName !== "Unassigned" && rawName !== "") {
+                // Truly a new person
+                consultant = { id: Date.now() + i, name: rawName };
+                allConsultants.push(consultant);
+                consultantsUpdated = true;
+                console.log("New Consultant Created:", rawName);
+            }
+
+            const b25 = parseNum(row[colMap.bal2025]), b20 = parseNum(row[colMap.bal2020]), b18 = parseNum(row[colMap.bal18]);
+            
+            newCustomers.push({
+                accountNo: row[colMap.accountNo],
+                companyName: row[colMap.companyName] || 'Unknown',
+                salesConsultantId: consultant ? consultant.id : null,
+                customerStatus: row[colMap.custStatus] || 'Collectors',
+                initialDebt: parseNum(row[colMap.initial]),
+                balance_2020_2025: b25, 
+                balance_2019_2020: b20, 
+                balance_lte_2018: b18,
+                outstanding: b25 + b20 + b18,
+                status: 'Active', 
+                paymentStatus: 'Negotiation', 
+                tags: []
+            });
+        }
+
+        // 2. Only save consultants if we actually added someone new
+        if (consultantsUpdated) {
+            App.DB.set('consultants', allConsultants);
+        }
+
+        newCustomers.forEach(nc => {
+            const idx = currentCustomers.findIndex(c => c.accountNo === nc.accountNo);
+            if (idx > -1) currentCustomers[idx] = {...currentCustomers[idx], ...nc};
+            else currentCustomers.push(nc);
+        });
+
+        // 3. Save customers
+        App.DB.set('customers', currentCustomers);
+        
+        this.updateProgress(100, "Done");
+        App.UI.toast("Import Successful. IDs were preserved.");
+        App.UI.closeModal('import-csv-modal');
+        this.isProcessing = false;
+
+        // 4. RELOAD the app to ensure the User ID mapping is refreshed in the browser
+        setTimeout(() => location.reload(), 1500);
+    };
+    reader.readAsText(file);
+	},
 
     resetUI() {
         document.getElementById('import-progress-container').classList.remove('hidden');
