@@ -87,74 +87,85 @@
     .page { display: none; } .page.active { display: block; animation: fadeIn 0.5s ease-in-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     /* --- Tablet & iPad Optimized Layout --- */
-    @media (max-width: 1180px) {
+      @media (max-width: 1180px) {
         .app-container { 
-            grid-template-columns: 80px 1fr; /* Slim sidebar by default on iPad */
-        }
-        .sidebar .logo-text, .sidebar .nav-text, .sidebar-heading { 
-            display: none; 
-        }
-        .sidebar .nav-link { 
-            justify-content: center; 
-            padding: var(--spacing-4);
-        }
-        .sidebar:hover {
-            width: 250px; /* Expand on hover/touch hold */
-            position: absolute;
-            height: 100%;
-            z-index: 1001;
-            box-shadow: var(--shadow-lg);
-        }
-        .sidebar:hover .logo-text, .sidebar:hover .nav-text, .sidebar:hover .sidebar-heading {
-            display: inline;
+            grid-template-columns: 80px 1fr !important; /* Maintain distinct columns */
+            overflow: hidden;
         }
 
-        /* Fix the Toolbar crowding seen in your screenshot */
-        #customers-page .card-header .d-flex.gap-2.flex-wrap {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr; /* Split into two columns */
+        .sidebar {
+            width: 80px !important;
+            z-index: 2000 !important; /* Force sidebar to stay on TOP layer */
+            position: relative;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* Hide text labels on iPad to save space, show only icons */
+        .sidebar .logo-text, 
+        .sidebar .nav-text, 
+        .sidebar-heading { 
+            display: none !important; 
+        }
+
+        /* Center the icons in the sidebar */
+        .nav-link {
+            justify-content: center !important;
+            padding: 15px 0 !important;
+        }
+
+        .nav-link i {
+            font-size: 1.4rem;
+            margin: 0 !important;
+        }
+
+        /* Fix the Overlapping Buttons & Filters */
+        .card-header, 
+        .d-flex.gap-2.flex-wrap,
+        #list-view-controls {
+            display: flex !important;
+            flex-direction: column !important; /* Stack items vertically on iPad */
+            align-items: flex-start !important;
             gap: 15px !important;
-            width: 100%;
         }
 
-        /* Make search bars wider on iPad */
-        .input-with-icon, .form-control {
+        /* Make search bars and dropdowns full width so they don't crowd each other */
+        .input-with-icon, 
+        .form-control, 
+        .btn-group {
             width: 100% !important;
-            min-height: 48px; /* Bigger touch target */
         }
 
-        /* Group the action buttons (Export, Add, etc.) at the bottom */
-        [data-role="admin"].d-flex.gap-2 {
-            grid-column: 1 / -1; /* Take full width */
-            justify-content: space-between;
+        /* Ensure the main content doesn't slide under the sidebar */
+        .main-content {
+            width: auto;
+            padding: 15px !important;
+            overflow-x: hidden;
         }
 
-        /* Table Optimization */
-        .table-container {
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 80px; /* Space for the FAB button */
+        /* Fix the 'Today/Tomorrow' date filter overlap */
+        .d-flex.gap-2.align-items-center.flex-wrap {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
+            gap: 10px;
         }
         
-        .data-table th, .data-table td {
-            padding: 12px 8px; /* Slightly more compact for small screens */
-            font-size: 0.9rem;
+        /* Floating Action Button (Red +) Fix */
+        .fab-container {
+            bottom: 20px !important;
+            right: 20px !important;
+            z-index: 3000 !important;
         }
     }
 
-    /* --- Floating Action Button (FAB) iPad Fix --- */
-    .fab-container {
-        bottom: 30px !important;
-        right: 30px !important;
-    }
-
-    /* Fix touch targets for dropdowns and buttons */
-    .btn, .form-control, .nav-link {
-        min-height: 48px; 
-    }
-    
-    /* Ensure the table doesn't get cut off */
-    .main-content {
-        padding: 15px !important;
+    /* Fix for the Top Header on iPad */
+    @media (max-width: 1180px) {
+        .main-header {
+            padding: 10px 15px !important;
+        }
+        #username-display {
+            display: none; /* Hide name on iPad to save space */
+        }
     }
     @media (max-width: 768px) { .app-container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; } .sidebar { position: fixed; top: 0; left: 0; height: 100%; transform: translateX(-100%); box-shadow: var(--shadow); } .sidebar.open { transform: translateX(0); } .sidebar .logo-text, .sidebar .nav-text, .sidebar-heading { display: inline; } .sidebar .nav-link { justify-content: flex-start; } .hamburger { display: block !important; } }
     
