@@ -7334,63 +7334,60 @@ Object.assign(App.Performance, {
         const visits = App.DB.get('visits');
 
         const rankedConsultants = consultants.map(c => {
-            // A. Base Metrics
-            const myCustomers = customers.filter(cust => cust.salesConsultantId === c.id).map(cust => cust.accountNo);
-            const paymentsInMonth = payments.filter(p => myCustomers.includes(p.customerId) && p.status === 'Completed' && p.date.startsWith(currentMonthStr));
+            // FIX: Force customer IDs to strings for matching
+            const myCustomers = customers.filter(cust => String(cust.salesConsultantId) === String(c.id)).map(cust => String(cust.accountNo));
+            
+            // FIX: Check payments using string comparison
+            const paymentsInMonth = payments.filter(p => 
+                myCustomers.includes(String(p.customerId)) && 
+                p.status === 'Completed' && 
+                p.date.startsWith(currentMonthStr)
+            );
+            
             const collected = paymentsInMonth.reduce((sum, p) => sum + p.amount, 0);
-            const visitCount = visits.filter(v => v.collectorId === c.id && v.status === 'Completed' && v.dateTime.startsWith(currentMonthStr)).length;
-            const overdueCount = visits.filter(v => v.collectorId === c.id && v.status === 'Overdue').length;
             
-            // B. Badge Logic
-            const badges = [];
-            
-            // 🦈 Shark: High Collector (> 100k)
-            if (collected >= 100000) {
-                badges.push({ icon: 'fa-shark', color: '#0dcaf0', title: 'The Shark (High Value Collector)' });
-            }
-            
-            // 🛡️ Guardian: Clean Slate (No Overdue)
-            if (overdueCount === 0 && myCustomers.length > 0) {
-                badges.push({ icon: 'fa-shield-alt', color: '#10b981', title: 'Guardian (Zero Overdue Tasks)' });
-            }
+            // FIX: Check visits using string comparison
+            const visitCount = visits.filter(v => 
+                String(v.collectorId) === String(c.id) && 
+                v.status === 'Completed' && 
+                v.dateTime.startsWith(currentMonthStr)
+            ).length;
 
-            // 🔥 On Fire: Recent Activity (Collection in last 48 hours)
+            const overdueCount = visits.filter(v => 
+                String(v.collectorId) === String(c.id) && 
+                v.status === 'Overdue'
+            ).length;
+            
+            const badges = [];
+            if (collected >= 100000) badges.push({ icon: 'fa-shark', color: '#0dcaf0', title: 'The Shark (High Value Collector)' });
+            if (overdueCount === 0 && myCustomers.length > 0) badges.push({ icon: 'fa-shield-alt', color: '#10b981', title: 'Guardian (Zero Overdue Tasks)' });
+
             const twoDaysAgo = new Date();
             twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-            const hasRecentPayment = payments.some(p => myCustomers.includes(p.customerId) && p.status === 'Completed' && new Date(p.date) >= twoDaysAgo);
-            
-            if (hasRecentPayment) {
-                badges.push({ icon: 'fa-fire', color: '#fd7e14', title: 'On Fire (Active Streak)' });
-            }
+            const hasRecentPayment = payments.some(p => myCustomers.includes(String(p.customerId)) && p.status === 'Completed' && new Date(p.date) >= twoDaysAgo);
+            if (hasRecentPayment) badges.push({ icon: 'fa-fire', color: '#fd7e14', title: 'On Fire (Active Streak)' });
 
-            // C. Scoring
             const score = Math.floor((collected / 1000) + (visitCount * 10));
             return { ...c, collected, visitCount, score, badges };
         }).sort((a, b) => b.score - a.score);
 
         const topPerformer = rankedConsultants[0];
 
-        // 2. Build The Layout
         const layoutHTML = `
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-8);">
-                
                 <div class="card" style="background: linear-gradient(135deg, var(--dark) 0%, #212529 100%); color: white; border: none; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; min-height: 300px;">
                     <div style="font-size: var(--fs-sm); color: #ffd700; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: var(--spacing-4);">
                         <i class="fas fa-crown"></i> Top Performer
                     </div>
-                    
                     <div style="background: rgba(255, 255, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: var(--spacing-4); font-size: 2.5rem; color: #ffd700; border: 2px solid #ffd700;">
                         ${topPerformer.name.charAt(0)}
                     </div>
-
                     <div style="font-size: 2rem; font-weight: 800; margin-bottom: var(--spacing-2); text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                         ${topPerformer.name}
                     </div>
-                    
                     <div class="d-flex gap-2 mb-4">
                         ${topPerformer.badges.map(b => `<i class="fas ${b.icon}" style="color:${b.color}; font-size: 1.2rem;" title="${b.title}"></i>`).join('')}
                     </div>
-
                     <div style="display: flex; gap: var(--spacing-4); font-size: var(--fs-sm); color: #adb5bd; border-top: 1px solid rgba(255,255,255,0.1); padding-top: var(--spacing-4); width: 100%; justify-content: center;">
                         <div>
                             <div style="color: white; font-weight: 600;">${App.Helpers.formatCurrency(topPerformer.collected)}</div>
@@ -7403,7 +7400,6 @@ Object.assign(App.Performance, {
                         </div>
                     </div>
                 </div>
-
                 <div class="card" style="display: flex; flex-direction: column;">
                     <div class="card-header"><h3 class="card-title"><i class="fas fa-list-ol"></i> Leaderboard Ranking</h3></div>
                     <div class="table-container" style="flex-grow: 1;">
@@ -7413,13 +7409,8 @@ Object.assign(App.Performance, {
                                 ${rankedConsultants.map((c, i) => `
                                     <tr style="${i === 0 ? 'background-color: rgba(255, 215, 0, 0.05);' : ''}">
                                         <td><span style="font-weight:700; color: ${i === 0 ? '#d9a007' : 'var(--text-secondary)'};">#${i + 1}</span></td>
-                                        <td style="font-weight: 600;">
-                                            ${c.name} 
-                                            ${i === 0 ? '<i class="fas fa-crown" style="color: #ffd700; margin-left: 5px;"></i>' : ''}
-                                        </td>
-                                        <td>
-                                            ${c.badges.map(b => `<i class="fas ${b.icon}" style="color:${b.color}; margin-right:5px;" title="${b.title}"></i>`).join('')}
-                                        </td>
+                                        <td style="font-weight: 600;">${c.name} ${i === 0 ? '<i class="fas fa-crown" style="color: #ffd700; margin-left: 5px;"></i>' : ''}</td>
+                                        <td>${c.badges.map(b => `<i class="fas ${b.icon}" style="color:${b.color}; margin-right:5px;" title="${b.title}"></i>`).join('')}</td>
                                         <td><span class="status-badge" style="background: var(--dark); color: white; border: none;">${c.score}</span></td>
                                         <td>${App.Helpers.formatCurrency(c.collected)}</td>
                                     </tr>
@@ -7429,7 +7420,6 @@ Object.assign(App.Performance, {
                     </div>
                 </div>
             </div>
-
             <h3 class="card-title mb-4" style="border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-2);">Detailed Metrics</h3>
             <div class="performance-grid">
                 ${rankedConsultants.map(c => this.getConsultantCardHTML(c)).join('')}
@@ -7441,33 +7431,39 @@ Object.assign(App.Performance, {
     },
     getConsultantCardHTML(consultant) {
         const currentMonthStr = `${App.state.dashboardTimeFrame.year}-${(App.state.dashboardTimeFrame.month).toString().padStart(2, '0')}`;
-        const customers = App.DB.get('customers').filter(c => c.salesConsultantId === consultant.id);
-        const customerIds = customers.map(c => c.accountNo);
-        const paymentsInMonth = App.DB.get('payments').filter(p => customerIds.includes(p.customerId) && p.status === 'Completed' && p.date.startsWith(currentMonthStr));
-        const visits = App.DB.get('visits').filter(v => v.collectorId === consultant.id && v.dateTime.startsWith(currentMonthStr));
-        const forecast = App.DB.get('forecasts').find(f => f.consultantId === consultant.id && f.month === currentMonthStr) || {};
+        const customers = App.DB.get('customers').filter(c => String(c.salesConsultantId) === String(consultant.id));
+        const customerIds = customers.map(c => String(c.accountNo));
+        
+        // FIX: Match payments using string comparison
+        const paymentsInMonth = App.DB.get('payments').filter(p => 
+            customerIds.includes(String(p.customerId)) && 
+            p.status === 'Completed' && 
+            p.date.startsWith(currentMonthStr)
+        );
+        
+        // FIX: Match visits using string comparison
+        const visits = App.DB.get('visits').filter(v => 
+            String(v.collectorId) === String(consultant.id) && 
+            v.dateTime.startsWith(currentMonthStr)
+        );
+        
+        const forecast = App.DB.get('forecasts').find(f => String(f.consultantId) === String(consultant.id) && f.month === currentMonthStr) || {};
         const customerForecasts = App.DB.get('customerForecasts');
 
         const collectedAmount = paymentsInMonth.reduce((sum, p) => sum + p.amount, 0);
-        
-        // --- Overall Target ---
         const targetAmount = forecast.amount || 0;
         const targetPercentage = targetAmount > 0 ? ((collectedAmount / targetAmount) * 100).toFixed(0) : 0;
 
-        // --- Customer Forecast ---
-        const forecastAmount = customerForecasts.filter(f => f.month === currentMonthStr && customerIds.includes(f.accountNo)).reduce((sum, f) => sum + f.amount, 0);
+        const forecastAmount = customerForecasts.filter(f => f.month === currentMonthStr && customerIds.includes(String(f.accountNo))).reduce((sum, f) => sum + f.amount, 0);
         const forecastPercentage = forecastAmount > 0 ? ((collectedAmount / forecastAmount) * 100).toFixed(0) : 0;
 
-        // --- Status-wise Targets ---
         const customerStatuses = ['Collectors', 'Sales (Above 3 Months)', 'Sales (Above 360 Days)'];
         let statusProgressHTML = '';
         customerStatuses.forEach(status => {
             const key = `amount_${status.replace(/\s/g, '').replace(/[()+]/g, '')}`;
             const statusTarget = forecast[key] || 0;
-            
-            const customersInStatus = customers.filter(c => c.customerStatus === status).map(c => c.accountNo);
-            const collectedForStatus = paymentsInMonth.filter(p => customersInStatus.includes(p.customerId)).reduce((sum, p) => sum + p.amount, 0);
-            
+            const customersInStatus = customers.filter(c => c.customerStatus === status).map(c => String(c.accountNo));
+            const collectedForStatus = paymentsInMonth.filter(p => customersInStatus.includes(String(p.customerId))).reduce((sum, p) => sum + p.amount, 0);
             const percentage = statusTarget > 0 ? ((collectedForStatus / statusTarget) * 100).toFixed(0) : 0;
 
             statusProgressHTML += `
@@ -7481,7 +7477,6 @@ Object.assign(App.Performance, {
                 </div>`;
         });
         
-        // --- Outstanding Balances & Collected This Month Breakdown ---
         const balance_lte_2018 = customers.reduce((sum, c) => sum + (c.balance_lte_2018 || 0), 0);
         const collected_lte_2018 = paymentsInMonth.reduce((sum, p) => sum + (p.amount_lte_2018 || 0), 0);
         const initial_balance_lte_2018 = balance_lte_2018 + collected_lte_2018;
@@ -7505,7 +7500,7 @@ Object.assign(App.Performance, {
                 <div>
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span>Overall Monthly Target (${currentMonthStr})</span>
+                            <span>Monthly Target</span>
                             <span>${targetPercentage}%</span>
                         </div>
                         <div class="progress-bar"><div class="progress-bar-inner" data-width="${targetPercentage}"></div></div>
@@ -7513,44 +7508,30 @@ Object.assign(App.Performance, {
                     </div>
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span>Overall Customer Forecast (${currentMonthStr})</span>
+                            <span>Customer Forecast</span>
                             <span>${forecastPercentage}%</span>
                         </div>
                         <div class="progress-bar"><div class="progress-bar-inner" data-width="${forecastPercentage}" style="background-color: var(--warning);"></div></div>
                          <div class="text-right" style="font-size: var(--fs-sm); color: var(--text-secondary); text-align: right;">${App.Helpers.formatCurrency(collectedAmount)} of ${App.Helpers.formatCurrency(forecastAmount)}</div>
                     </div>
-                    
                     <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
-                    <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Status-wise Target Progress</h4>
                     ${statusProgressHTML}
-
                     <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
-                    <h4 class="card-title" style="font-size: var(--fs-base); margin-bottom: var(--spacing-4);">Collected This Month vs Initial Balance</h4>
                     <div class="detail-info-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--spacing-2);">
                          <div class="detail-info-card">
                             <div class="label"><=2018</div>
-                            <div class="breakdown-item">
-                                <span class="value">${App.Helpers.formatCurrency(collected_lte_2018)}</span>
-                                <span class="percentage">${perc_collected_lte_2018}%</span>
-                            </div>
+                            <div class="breakdown-item"><span class="value">${App.Helpers.formatCurrency(collected_lte_2018)}</span><span class="percentage">${perc_collected_lte_2018}%</span></div>
                         </div>
                          <div class="detail-info-card">
                             <div class="label">2019-2020</div>
-                            <div class="breakdown-item">
-                                <span class="value">${App.Helpers.formatCurrency(collected_2019_2020)}</span>
-                                <span class="percentage">${perc_collected_2019_2020}%</span>
-                            </div>
+                            <div class="breakdown-item"><span class="value">${App.Helpers.formatCurrency(collected_2019_2020)}</span><span class="percentage">${perc_collected_2019_2020}%</span></div>
                         </div>
                          <div class="detail-info-card">
                             <div class="label">2020-2025</div>
-                            <div class="breakdown-item">
-                                <span class="value">${App.Helpers.formatCurrency(collected_2020_2025)}</span>
-                                <span class="percentage">${perc_collected_2020_2025}%</span>
-                            </div>
+                            <div class="breakdown-item"><span class="value">${App.Helpers.formatCurrency(collected_2020_2025)}</span><span class="percentage">${perc_collected_2020_2025}%</span></div>
                         </div>
                     </div>
-
-                     <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
+                    <hr style="border-color: var(--border-color); margin: var(--spacing-4) 0;">
                     <div class="detail-info-grid" style="grid-template-columns: 1fr 1fr;">
                         <div class="detail-info-card"><div class="label">Visits This Month</div><div class="value">${visits.length}</div></div>
                         <div class="detail-info-card"><div class="label">Payments This Month</div><div class="value">${paymentsInMonth.length}</div></div>
@@ -7560,6 +7541,7 @@ Object.assign(App.Performance, {
         `;
     }
 });
+
 Object.assign(App.Geo, {
     // A mock geocoding service. Replace with a real API call.
     async geocodeAddress(addressString, accountNo) {
