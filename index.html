@@ -31,6 +31,13 @@
 
 
 <style>
+	
+	#upcoming-visits-tile:hover {
+    transform: translateY(-5px);
+    background-color: var(--bg-color);
+    border-color: var(--primary);
+    box-shadow: var(--shadow-lg);
+}
     :root {
         /* Wuerth Group Inspired Color Palette */
         --primary: #e2000f; /* Wuerth Red */
@@ -1314,7 +1321,46 @@ Object.assign(App.UI, {
         document.getElementById('customers-page').innerHTML = `<div class="kpi-card-grid" data-role="admin"><div class="kpi-card"><div class="title">Total Customers</div><div id="customer-kpi-total" class="value">0</div></div><div class="kpi-card"><div class="title">Total Outstanding</div><div id="customer-kpi-outstanding" class="value">0</div></div><div class="kpi-card"><div class="title">Active Accounts</div><div id="customer-kpi-active" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Manage Customers</h3><div class="d-flex gap-2 flex-wrap align-items-center"><div class="input-with-icon"><input type="search" id="customer-search" placeholder="Search customers..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear search"></i></div><div class="input-with-icon"><input type="search" id="customer-tag-filter" placeholder="Filter by tag..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon" title="Clear tag filter"></i></div><select id="customer-account-status-filter" class="form-control" style="width: auto;"><option value="all">All Account Status</option><option>Active</option><option>Inactive</option></select><select id="customer-status-filter" class="form-control" style="width: auto;"><option value="all">All Statuses</option><option>Collectors</option><option>Sales (Above 3 Months)</option><option>Sales (Above 360 Days)</option></select><div style="position: relative;"><button class="btn btn-outline" id="toggle-columns-btn"><i class="fas fa-columns"></i> Columns</button><div id="column-toggle-dropdown" class="column-toggle-dropdown"></div></div><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-customers-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-customers-pdf"><i class="fas fa-file-pdf"></i> PDF</button><button class="btn btn-outline" id="import-customer-btn"><i class="fas fa-upload"></i> Import</button><button class="btn btn-primary" id="add-customer-btn"><i class="fas fa-plus"></i> Add Customer</button><button class="btn btn-warning" id="bulk-update-btn"><i class="fas fa-edit"></i> Bulk Update</button></div></div></div><div class="table-container"><table class="data-table"><thead></thead><tbody id="customer-table-body"></tbody></table></div><div id="customers-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('users-page').innerHTML = `<div class="page-header"><h2 >User Management</h2><p >Home > Users</p></div><div class="card"><div class="card-header"><h3 class="card-title">User List</h3><button id="add-user-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add User</button></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="username">Username</th><th data-sort="fullName">Full Name</th><th data-sort="role">Role</th><th data-sort="assignedConsultantId">Assigned Consultant</th><th data-sort="department">Department</th><th data-sort="lastLogin">Last Login</th><th>Actions</th></tr></thead><tbody id="user-table-body"></tbody></table></div><div id="users-pagination" class="pagination-controls"></div></div>`; 
         document.getElementById('user-modal').innerHTML = `<div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h3 id="user-modal-title"></h3><button class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">&times;</button></div><form id="user-form"><input type="hidden" id="user-id-hidden"><div class="form-grid"><div class="form-group"><label for="username">Username*</label><input type="text" id="username" class="form-control" required></div><div class="form-group"><label for="fullName">Full Name*</label><input type="text" id="fullName" class="form-control" required></div></div><div class="form-group"><label for="password">Password*</label><input type="password" id="password" class="form-control" required></div><div class="form-group"><label for="department">Department</label><input type="text" id="department" class="form-control" placeholder="e.g., Collections"></div><div class="form-group"><label for="role">Role</label><select id="role" class="form-control"><option value="user">User</option><option value="admin">Admin</option></select></div><div class="form-group" id="assigned-consultant-group"><label for="assignedConsultantId">Assigned Sales Consultant</label><select id="assignedConsultantId" class="form-control"></select></div><div class="modal-footer"><button type="button" class="btn btn-outline" onclick="App.UI.closeModal('user-modal')">Cancel</button><button type="submit" class="btn btn-primary">Save User</button></div></form></div>`;
-        document.getElementById('dashboard-page').innerHTML = `<div id="admin-dashboard-wrapper" class="hidden"><div class="d-flex justify-content-between align-items-center mb-4 flex-wrap"><h2 class="page-header" style="margin-bottom: 0;">Admin Dashboard</h2><div class="d-flex gap-2 align-items-center"><label for="dashboard-month-select" style="margin-bottom:0;">Data for:</label><div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);"><select id="dashboard-month-select" class="form-control" style="width: auto;"></select><select id="dashboard-year-select" class="form-control" style="width: auto;"></select></div></div><div id="consultant-dashboard-header" class="hidden"></div><button id="toggle-dashboard-view-btn" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Switch to Chart View</button></div><div id="admin-dashboard-content"></div></div><div id="chart-dashboard-wrapper"><div id="attendance-controls" class="mb-4"></div><div id="todays-agenda" class="mb-4"></div><div id="priority-actions" class="mb-4"></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);"><div class="card"><div class="card-title">Total Customers</div><div id="stat-total-customers" class="value">0</div></div><div class="card"><div class="card-title">Total Outstanding</div><div id="stat-outstanding-debt" class="value">0</div></div><div class="card" id="user-dashboard-forecast-card"><div class="card-title">Total Forecast</div><div id="stat-total-forecast" class="value">0</div></div><div class="card"><div class="card-title">Recovered This Month</div><div id="stat-recovered-this-month" class="value">0</div></div><div class="card"><div class="card-title">Upcoming Visits</div><div id="stat-upcoming-visits" class="value">0</div></div></div><div id="recovery-progress-card" class="card mb-4"></div><div id="dashboard-bottom-content"></div></div>`; 
+        
+		document.getElementById('dashboard-page').innerHTML = `
+    <div id="admin-dashboard-wrapper" class="hidden">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+            <h2 class="page-header" style="margin-bottom: 0;">Admin Dashboard</h2>
+            <div class="d-flex gap-2 align-items-center">
+                <label for="dashboard-month-select" style="margin-bottom:0;">Data for:</label>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-2);">
+                    <select id="dashboard-month-select" class="form-control" style="width: auto;"></select>
+                    <select id="dashboard-year-select" class="form-control" style="width: auto;"></select>
+                </div>
+            </div>
+            <div id="consultant-dashboard-header" class="hidden"></div>
+            <button id="toggle-dashboard-view-btn" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Switch to Chart View</button>
+        </div>
+        <div id="admin-dashboard-content"></div>
+    </div>
+    <div id="chart-dashboard-wrapper">
+        <div id="attendance-controls" class="mb-4"></div>
+        <div id="todays-agenda" class="mb-4"></div>
+        <div id="priority-actions" class="mb-4"></div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-6); margin-bottom: var(--spacing-6);">
+            <div class="card"><div class="card-title">Total Customers</div><div id="stat-total-customers" class="value">0</div></div>
+            <div class="card"><div class="card-title">Total Outstanding</div><div id="stat-outstanding-debt" class="value">0</div></div>
+            <div class="card" id="user-dashboard-forecast-card"><div class="card-title">Total Forecast</div><div id="stat-total-forecast" class="value">0</div></div>
+            <div class="card"><div class="card-title">Recovered This Month</div><div id="stat-recovered-this-month" class="value">0</div></div>
+            
+            <!-- FIXED: UPCOMING VISITS TILE IS NOW CLICKABLE -->
+            <div class="card" id="upcoming-visits-tile" style="cursor: pointer; transition: all 0.2s ease;">
+                <div class="card-title">Upcoming Visits</div>
+                <div id="stat-upcoming-visits" class="value">0</div>
+                <div style="font-size: var(--fs-sm); color: var(--primary); margin-top: 8px; font-weight: 600;">
+                    View List <i class="fas fa-chevron-right" style="font-size: 0.7rem;"></i>
+                </div>
+            </div>
+        </div>
+        <div id="recovery-progress-card" class="card mb-4"></div>
+        <div id="dashboard-bottom-content"></div>
+    </div>`;
+		
         document.getElementById('myday-page').innerHTML = `<div class="page-header"><h2 id="myday-title">My Day</h2><p id="myday-date"></p></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-6);"><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-tasks" style="margin-right: 8px;"></i>Today's Visits</h3></div><div id="myday-visits-list"></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-map-route" style="margin-right: 8px;"></i>Today's Map Route</h3></div><div id="myday-map-view" style="height: 400px; border-radius: 8px;"></div></div><div class="card"><div class="card-header"><h3 class="card-title"><i class="fas fa-hand-holding-usd" style="margin-right: 8px;"></i>Follow-ups Due Today</h3></div><div id="myday-promises-list"></div></div><div class="card" style="border-color: var(--danger);"><div class="card-header"><h3 class="card-title" style="color: var(--danger);"><i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>Overdue Tasks</h3></div><div id="myday-overdue-list"></div></div></div>`;
         document.getElementById('visits-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Upcoming Visits</div><div id="visit-kpi-upcoming" class="value">0</div></div><div class="kpi-card"><div class="title">Overdue Visits</div><div id="visit-kpi-overdue" class="value">0</div></div><div class="kpi-card"><div class="title">Completed Today</div><div id="visit-kpi-completed-today" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><div class="d-flex gap-2"><button class="btn btn-outline visit-view-tab active" data-view="list"><i class="fas fa-list"></i> List View</button><button class="btn btn-outline visit-view-tab" data-view="calendar"><i class="fas fa-calendar"></i> Calendar View</button><button class="btn btn-outline visit-view-tab" data-view="map"><i class="fas fa-map-marked-alt"></i> Map View</button></div><div id="visits-header-actions" class="d-flex gap-2"></div></div><div id="list-view-controls" class="d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap"><div class="d-flex gap-2" data-role="admin"><div class="input-with-icon"><input type="search" id="visit-search" placeholder="Search customer or purpose..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="visit-consultant-filter" class="form-control" style="width: auto;"><option value="all">All Consultants</option></select></div><button class="btn filter-btn visit-filter-btn active" data-filter="Upcoming">Upcoming</button><button class="btn filter-btn visit-filter-btn" data-filter="Today">Today</button><button class="btn filter-btn visit-filter-btn" data-filter="Overdue">Overdue</button><button class="btn filter-btn visit-filter-btn" data-filter="All">All Visits</button></div><div class="d-flex gap-2 align-items-center flex-wrap"><input type="date" id="visit-start-date" class="form-control" style="width:auto;"><div class="d-flex gap-1"><button class="btn btn-outline" id="set-visit-date-today">Today</button><button class="btn btn-outline" id="set-visit-date-tomorrow">Tomorrow</button></div><span>to</span><input type="date" id="visit-end-date" class="form-control" style="width:auto;"><button class="btn btn-primary" id="visit-date-apply">Apply</button></div></div><div id="map-view-controls" class="hidden d-flex justify-content-between align-items-center my-4 flex-wrap gap-4"><div class="d-flex gap-2 flex-wrap align-items-center"><div data-role="admin" class="form-group mb-0"><label for="map-consultant-filter">Consultant</label><select id="map-consultant-filter" class="form-control"></select></div><div class="form-group mb-0"><label for="map-date-filter">Date</label><input type="date" id="map-date-filter" class="form-control"></div></div><button id="clear-route-btn" class="btn btn-outline hidden"><i class="fas fa-times"></i> Clear Route</button></div><div id="list-view-content" class="visit-view-content"><div class="table-container"><table class="data-table"><thead></thead><tbody id="visit-table-body"></tbody></table></div><div id="visits-pagination" class="pagination-controls"></div></div><div id="calendar-view-content" class="visit-view-content hidden"><div id="calendar-view" style="min-height: 600px;"></div></div><div id="map-view-content" class="visit-view-content hidden"><div id="map-view" style="height: 600px; border-radius: 8px;"></div></div></div>`; 
         document.getElementById('payments-page').innerHTML = `<div class="kpi-card-grid"><div class="kpi-card"><div class="title">Recovered This Month</div><div id="payment-kpi-recovered-month" class="value">0</div></div><div class="kpi-card"><div class="title">Total Payments Recorded</div><div id="payment-kpi-total-count" class="value">0</div></div><div class="kpi-card"><div class="title">Pending Payments</div><div id="payment-kpi-pending" class="value">0</div></div></div><div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><h3 class="card-title">Recent Payments</h3><div class="d-flex gap-2"><div class="input-with-icon"><input type="search" id="payment-search" placeholder="Search customer..." class="form-control" style="width: auto;"><i class="fas fa-times-circle icon clear-icon"></i></div><select id="payment-status-filter" class="form-control" style="width: auto;"><option value="all">All Status</option><option>Completed</option><option>Pending</option><option>Failed</option></select><select id="payment-method-filter" class="form-control" style="width: auto;"><option value="all">All Methods</option><option>Bank Transfer</option><option>Cheque</option><option>Cash</option></select></div><div class="d-flex gap-2"><div data-role="admin" class="d-flex gap-2"><button class="btn btn-outline" id="export-payments-csv"><i class="fas fa-file-csv"></i> CSV</button><button class="btn btn-outline" id="export-payments-pdf"><i class="fas fa-file-pdf"></i> PDF</button></div><button class="btn btn-success" id="record-payment-btn"><i class="fas fa-plus"></i> Record Payment</button></div></div><div class="table-container"><table class="data-table"><thead><tr><th data-sort="date">Date</th><th data-sort="customerId">Customer</th><th data-sort="consultantId">Consultant</th><th data-sort="amount">Amount</th><th data-sort="method">Method</th><th data-sort="status">Status</th><th>Actions</th></tr></thead><tbody id="payment-table-body"></tbody></table></div><div id="payments-pagination" class="pagination-controls"></div></div>`; 
@@ -2265,6 +2311,12 @@ Object.assign(App.Dashboard, {
             if (e.target.id === 'end-day-btn') this.endDay(); 
             if (e.target.id === 'start-break-btn') this.startBreak(); 
             if (e.target.id === 'end-break-btn') this.endBreak(); 
+            
+            // NEW: Handle Upcoming Visits Tile Click
+            if (e.target.closest('#upcoming-visits-tile')) {
+                this.showUpcomingVisitsPopup();
+            }
+
             if (e.target.closest('#toggle-dashboard-view-btn')) { 
                 App.state.adminDashboardView = App.state.adminDashboardView === 'overview' ? 'chart_view' : 'overview'; this.render(); 
             }
@@ -2274,6 +2326,34 @@ Object.assign(App.Dashboard, {
             }
         });
     }, 
+
+    // NEW FUNCTION: Logic for the popup list
+    showUpcomingVisitsPopup: function() {
+        const consultantId = App.state.currentUser.assignedConsultantId;
+        // Force string comparison for the consultant ID
+        const visits = App.Helpers.getScopedData('visits', consultantId)
+            .filter(v => (v.status === 'Scheduled' || v.status === 'In Progress') && new Date(v.dateTime) >= new Date())
+            .sort((a,b) => new Date(a.dateTime) - new Date(b.dateTime));
+
+        if (visits.length === 0) {
+            return App.UI.toast('No upcoming visits scheduled.', 'info');
+        }
+
+        const customers = App.DB.get('customers');
+        const headers = ['Date & Time', 'Customer Name', 'Purpose'];
+        
+        const data = visits.map(v => {
+            const customer = customers.find(c => String(c.accountNo) === String(v.customerId));
+            return [
+                App.Helpers.formatDateTime(v.dateTime),
+                customer ? customer.companyName : 'N/A',
+                v.purpose
+            ];
+        });
+
+        App.Reports.displayReport('My Upcoming Visits', headers, data, '', ['pdf']);
+    },
+
     render() { 
         const consultantDashboardHeader = document.getElementById('consultant-dashboard-header');
         const adminDashboardWrapper = document.getElementById('admin-dashboard-wrapper');
@@ -2292,8 +2372,8 @@ Object.assign(App.Dashboard, {
             const consultant = App.DB.get('consultants').find(c => c.id === App.state.activeConsultantId);
             consultantDashboardHeader.innerHTML = `<h3 class="mb-0">Viewing Dashboard for: ${consultant.name}</h3><button class="btn btn-outline" onclick="App.UI.navigateTo('dashboard')">Back to Main Dashboard</button>`;
             consultantDashboardHeader.classList.remove('hidden');
-            adminDashboardWrapper.style.display = 'none'; // Hide the admin-specific dashboard
-            chartWrapper.classList.remove('hidden'); // Make sure the user dashboard container is visible
+            adminDashboardWrapper.style.display = 'none'; 
+            chartWrapper.classList.remove('hidden'); 
             this.renderUserDashboard(App.state.activeConsultantId);
             return;
         }
@@ -2314,7 +2394,7 @@ Object.assign(App.Dashboard, {
                 document.getElementById('admin-dashboard-content').innerHTML = ''; 
                 toggleBtn.innerHTML = `<i class="fas fa-tachometer-alt"></i> Switch to Overview`; 
                 this.renderUserDashboard();
-                this.renderAdminChartDashboard(); // Special render for admin chart view
+                this.renderAdminChartDashboard(); 
             } 
         } else { 
             adminWrapper.classList.add('hidden'); 
