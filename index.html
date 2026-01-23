@@ -4009,11 +4009,16 @@ Object.assign(App.Visits, {
         const paginatedVisits = visits.slice(startIndex, startIndex + rowsPerPage);
         
         const customers = App.DB.get('customers'); 
-        const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
+        const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[String(c.id)] = c.name; return map; }, {});
         const tbody = document.getElementById('visit-table-body'); 
+        
         if (paginatedVisits.length > 0) {
             tbody.innerHTML = paginatedVisits.map(v => { 
-                const consultantCell = isAdmin ? `<td>${consultantMap[v.collectorId] || 'N/A'}</td>` : '';
+                // FIX: Force IDs to strings for comparison
+                const customerObj = customers.find(c => String(c.accountNo) === String(v.customerId));
+                const customerName = customerObj ? customerObj.companyName : 'N/A';
+                
+                const consultantCell = isAdmin ? `<td>${consultantMap[String(v.collectorId)] || 'N/A'}</td>` : '';
                 
                 const actions = [];
                 if (v.status === 'Scheduled' || v.status === 'Overdue') {
@@ -4032,7 +4037,7 @@ Object.assign(App.Visits, {
                     actions.push(`<button class="btn btn-danger delete-visit" data-id="${v.id}" title="Delete"><i class="fas fa-trash"></i></button>`);
                 }
                 
-                return `<tr><td>${App.Helpers.formatDateTime(v.dateTime)}</td><td>${customers.find(c => c.accountNo === v.customerId)?.companyName || 'N/A'}</td><td>${v.purpose}</td>${consultantCell}<td><span class="status-badge ${v.status.toLowerCase().replace(' ','-')}">${v.status}</span></td><td><div class="d-flex gap-2">${actions.join('')}</div></td></tr>`; 
+                return `<tr><td>${App.Helpers.formatDateTime(v.dateTime)}</td><td>${customerName}</td><td>${v.purpose}</td>${consultantCell}<td><span class="status-badge ${v.status.toLowerCase().replace(' ','-')}">${v.status}</span></td><td><div class="d-flex gap-2">${actions.join('')}</div></td></tr>`; 
             }).join('');
         } else {
             const buttonHTML = `<button class="btn btn-primary" onclick="App.Visits.showScheduleModal()"><i class="fas fa-plus"></i> Schedule a Visit</button>`;
@@ -4468,14 +4473,20 @@ Object.assign(App.Payments, {
         const paginatedPayments = filteredPayments.slice(startIndex, startIndex + rowsPerPage);
         
         const customers = App.DB.get('customers');
-        const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
+        const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[String(c.id)] = c.name; return map; }, {});
         const tbody = document.getElementById('payment-table-body');
+        
         if (paginatedPayments.length > 0) {
             tbody.innerHTML = paginatedPayments.map(p => { 
-                const customer = customers.find(c => c.accountNo === p.customerId); 
-                const consultantName = customer ? consultantMap[customer.salesConsultantId] || 'N/A' : 'N/A';
+                // FIX: Force comparison as strings
+                const customer = customers.find(c => String(c.accountNo) === String(p.customerId)); 
+                const customerName = customer ? customer.companyName : 'N/A';
+                
+                // Ensure consultant ID is also treated as a string for lookup
+                const consultantName = customer ? consultantMap[String(customer.salesConsultantId)] || 'N/A' : 'N/A';
+                
                 const actions = [ `<button class="btn btn-outline view-payment" data-id="${p.id}" title="View Details"><i class="fas fa-eye"></i></button>`, App.state.currentUser.role === 'admin' ? `<button class="btn btn-danger delete-payment" data-id="${p.id}" title="Delete"><i class="fas fa-trash"></i></button>` : '' ].join(''); 
-                return `<tr><td>${App.Helpers.formatDate(p.date)}</td><td>${customer ? customer.companyName : 'N/A'}</td><td>${consultantName}</td><td>${App.Helpers.formatCurrency(p.amount)}</td><td>${p.method}</td><td><span class="status-badge ${p.status.toLowerCase()}">${p.status}</span></td><td><div class="d-flex gap-2">${actions}</div></td></tr>`; 
+                return `<tr><td>${App.Helpers.formatDate(p.date)}</td><td>${customerName}</td><td>${consultantName}</td><td>${App.Helpers.formatCurrency(p.amount)}</td><td>${p.method}</td><td><span class="status-badge ${p.status.toLowerCase()}">${p.status}</span></td><td><div class="d-flex gap-2">${actions}</div></td></tr>`; 
             }).join('');
         } else {
             const buttonHTML = `<button class="btn btn-success" onclick="App.Payments.showPaymentForm()"><i class="fas fa-plus"></i> Record First Payment</button>`;
@@ -7707,16 +7718,25 @@ Object.assign(App.Helpers, {
         
         const effectiveConsultantId = user.assignedConsultantId;
         const allCustomers = App.DB.get('customers');
-        const scopedCustomers = allCustomers.filter(c => c.salesConsultantId === effectiveConsultantId);
+        
+        // FIX: Match consultant ID as string
+        const scopedCustomers = allCustomers.filter(c => String(c.salesConsultantId) === String(effectiveConsultantId));
         
         if (dataType === 'customers') return scopedCustomers;
         
-        const scopedCustomerIds = scopedCustomers.map(c => c.accountNo);
+        const scopedCustomerIds = scopedCustomers.map(c => String(c.accountNo));
         
-        if (dataType === 'visits') return App.DB.get('visits').filter(v => v.collectorId === effectiveConsultantId);
-        if (dataType === 'payments') return App.DB.get('payments').filter(p => scopedCustomerIds.includes(p.customerId));
+        if (dataType === 'visits') {
+            // FIX: Match collector ID as string
+            return App.DB.get('visits').filter(v => String(v.collectorId) === String(effectiveConsultantId));
+        }
         
-        return App.DB.get(dataType); // Fallback for other data types
+        if (dataType === 'payments') {
+            // FIX: Match customer IDs as strings
+            return App.DB.get('payments').filter(p => scopedCustomerIds.includes(String(p.customerId)));
+        }
+        
+        return App.DB.get(dataType); 
     },
     logActivity(action, details = '', customerId = null, amount = null, visitId = null, duration = null) {
         if (App.state.currentUser.role !== 'user') return;
