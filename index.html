@@ -87,84 +87,107 @@
     .page { display: none; } .page.active { display: block; animation: fadeIn 0.5s ease-in-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     /* --- Tablet & iPad Optimized Layout --- */
-      @media (max-width: 1180px) {
+        @media (max-width: 1180px) {
         .app-container { 
-            grid-template-columns: 80px 1fr !important; /* Maintain distinct columns */
-            overflow: hidden;
+            grid-template-columns: 80px 1fr !important; 
         }
 
         .sidebar {
             width: 80px !important;
-            z-index: 2000 !important; /* Force sidebar to stay on TOP layer */
-            position: relative;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            z-index: 2000 !important;
+            position: fixed; /* Keep sidebar fixed so content doesn't slide under */
+            height: 100vh;
         }
 
-        /* Hide text labels on iPad to save space, show only icons */
-        .sidebar .logo-text, 
-        .sidebar .nav-text, 
-        .sidebar-heading { 
-            display: none !important; 
-        }
-
-        /* Center the icons in the sidebar */
-        .nav-link {
-            justify-content: center !important;
-            padding: 15px 0 !important;
-        }
-
-        .nav-link i {
-            font-size: 1.4rem;
-            margin: 0 !important;
-        }
-
-        /* Fix the Overlapping Buttons & Filters */
-        .card-header, 
-        .d-flex.gap-2.flex-wrap,
-        #list-view-controls {
-            display: flex !important;
-            flex-direction: column !important; /* Stack items vertically on iPad */
-            align-items: flex-start !important;
-            gap: 15px !important;
-        }
-
-        /* Make search bars and dropdowns full width so they don't crowd each other */
-        .input-with-icon, 
-        .form-control, 
-        .btn-group {
-            width: 100% !important;
-        }
-
-        /* Ensure the main content doesn't slide under the sidebar */
         .main-content {
-            width: auto;
-            padding: 15px !important;
-            overflow-x: hidden;
+            margin-left: 80px; /* Offset for fixed sidebar */
+            padding: 20px !important;
         }
 
-        /* Fix the 'Today/Tomorrow' date filter overlap */
-        .d-flex.gap-2.align-items-center.flex-wrap {
+        /* 1. TOP HEADER ACTIONS (View Tabs & Buttons) */
+        #visits-page .card-header {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 20px !important;
+            padding-bottom: 20px;
+        }
+
+        /* View switcher tabs in a nice row */
+        .visit-view-tab {
+            flex: 1;
+            padding: 10px !important;
+            font-size: 0.85rem;
+        }
+
+        /* 2. FILTER CONTROLS GRID */
+        #list-view-controls {
+            display: grid !important;
+            grid-template-columns: 1fr !important; /* Stack logical groups */
+            gap: 20px !important;
+            background: var(--bg-color);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+        }
+
+        /* Search and Consultant Select - Side by Side */
+        #list-view-controls > .d-flex:first-child {
             display: grid !important;
             grid-template-columns: 1fr 1fr;
-            width: 100%;
             gap: 10px;
+            width: 100%;
         }
-        
-        /* Floating Action Button (Red +) Fix */
-        .fab-container {
-            bottom: 20px !important;
-            right: 20px !important;
-            z-index: 3000 !important;
-        }
-    }
 
-    /* Fix for the Top Header on iPad */
-    @media (max-width: 1180px) {
-        .main-header {
-            padding: 10px 15px !important;
+        /* Status Buttons (Upcoming, Today, etc.) in a Row */
+        .visit-filter-btn {
+            flex: 1;
+            min-width: 80px;
+            height: 40px !important;
+            padding: 0 !important;
         }
-        #username-display {
-            display: none; /* Hide name on iPad to save space */
+
+        /* 3. DATE RANGE ALIGNMENT */
+        #list-view-controls > .d-flex:last-child {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr; /* Two dates per row */
+            grid-template-areas: 
+                "start end"
+                "shortcuts apply";
+            gap: 12px;
+            align-items: center;
+        }
+
+        #visit-start-date { grid-area: start; }
+        #visit-end-date { grid-area: end; }
+        
+        /* Today/Tomorrow buttons grouped */
+        .d-flex.gap-1 { 
+            grid-area: shortcuts; 
+            width: 100%;
+        }
+        .d-flex.gap-1 button { flex: 1; }
+
+        #visit-date-apply { 
+            grid-area: apply; 
+            width: 100%;
+            background: var(--primary) !important;
+        }
+
+        /* Fix the "to" label */
+        #list-view-controls span {
+            display: none; /* Hide the word 'to' to save space */
+        }
+
+        /* Table Optimization */
+        .table-container {
+            border-radius: 8px;
+            box-shadow: none;
+            overflow-x: auto;
+        }
+
+        .data-table th {
+            font-size: 0.8rem;
+            white-space: nowrap;
         }
     }
     @media (max-width: 768px) { .app-container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; } .sidebar { position: fixed; top: 0; left: 0; height: 100%; transform: translateX(-100%); box-shadow: var(--shadow); } .sidebar.open { transform: translateX(0); } .sidebar .logo-text, .sidebar .nav-text, .sidebar-heading { display: inline; } .sidebar .nav-link { justify-content: flex-start; } .hamburger { display: block !important; } }
