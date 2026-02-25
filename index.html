@@ -5364,7 +5364,7 @@ Object.assign(App.Reports, {
                     }
                     
                     return `<tr>
-                        <td style="white-space:nowrap;">${App.Helpers.formatDate(e.date)} ${e.time}</td>
+                        <td style="white-space:nowrap;">${App.Helpers.formatDate(e.date)} ${String(e.time).replace(/[\u00A0\u202F]/g, ' ')}</td>
                         <td>${consName}</td>
                         <td style="${style}">${actionLabel}</td>
                         <td>${customerName}</td>
@@ -5388,7 +5388,18 @@ Object.assign(App.Reports, {
                 </div>
             `;
 
-            this.displayReport(reportTitle, [], [], summaryContent); 
+            // Prepare data for the Export buttons in Summary View
+            const exportHeaders = ['Date', 'Time', 'Consultant', 'Action', 'Customer', 'Details'];
+            const exportData = timelineEvents.map(e => [
+                App.Helpers.formatDate(e.date),
+                e.time,
+                consultantMap[e.consultantId] || 'Unknown',
+                e.action,
+                e.customerId ? (customerMap[e.customerId] ? customerMap[e.customerId].companyName : '-') : '-',
+                App.Helpers.stripHtml(e.details || '-') // Cleans up HTML tags for the CSV
+            ]);
+
+            this.displayReport(reportTitle, exportHeaders, exportData, summaryContent);
         } else { 
             // --- TABLE VIEW (Case Insensitive Updates) ---
             const customerMap = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c; return map;}, {});
@@ -5436,7 +5447,7 @@ Object.assign(App.Reports, {
 
                 return [
                     App.Helpers.formatDate(entry.date), 
-                    entry.time, 
+					String(entry.time).replace(/[\u00A0\u202F]/g, ' '), 
                     rowConsultantName,
                     category, 
                     customerName, 
@@ -5732,7 +5743,7 @@ Object.assign(App.Reports, {
                 </div>
             </div>`;
 
-        this.displayReport('Customer Status Report', [], [], content);
+        this.displayReport('Customer Status Report', tableHeaders, tableData, content);
 
         if(this.charts.customerStatusCount) this.charts.customerStatusCount.destroy();
         this.charts.customerStatusCount = new Chart(document.getElementById('customer-status-chart-count'), {
@@ -7745,7 +7756,7 @@ Object.assign(App.Offline, {
 });
 Object.assign(App.Helpers, { 
     tagColors: {},
-    formatCurrency: (a) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a),
+    formatCurrency: (a) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a).replace(/[\u00A0\u202F]/g, ' '),
 	highlightMatch: (text, query) => {
         if (!query || query.length < 2 || !text) return text;
         const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
@@ -7820,8 +7831,7 @@ Object.assign(App.Helpers, {
     formatDateTime: (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        // Format: "25 Oct 2025, 10:30 am"
-        return date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+        return date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/[\u00A0\u202F]/g, ' ');
     }, 
     parseCSVDate(dateStr) {
         if (!dateStr || typeof dateStr !== 'string') return null;
@@ -8148,11 +8158,29 @@ Object.assign(App.Helpers, {
         URL.revokeObjectURL(link.href);
     },
     exportToCSV(filename, headers, data) {
-        let csvContent = headers.join(",") + "\r\n";
+        // 1. Add "\uFEFF" (UTF-8 BOM) to the start so Excel reads characters correctly
+        let csvContent = "\uFEFF" + headers.join(",") + "\r\n";
+        
         data.forEach(rowArray => {
-            let row = rowArray.map(item => `"${String(item || '').replace(/"/g, '""')}"`).join(",");
+            let row = rowArray.map(item => {
+                let str = String(item || '');
+                
+                // 2. Replace non-breaking spaces with normal spaces (Fixes the "AEDÂ" issue)
+                str = str.replace(/\u00A0/g, ' ');
+                
+                // 3. Replace narrow spaces before AM/PM with normal spaces (Fixes the Time issue)
+                str = str.replace(/\u202F/g, ' ');
+                
+                // 4. Remove invisible Left-to-Right marks added by browsers
+                str = str.replace(/[\u200E\u200F\u202A-\u202E]/g, '');
+                
+                // 5. Escape quotes for standard CSV formatting
+                return `"${str.replace(/"/g, '""')}"`;
+            }).join(",");
+            
             csvContent += row + "\r\n";
         });
+        
         this.downloadBlob(csvContent, filename, 'text/csv;charset=utf-8;');
     },
     exportToPDF(filename, title, headers, data) {
