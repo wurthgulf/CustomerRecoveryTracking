@@ -5364,7 +5364,7 @@ Object.assign(App.Reports, {
                     }
                     
                     return `<tr>
-                        <td style="white-space:nowrap;">${App.Helpers.formatDate(e.date)} ${String(e.time).replace(/[\u00A0\u202F]/g, ' ')}</td>
+                        <td style="white-space:nowrap;">${App.Helpers.formatDate(e.date)} ${String(e.time).replace(/[^a-zA-Z0-9: ]/g, '').trim()}</td>
                         <td>${consName}</td>
                         <td style="${style}">${actionLabel}</td>
                         <td>${customerName}</td>
@@ -5390,14 +5390,18 @@ Object.assign(App.Reports, {
 
             // Prepare data for the Export buttons in Summary View
             const exportHeaders = ['Date', 'Time', 'Consultant', 'Action', 'Customer', 'Details'];
-            const exportData = timelineEvents.map(e => [
-                App.Helpers.formatDate(e.date),
-                e.time,
-                consultantMap[e.consultantId] || 'Unknown',
-                e.action,
-                e.customerId ? (customerMap[e.customerId] ? customerMap[e.customerId].companyName : '-') : '-',
-                App.Helpers.stripHtml(e.details || '-') // Cleans up HTML tags for the CSV
-            ]);
+            const exportData = timelineEvents.map(e => {
+                // Scrub hidden Unicode characters from historical times
+                const cleanTime = String(e.time || '').replace(/[^0-9a-zA-Z:]/g, ' ').replace(/\s+/g, ' ').trim();
+                return [
+                    App.Helpers.formatDate(e.date),
+                    cleanTime,
+                    consultantMap[e.consultantId] || 'Unknown',
+                    e.action,
+                    e.customerId ? (customerMap[e.customerId] ? customerMap[e.customerId].companyName : '-') : '-',
+                    App.Helpers.stripHtml(e.details || '-')
+                ];
+            });
 
             this.displayReport(reportTitle, exportHeaders, exportData, summaryContent);
         } else { 
@@ -5445,9 +5449,11 @@ Object.assign(App.Reports, {
                     category = 'Customer'; actionOutcome = 'New Account';
                 }
 
+                const cleanTime = String(entry.time || '').replace(/[^0-9a-zA-Z:]/g, ' ').replace(/\s+/g, ' ').trim();
+                
                 return [
                     App.Helpers.formatDate(entry.date), 
-					String(entry.time).replace(/[\u00A0\u202F]/g, ' '), 
+                    cleanTime, 
                     rowConsultantName,
                     category, 
                     customerName, 
@@ -5572,7 +5578,7 @@ Object.assign(App.Reports, {
         consultantsToReportOn.forEach(c => { consultantData[c.id] = { name: c.name, totalVisits: 0, completedVisits: 0, scheduledVisits: 0, overdueVisits: 0, successfulVisits: 0, visitDetails: [] }; });
         visits.forEach(visit => {
             if (!consultantData[visit.collectorId]) return;
-            const customerName = customers.find(c => c.accountNo === visit.customerId)?.companyName || 'N/A';
+            const customerName = customers.find(c => String(c.accountNo).trim() === String(visit.customerId).trim())?.companyName || 'N/A';
             consultantData[visit.collectorId].totalVisits++;
             if (visit.status === 'Completed') { consultantData[visit.collectorId].completedVisits++; if (['Paid in Full', 'Partial Payment', 'Promise to Pay'].includes(visit.outcome)) consultantData[visit.collectorId].successfulVisits++; } 
             else if (visit.status === 'Scheduled') consultantData[visit.collectorId].scheduledVisits++; 
@@ -7756,7 +7762,7 @@ Object.assign(App.Offline, {
 });
 Object.assign(App.Helpers, { 
     tagColors: {},
-    formatCurrency: (a) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'AED', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(a).replace(/[\u00A0\u202F]/g, ' '),
+    formatCurrency: (a) => 'AED ' + (parseFloat(String(a).replace(/[^0-9.-]+/g,"")) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 	highlightMatch: (text, query) => {
         if (!query || query.length < 2 || !text) return text;
         const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
@@ -7831,7 +7837,15 @@ Object.assign(App.Helpers, {
     formatDateTime: (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        return date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/[\u00A0\u202F]/g, ' ');
+        const day = date.getDate();
+        const month = date.toLocaleString('en-US', { month: 'short' });
+        const year = date.getFullYear();
+        let hours = date.getHours();
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // the hour '0' should be '12'
+        return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
     }, 
     parseCSVDate(dateStr) {
         if (!dateStr || typeof dateStr !== 'string') return null;
@@ -8193,7 +8207,7 @@ Object.assign(App.Helpers, {
     exportTableData(format, entityName, getDataCallback, displayColumns) {
         const allData = getDataCallback();
         const consultantMap = App.DB.get('consultants').reduce((map, c) => { map[c.id] = c.name; return map; }, {});
-        const customerMap = App.DB.get('customers').reduce((map, c) => { map[c.accountNo] = c.companyName; return map; }, {});
+        const customerMap = App.DB.get('customers').reduce((map, c) => { map[String(c.accountNo).trim()] = c.companyName; return map; }, {});
         const customerForecasts = App.DB.get('customerForecasts');
         const currentMonthStr = `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
 
@@ -8215,7 +8229,7 @@ Object.assign(App.Helpers, {
                     case 'consultantId':
                         return consultantMap[value] || 'N/A';
                     case 'customerId':
-                        return customerMap[value] || 'N/A';
+                        return customerMap[String(value).trim()] || 'N/A';
                     case 'dateTime':
                     case 'date':
                         return App.Helpers.formatDate(value);
